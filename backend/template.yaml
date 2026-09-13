@@ -1,0 +1,59 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: Photo App Backend
+
+Globals:
+  Function:
+    Timeout: 20
+    MemorySize: 512
+    Runtime: nodejs18.x
+
+Resources:
+  PhotoAppFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: .
+      Handler: src/lambda.handler
+      Events:
+        ApiEvent:
+          Type: Api
+          Properties:
+            RestApiId: !Ref PhotoAppApi
+            Path: /{proxy+}
+            Method: ANY
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref PhotoTable
+        - S3CrudPolicy:
+            BucketName: !Ref PhotoBucket
+
+  PhotoAppApi:
+    Type: AWS::Serverless::Api
+    Properties:
+      StageName: prod
+
+  PhotoTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: PhotoTable
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: userId
+          AttributeType: S
+        - AttributeName: photoId
+          AttributeType: S
+      KeySchema:
+        - AttributeName: userId
+          KeyType: HASH
+        - AttributeName: photoId
+          KeyType: RANGE
+
+  PhotoBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub 'photo-app-${AWS::AccountId}'
+
+Outputs:
+  PhotoAppApi:
+    Description: API Gateway endpoint
+    Value: !Sub 'https://${PhotoAppApi}.execute-api.${AWS::Region}.amazonaws.com/prod'
