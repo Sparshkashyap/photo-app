@@ -1,25 +1,40 @@
-// Authentication middleware
-// Verifies JWT tokens and protects routes
+const jwt = require("jsonwebtoken");
 
-const jwt = require('../utils/jwt');
-
-const authenticateToken = (req, res, next) => {
-  const authHeader = req.headers['authorization'];
-  const token = authHeader && authHeader.split(' ')[1];
-
-  if (!token) {
-    return res.status(401).json({ error: 'No token provided' });
-  }
-
+const authMiddleware = (req, res, next) => {
   try {
-    const decoded = jwt.verifyToken(token);
-    req.user = decoded;
+    const authHeader = req.headers.authorization;
+
+    if (!authHeader) {
+      return res.status(401).json({
+        success: false,
+        message: "Authorization token is required",
+      });
+    }
+
+    const token = authHeader.startsWith("Bearer ")
+      ? authHeader.split(" ")[1]
+      : null;
+
+    if (!token) {
+      return res.status(401).json({
+        success: false,
+        message: "Invalid authorization format",
+      });
+    }
+
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+
+    req.user = {
+      userId: decoded.userId,
+    };
+
     next();
   } catch (error) {
-    res.status(403).json({ error: 'Invalid token' });
+    return res.status(401).json({
+      success: false,
+      message: "Invalid or expired token",
+    });
   }
 };
 
-module.exports = {
-  authenticateToken,
-};
+module.exports = authMiddleware;

@@ -1,35 +1,86 @@
-// Photo controller
-// Handles photo upload, retrieval, and management
+const crypto = require("crypto");
 
-const getPhotos = async (req, res) => {
+const {
+  createUploadUrl,
+  createDownloadUrl,
+} = require("../services/s3Service");
+
+const {
+  sanitizeFileName,
+  allowedImageTypes,
+} = require("../utils/validation");
+
+const uploadPhoto = async (req, res, next) => {
   try {
-    // TODO: Implement get photos logic
-    res.json({ message: 'Get photos endpoint' });
+    const { fileName, contentType } = req.body;
+
+    if (!fileName || !contentType) {
+      return res.status(400).json({
+        success: false,
+        message: "fileName and contentType are required",
+      });
+    }
+
+    if (!allowedImageTypes.includes(contentType)) {
+      return res.status(400).json({
+        success: false,
+        message: "Unsupported image type",
+      });
+    }
+
+    const safeFileName = sanitizeFileName(fileName);
+
+    const photoId = crypto.randomUUID();
+
+    const key = `photos/${req.user.userId}/${photoId}-${safeFileName}`;
+
+    const uploadUrl = await createUploadUrl({
+      key,
+      contentType,
+    });
+
+    return res.status(200).json({
+      success: true,
+      uploadUrl,
+      key,
+    });
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    next(error);
   }
 };
 
-const uploadPhoto = async (req, res) => {
+const downloadPhoto = async (req, res, next) => {
   try {
-    // TODO: Implement upload photo logic
-    res.json({ message: 'Upload photo endpoint' });
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
-};
+    const { key } = req.query;
 
-const deletePhoto = async (req, res) => {
-  try {
-    // TODO: Implement delete photo logic
-    res.json({ message: 'Delete photo endpoint' });
+    if (!key) {
+      return res.status(400).json({
+        success: false,
+        message: "Photo key is required",
+      });
+    }
+
+    const userPrefix = `photos/${req.user.userId}/`;
+
+    if (!key.startsWith(userPrefix)) {
+      return res.status(403).json({
+        success: false,
+        message: "You are not allowed to access this photo",
+      });
+    }
+
+    const downloadUrl = await createDownloadUrl(key);
+
+    return res.status(200).json({
+      success: true,
+      downloadUrl,
+    });
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    next(error);
   }
 };
 
 module.exports = {
-  getPhotos,
   uploadPhoto,
-  deletePhoto,
+  downloadPhoto,
 };

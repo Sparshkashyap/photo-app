@@ -1,53 +1,60 @@
-// DynamoDB service
-// Handles all database operations
+const {
+  DynamoDBClient,
+} = require("@aws-sdk/client-dynamodb");
 
-const AWS = require('aws-sdk');
-const dynamodb = new AWS.DynamoDB.DocumentClient();
+const {
+  DynamoDBDocumentClient,
+  GetCommand,
+  PutCommand,
+  QueryCommand,
+} = require("@aws-sdk/lib-dynamodb");
+
+const client = new DynamoDBClient({
+  region: process.env.AWS_REGION,
+});
+
+const dynamoDB = DynamoDBDocumentClient.from(client);
 
 const getItem = async (tableName, key) => {
-  try {
-    const params = {
+  const result = await dynamoDB.send(
+    new GetCommand({
       TableName: tableName,
       Key: key,
-    };
-    const result = await dynamodb.get(params).promise();
-    return result.Item;
-  } catch (error) {
-    console.error('Error getting item:', error);
-    throw error;
-  }
+    })
+  );
+
+  return result.Item;
 };
 
 const putItem = async (tableName, item) => {
-  try {
-    const params = {
+  await dynamoDB.send(
+    new PutCommand({
       TableName: tableName,
       Item: item,
-    };
-    await dynamodb.put(params).promise();
-    return item;
-  } catch (error) {
-    console.error('Error putting item:', error);
-    throw error;
-  }
+    })
+  );
+
+  return item;
 };
 
-const deleteItem = async (tableName, key) => {
-  try {
-    const params = {
+const findUserByEmail = async (tableName, email) => {
+  const result = await dynamoDB.send(
+    new QueryCommand({
       TableName: tableName,
-      Key: key,
-    };
-    await dynamodb.delete(params).promise();
-    return { success: true };
-  } catch (error) {
-    console.error('Error deleting item:', error);
-    throw error;
-  }
+      IndexName: "email-index",
+      KeyConditionExpression: "email = :email",
+      ExpressionAttributeValues: {
+        ":email": email,
+      },
+      Limit: 1,
+    })
+  );
+
+  return result.Items?.[0] || null;
 };
 
 module.exports = {
   getItem,
   putItem,
-  deleteItem,
+  findUserByEmail,
 };

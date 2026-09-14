@@ -1,35 +1,110 @@
-// Authentication controller
-// Handles user login, signup, and token management
+const bcrypt = require("bcryptjs");
+const User = require("../models/User");
+const { generateToken } = require("../utils/jwt");
 
-const login = async (req, res) => {
+const signup = async (req, res, next) => {
   try {
-    // TODO: Implement login logic
-    res.json({ message: 'Login endpoint' });
+    const { name, email, password } = req.body;
+
+    if (!name || !email || !password) {
+      return res.status(400).json({
+        success: false,
+        message: "Name, email and password are required",
+      });
+    }
+
+    const normalizedEmail = email.toLowerCase().trim();
+
+    const existingUser = await User.findOne({
+      email: normalizedEmail,
+    });
+
+    if (existingUser) {
+      return res.status(409).json({
+        success: false,
+        message: "User already exists",
+      });
+    }
+
+    const hashedPassword = await bcrypt.hash(password, 12);
+
+    const user = await User.create({
+      name: name.trim(),
+      email: normalizedEmail,
+      password: hashedPassword,
+    });
+
+    const token = generateToken(user._id.toString());
+
+    return res.status(201).json({
+      success: true,
+      message: "Signup successful",
+      token,
+      user: {
+        id: user._id,
+        name: user.name,
+        email: user.email,
+      },
+    });
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    next(error);
   }
 };
 
-const signup = async (req, res) => {
+const login = async (req, res, next) => {
   try {
-    // TODO: Implement signup logic
-    res.json({ message: 'Signup endpoint' });
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
-};
+    const { email, password } = req.body;
 
-const logout = async (req, res) => {
-  try {
-    // TODO: Implement logout logic
-    res.json({ message: 'Logout endpoint' });
+    if (!email || !password) {
+      return res.status(400).json({
+        success: false,
+        message: "Email and password are required",
+      });
+    }
+
+    const normalizedEmail = email.toLowerCase().trim();
+
+    const user = await User.findOne({
+      email: normalizedEmail,
+    });
+
+    if (!user) {
+      return res.status(401).json({
+        success: false,
+        message: "Invalid email or password",
+      });
+    }
+
+    const passwordMatched = await bcrypt.compare(
+      password,
+      user.password
+    );
+
+    if (!passwordMatched) {
+      return res.status(401).json({
+        success: false,
+        message: "Invalid email or password",
+      });
+    }
+
+    const token = generateToken(user._id.toString());
+
+    return res.status(200).json({
+      success: true,
+      message: "Login successful",
+      token,
+      user: {
+        id: user._id,
+        name: user.name,
+        email: user.email,
+      },
+    });
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    next(error);
   }
 };
 
 module.exports = {
-  login,
   signup,
-  logout,
+  login,
 };

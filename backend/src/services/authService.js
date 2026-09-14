@@ -1,39 +1,122 @@
-// Authentication service
-// Handles authentication logic
+const bcrypt = require("bcryptjs");
+const crypto = require("crypto");
 
-const jwt = require('../utils/jwt');
-const validation = require('../utils/validation');
+const {
+  isValidEmail,
+  isValidPassword,
+  isValidName,
+} = require("../utils/validation");
 
-const registerUser = async (email, password) => {
-  try {
-    // Validate input
-    if (!validation.isValidEmail(email)) {
-      throw new Error('Invalid email format');
-    }
+const {
+  putItem,
+  findUserByEmail,
+} = require("./dynamoService");
 
-    if (!validation.isValidPassword(password)) {
-      throw new Error('Password does not meet requirements');
-    }
+const {
+  generateToken,
+} = require("../utils/jwt");
 
-    // TODO: Hash password and save to database
-    // TODO: Return user object with token
-    return { message: 'User registered successfully' };
-  } catch (error) {
-    console.error('Error registering user:', error);
+const USERS_TABLE = process.env.USERS_TABLE_NAME;
+
+const registerUser = async ({ name, email, password }) => {
+  if (!isValidName(name)) {
+    throw new Error("Name must contain at least 2 characters");
+  }
+
+  if (!isValidEmail(email)) {
+    throw new Error("Invalid email format");
+  }
+
+  if (!isValidPassword(password)) {
+    throw new Error("Password must contain at least 8 characters");
+  }
+
+  const normalizedEmail = email.trim().toLowerCase();
+
+  const existingUser = await findUserByEmail(
+    USERS_TABLE,
+    normalizedEmail
+  );
+
+  if (existingUser) {
+    const error = new Error(
+      "An account with this email already exists"
+    );
+    error.statusCode = 409;
     throw error;
   }
+
+  const userId = crypto.randomUUID();
+
+  const passwordHash = await bcrypt.hash(password, 12);
+
+  const user = {
+    userId,
+    name: name.trim(),
+    email: normalizedEmail,
+    passwordHash,
+    createdAt: new Date().toISOString(),
+  };
+
+  await putItem(USERS_TABLE, user);
+
+  const token = generateToken({
+    userId,
+  });
+
+  return {
+    token,
+    user: {
+      userId,
+      name: user.name,
+      email: user.email,
+    },
+  };
 };
 
-const loginUser = async (email, password) => {
-  try {
-    // TODO: Retrieve user from database
-    // TODO: Verify password
-    // TODO: Generate and return token
-    return { message: 'User logged in successfully' };
-  } catch (error) {
-    console.error('Error logging in user:', error);
+const loginUser = async ({ email, password }) => {
+  if (!isValidEmail(email)) {
+    const error = new Error("Invalid email or password");
+    error.statusCode = 401;
     throw error;
   }
+
+  const normalizedEmail = email.trim().toLowerCase();
+
+  const user = await findUserByEmail(
+    USERS_TABLE,
+    normalizedEmail
+  );
+
+  if (!user) {
+    const error = new Error("Invalid email or password");
+    error.statusCode = 401;
+    throw error;
+  }
+
+  const passwordMatches = await bcrypt.compare(
+    password,
+    user.passwordHash
+  );
+
+  if (!passwordMatches) {
+    const error = new Error("Invalid email or password");
+    error.statusCode = 401;
+    throw error;
+  }
+
+  const token = generateToken({
+    userId: user.userId,
+  });
+
+  return {
+    token,
+    user: {
+      userId: user.userId,
+      name: user.name,
+      email: user.email,
+    },
+  };
 };
 
 module.exports = {

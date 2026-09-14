@@ -1,24 +1,21 @@
-// JWT utility functions
-// Handles token generation and verification
-
-const jwt = require('jsonwebtoken');
+const jwt = require("jsonwebtoken");
 
 const generateToken = (payload) => {
-  const secret = process.env.JWT_SECRET || 'your-secret-key';
-  const expiresIn = process.env.JWT_EXPIRY || '24h';
+  if (!process.env.JWT_SECRET) {
+    throw new Error("JWT_SECRET is not configured");
+  }
 
-  return jwt.sign(payload, secret, { expiresIn });
+  return jwt.sign(payload, process.env.JWT_SECRET, {
+    expiresIn: process.env.JWT_EXPIRES_IN || "1d",
+  });
 };
 
 const verifyToken = (token) => {
-  const secret = process.env.JWT_SECRET || 'your-secret-key';
-
-  try {
-    return jwt.verify(token, secret);
-  } catch (error) {
-    console.error('Error verifying token:', error);
-    throw error;
+  if (!process.env.JWT_SECRET) {
+    throw new Error("JWT_SECRET is not configured");
   }
+
+  return jwt.verify(token, process.env.JWT_SECRET);
 };
 
 module.exports = {

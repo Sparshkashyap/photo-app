@@ -1,59 +1,155 @@
-AWSTemplateFormatVersion: '2010-09-09'
+AWSTemplateFormatVersion: "2010-09-09"
+
 Transform: AWS::Serverless-2016-10-31
-Description: Photo App Backend
+
+Description: Serverless backend for Photo App
 
 Globals:
   Function:
+    Runtime: nodejs20.x
     Timeout: 20
     MemorySize: 512
-    Runtime: nodejs18.x
+    Environment:
+      Variables:
+        USERS_TABLE_NAME: !Ref UsersTable
+        S3_BUCKET_NAME: !Ref PhotosBucket
+        JWT_EXPIRES_IN: "1d"
 
 Resources:
+
+  # -------------------------
+  # API Gateway
+  # -------------------------
+
+  PhotoApi:
+    Type: AWS::Serverless::HttpApi
+    Properties:
+      CorsConfiguration:
+        AllowOrigins:
+          - "*"
+        AllowHeaders:
+          - Content-Type
+          - Authorization
+        AllowMethods:
+          - GET
+          - POST
+          - OPTIONS
+
+  # -------------------------
+  # Lambda
+  # -------------------------
+
   PhotoAppFunction:
     Type: AWS::Serverless::Function
+
     Properties:
       CodeUri: .
+
       Handler: src/lambda.handler
+
+      Environment:
+        Variables:
+          JWT_SECRET: "{{resolve:ssm:/photo-app/JWT_SECRET}}"
+
+      Policies:
+
+        - DynamoDBCrudPolicy:
+            TableName: !Ref UsersTable
+
+        - S3CrudPolicy:
+            BucketName: !Ref PhotosBucket
+
       Events:
-        ApiEvent:
-          Type: Api
+
+        Root:
+          Type: HttpApi
           Properties:
-            RestApiId: !Ref PhotoAppApi
+            ApiId: !Ref PhotoApi
+            Path: /
+            Method: ANY
+
+        Proxy:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref PhotoApi
             Path: /{proxy+}
             Method: ANY
-      Policies:
-        - DynamoDBCrudPolicy:
-            TableName: !Ref PhotoTable
-        - S3CrudPolicy:
-            BucketName: !Ref PhotoBucket
 
-  PhotoAppApi:
-    Type: AWS::Serverless::Api
-    Properties:
-      StageName: prod
+  # -------------------------
+  # DynamoDB Users
+  # -------------------------
 
-  PhotoTable:
+  UsersTable:
     Type: AWS::DynamoDB::Table
+
     Properties:
-      TableName: PhotoTable
+      TableName: PhotoAppUsers
+
       BillingMode: PAY_PER_REQUEST
+
       AttributeDefinitions:
         - AttributeName: userId
           AttributeType: S
-        - AttributeName: photoId
+
+        - AttributeName: email
           AttributeType: S
+
       KeySchema:
         - AttributeName: userId
           KeyType: HASH
-        - AttributeName: photoId
-          KeyType: RANGE
 
-  PhotoBucket:
+      GlobalSecondaryIndexes:
+
+        - IndexName: email-index
+
+          KeySchema:
+            - AttributeName: email
+              KeyType: HASH
+
+          Projection:
+            ProjectionType: ALL
+
+  # -------------------------
+  # S3 Photos
+  # -------------------------
+
+  PhotosBucket:
     Type: AWS::S3::Bucket
+
     Properties:
-      BucketName: !Sub 'photo-app-${AWS::AccountId}'
+
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+
+      CorsConfiguration:
+
+        CorsRules:
+
+          - AllowedOrigins:
+              - "*"
+
+            AllowedMethods:
+              - GET
+              - PUT
+
+            AllowedHeaders:
+              - "*"
+
+            ExposedHeaders:
+              - ETag
 
 Outputs:
-  PhotoAppApi:
-    Description: API Gateway endpoint
-    Value: !Sub 'https://${PhotoAppApi}.execute-api.${AWS::Region}.amazonaws.com/prod'
+
+  ApiUrl:
+    Description: API Gateway URL
+
+    Value: !Sub "https://${PhotoApi}.execute-api.${AWS::Region}.amazonaws.com"
+
+  UsersTable:
+    Value: !Ref UsersTable
+
+  PhotosBucket:
+    Value: !Ref PhotosBucket

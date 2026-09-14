@@ -1,24 +1,32 @@
-// Validation utility functions
-
 const isValidEmail = (email) => {
-  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-  return emailRegex.test(email);
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
 };
 
 const isValidPassword = (password) => {
-  // At least 8 characters, 1 uppercase, 1 lowercase, 1 number
-  const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).{8,}$/;
-  return passwordRegex.test(password);
+  return typeof password === "string" && password.length >= 8;
 };
 
-const isValidPhotoId = (id) => {
-  // UUID format
-  const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-  return uuidRegex.test(id);
+const isValidName = (name) => {
+  return typeof name === "string" && name.trim().length >= 2;
 };
+
+const sanitizeFileName = (fileName) => {
+  return fileName
+    .replace(/[^a-zA-Z0-9._-]/g, "_")
+    .replace(/_+/g, "_");
+};
+
+const allowedImageTypes = [
+  "image/jpeg",
+  "image/jpg",
+  "image/png",
+  "image/webp",
+];
 
 module.exports = {
   isValidEmail,
   isValidPassword,
-  isValidPhotoId,
+  isValidName,
+  sanitizeFileName,
+  allowedImageTypes,
 };
