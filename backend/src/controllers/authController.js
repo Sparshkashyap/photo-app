@@ -34,7 +34,10 @@ const signup = async (req, res, next) => {
       password: hashedPassword,
     });
 
-    const token = generateToken(user._id.toString());
+    // Generate JWT with an object payload
+    const token = generateToken({
+      userId: user._id.toString(),
+    });
 
     return res.status(201).json({
       success: true,
@@ -87,7 +90,10 @@ const login = async (req, res, next) => {
       });
     }
 
-    const token = generateToken(user._id.toString());
+    // Generate JWT with an object payload
+    const token = generateToken({
+      userId: user._id.toString(),
+    });
 
     return res.status(200).json({
       success: true,

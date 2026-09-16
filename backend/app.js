@@ -8,6 +8,7 @@ const connectDB = require("./src/config/database");
 
 const authRoutes = require("./src/routes/authRoutes");
 const userRoutes = require("./src/routes/userRoutes");
+const photoRoutes = require("./src/routes/photoRoutes");
 
 const app = express();
 
@@ -42,6 +43,7 @@ app.get("/health", (req, res) => {
 
 app.use("/auth", authRoutes);
 app.use("/user", userRoutes);
+app.use("/photos", photoRoutes);
 
 // -------------------------
 // Error Handler

@@ -1,26 +1,31 @@
 const express = require("express");
 
-const router = express.Router();
+const authMiddleware = require("../middleware/authMiddleware");
 
 const {
-  authenticateToken,
-} = require("../middleware/authMiddleware");
-
-const {
-  uploadPhoto,
-  downloadPhoto,
+  uploadUrl,
+  confirmUpload,
+  downloadUrl,
 } = require("../controllers/photoController");
 
+const router = express.Router();
+
 router.post(
-  "/photos/upload-url",
-  authenticateToken,
-  uploadPhoto
+  "/upload-url",
+  authMiddleware,
+  uploadUrl
+);
+
+router.post(
+  "/confirm",
+  authMiddleware,
+  confirmUpload
 );
 
 router.get(
-  "/photos/download-url",
-  authenticateToken,
-  downloadPhoto
+  "/download-url",
+  authMiddleware,
+  downloadUrl
 );
 
 module.exports = router;

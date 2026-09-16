@@ -6,38 +6,45 @@ Description: Serverless backend for Photo App
 
 Globals:
   Function:
-    Runtime: nodejs20.x
+    Runtime: nodejs24.x
     Timeout: 20
     MemorySize: 512
+
     Environment:
       Variables:
-        USERS_TABLE_NAME: !Ref UsersTable
+        DYNAMODB_TABLE: PhotoTable
         S3_BUCKET_NAME: !Ref PhotosBucket
         JWT_EXPIRES_IN: "1d"
 
 Resources:
 
-  # -------------------------
+  # --------------------------------
   # API Gateway
-  # -------------------------
+  # --------------------------------
 
   PhotoApi:
     Type: AWS::Serverless::HttpApi
+
     Properties:
       CorsConfiguration:
         AllowOrigins:
           - "*"
+
         AllowHeaders:
           - Content-Type
           - Authorization
+
         AllowMethods:
           - GET
           - POST
+          - PUT
+          - DELETE
           - OPTIONS
 
-  # -------------------------
+
+  # --------------------------------
   # Lambda
-  # -------------------------
+  # --------------------------------
 
   PhotoAppFunction:
     Type: AWS::Serverless::Function
@@ -45,24 +52,32 @@ Resources:
     Properties:
       CodeUri: .
 
-      Handler: src/lambda.handler
-
-      Environment:
-        Variables:
-          JWT_SECRET: "{{resolve:ssm:/photo-app/JWT_SECRET}}"
+      Handler: lambda.handler
 
       Policies:
 
+        # DynamoDB permissions
         - DynamoDBCrudPolicy:
-            TableName: !Ref UsersTable
+            TableName: !Ref PhotoTable
 
+        # S3 permissions
         - S3CrudPolicy:
             BucketName: !Ref PhotosBucket
+
+        # SSM Parameter Store permissions
+        - Statement:
+            - Effect: Allow
+              Action:
+                - ssm:GetParameter
+              Resource:
+                - !Sub "arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter/photo-app/JWT_SECRET"
+                - !Sub "arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter/photo-app/MONGO_URI"
 
       Events:
 
         Root:
           Type: HttpApi
+
           Properties:
             ApiId: !Ref PhotoApi
             Path: /
@@ -70,54 +85,42 @@ Resources:
 
         Proxy:
           Type: HttpApi
+
           Properties:
             ApiId: !Ref PhotoApi
             Path: /{proxy+}
             Method: ANY
 
-  # -------------------------
-  # DynamoDB Users
-  # -------------------------
 
-  UsersTable:
+  # --------------------------------
+  # DynamoDB
+  # --------------------------------
+
+  PhotoTable:
     Type: AWS::DynamoDB::Table
 
     Properties:
-      TableName: PhotoAppUsers
+      TableName: PhotoTable
 
       BillingMode: PAY_PER_REQUEST
 
       AttributeDefinitions:
-        - AttributeName: userId
-          AttributeType: S
-
-        - AttributeName: email
+        - AttributeName: photoId
           AttributeType: S
 
       KeySchema:
-        - AttributeName: userId
+        - AttributeName: photoId
           KeyType: HASH
 
-      GlobalSecondaryIndexes:
 
-        - IndexName: email-index
-
-          KeySchema:
-            - AttributeName: email
-              KeyType: HASH
-
-          Projection:
-            ProjectionType: ALL
-
-  # -------------------------
-  # S3 Photos
-  # -------------------------
+  # --------------------------------
+  # S3
+  # --------------------------------
 
   PhotosBucket:
     Type: AWS::S3::Bucket
 
     Properties:
-
       PublicAccessBlockConfiguration:
         BlockPublicAcls: true
         BlockPublicPolicy: true
@@ -125,9 +128,7 @@ Resources:
         RestrictPublicBuckets: true
 
       CorsConfiguration:
-
         CorsRules:
-
           - AllowedOrigins:
               - "*"
 
@@ -141,6 +142,11 @@ Resources:
             ExposedHeaders:
               - ETag
 
+
+# --------------------------------
+# Outputs
+# --------------------------------
+
 Outputs:
 
   ApiUrl:
@@ -148,8 +154,14 @@ Outputs:
 
     Value: !Sub "https://${PhotoApi}.execute-api.${AWS::Region}.amazonaws.com"
 
-  UsersTable:
-    Value: !Ref UsersTable
+  PhotoTable:
+    Description: DynamoDB Photo Metadata Table
+
+    Value: !Ref PhotoTable
 
   PhotosBucket:
+    Description: S3 Photo Storage Bucket
+
     Value: !Ref PhotosBucket
+
+    
