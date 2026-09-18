@@ -5,27 +5,57 @@ const authMiddleware = require("../middleware/authMiddleware");
 const {
   uploadUrl,
   confirmUpload,
+  getPhotos,
+  renamePhoto,
   downloadUrl,
 } = require("../controllers/photoController");
 
 const router = express.Router();
 
+// --------------------------------------------------
+// Upload
+// --------------------------------------------------
+
 router.post(
   "/upload-url",
   authMiddleware,
-  uploadUrl
+  uploadUrl,
 );
 
 router.post(
   "/confirm",
   authMiddleware,
-  confirmUpload
+  confirmUpload,
 );
+
+// --------------------------------------------------
+// Photos
+// --------------------------------------------------
+
+router.get(
+  "/",
+  authMiddleware,
+  getPhotos,
+);
+
+// --------------------------------------------------
+// Rename
+// --------------------------------------------------
+
+router.patch(
+  "/:photoId",
+  authMiddleware,
+  renamePhoto,
+);
+
+// --------------------------------------------------
+// Download
+// --------------------------------------------------
 
 router.get(
   "/download-url",
   authMiddleware,
-  downloadUrl
+  downloadUrl,
 );
 
 module.exports = router;

@@ -12,15 +12,24 @@ Globals:
 
     Environment:
       Variables:
+        # Existing manually created DynamoDB table
         DYNAMODB_TABLE: PhotoTable
+
+        # Folder manully creatted
+
+        FOLDER_TABLE: FolderTable
+
+        # S3 bucket managed by this SAM stack
         S3_BUCKET_NAME: !Ref PhotosBucket
+
+        # JWT configuration
         JWT_EXPIRES_IN: "1d"
 
 Resources:
 
-  # --------------------------------
-  # API Gateway
-  # --------------------------------
+  # ==================================================
+  # API GATEWAY
+  # ==================================================
 
   PhotoApi:
     Type: AWS::Serverless::HttpApi
@@ -38,13 +47,14 @@ Resources:
           - GET
           - POST
           - PUT
+          - PATCH
           - DELETE
           - OPTIONS
 
 
-  # --------------------------------
-  # Lambda
-  # --------------------------------
+  # ==================================================
+  # LAMBDA
+  # ==================================================
 
   PhotoAppFunction:
     Type: AWS::Serverless::Function
@@ -56,22 +66,68 @@ Resources:
 
       Policies:
 
-        # DynamoDB permissions
-        - DynamoDBCrudPolicy:
-            TableName: !Ref PhotoTable
+        # ------------------------------------------------
+        # DynamoDB
+        #
+        # PhotoTable is an EXISTING manually-created table.
+        # It is NOT managed by CloudFormation.
+        # ------------------------------------------------
 
-        # S3 permissions
+        - Statement:
+            - Effect: Allow
+
+              Action:
+                - dynamodb:GetItem
+                - dynamodb:PutItem
+                - dynamodb:UpdateItem
+                - dynamodb:DeleteItem
+                - dynamodb:Query
+                - dynamodb:Scan
+
+              Resource:
+                # Main table
+                - !Sub "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/PhotoTable"
+
+                # Global Secondary Index
+                - !Sub "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/PhotoTable/index/*"
+
+                - !Sub "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/FolderTable"
+                
+                - !Sub "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/FolderTable/index/*"
+
+
+        # ------------------------------------------------
+        # S3
+        #
+        # S3 bucket is managed by this SAM stack.
+        # ------------------------------------------------
+
         - S3CrudPolicy:
             BucketName: !Ref PhotosBucket
 
-        # SSM Parameter Store permissions
+
+        # ------------------------------------------------
+        # SSM Parameter Store
+        #
+        # JWT_SECRET
+        # MONGO_URI
+        # ------------------------------------------------
+
         - Statement:
             - Effect: Allow
+
               Action:
                 - ssm:GetParameter
+
               Resource:
                 - !Sub "arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter/photo-app/JWT_SECRET"
+
                 - !Sub "arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter/photo-app/MONGO_URI"
+
+
+      # ------------------------------------------------
+      # API ROUTES
+      # ------------------------------------------------
 
       Events:
 
@@ -80,55 +136,58 @@ Resources:
 
           Properties:
             ApiId: !Ref PhotoApi
+
             Path: /
+
             Method: ANY
+
 
         Proxy:
           Type: HttpApi
 
           Properties:
             ApiId: !Ref PhotoApi
+
             Path: /{proxy+}
+
             Method: ANY
 
 
-  # --------------------------------
-  # DynamoDB
-  # --------------------------------
-
-  PhotoTable:
-    Type: AWS::DynamoDB::Table
-
-    Properties:
-      TableName: PhotoTable
-
-      BillingMode: PAY_PER_REQUEST
-
-      AttributeDefinitions:
-        - AttributeName: photoId
-          AttributeType: S
-
-      KeySchema:
-        - AttributeName: photoId
-          KeyType: HASH
-
-
-  # --------------------------------
-  # S3
-  # --------------------------------
+  # ==================================================
+  # S3 PHOTO STORAGE
+  # ==================================================
 
   PhotosBucket:
     Type: AWS::S3::Bucket
 
     Properties:
+
+      # ------------------------------------------------
+      # Keep bucket private
+      # ------------------------------------------------
+
       PublicAccessBlockConfiguration:
+
         BlockPublicAcls: true
+
         BlockPublicPolicy: true
+
         IgnorePublicAcls: true
+
         RestrictPublicBuckets: true
 
+
+      # ------------------------------------------------
+      # S3 CORS
+      #
+      # Browser uploads directly to S3 using
+      # presigned PUT URLs.
+      # ------------------------------------------------
+
       CorsConfiguration:
+
         CorsRules:
+
           - AllowedOrigins:
               - "*"
 
@@ -143,25 +202,40 @@ Resources:
               - ETag
 
 
-# --------------------------------
-# Outputs
-# --------------------------------
+# ==================================================
+# OUTPUTS
+# ==================================================
 
 Outputs:
+
+  # --------------------------------------------------
+  # API Gateway URL
+  # --------------------------------------------------
 
   ApiUrl:
     Description: API Gateway URL
 
     Value: !Sub "https://${PhotoApi}.execute-api.${AWS::Region}.amazonaws.com"
 
-  PhotoTable:
-    Description: DynamoDB Photo Metadata Table
 
-    Value: !Ref PhotoTable
+  # --------------------------------------------------
+  # DynamoDB
+  #
+  # External table — only displaying its name.
+  # CloudFormation does NOT create/delete it.
+  # --------------------------------------------------
+
+  PhotoTable:
+    Description: Existing DynamoDB Photo Metadata Table
+
+    Value: "PhotoTable"
+
+
+  # --------------------------------------------------
+  # S3 Bucket
+  # --------------------------------------------------
 
   PhotosBucket:
     Description: S3 Photo Storage Bucket
 
     Value: !Ref PhotosBucket
-
-    
