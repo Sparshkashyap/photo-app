@@ -110,9 +110,11 @@ const createFolder = async (
       name:
         trimmedName,
 
-      createdAt: now,
+      createdAt:
+        now,
 
-      updatedAt: now,
+      updatedAt:
+        now,
     };
 
     await dynamoDb.send(
@@ -120,7 +122,8 @@ const createFolder = async (
         TableName:
           getFolderTableName(),
 
-        Item: folder,
+        Item:
+          folder,
 
         ConditionExpression:
           "attribute_not_exists(folderId)",
@@ -171,7 +174,8 @@ const getFolders = async (
           "userId = :userId",
 
         ExpressionAttributeValues: {
-          ":userId": userId,
+          ":userId":
+            userId,
         },
       });
 
@@ -278,10 +282,6 @@ const renameFolder = async (
     const userId =
       req.user.userId;
 
-    // ----------------------------------------------
-    // Verify folder ownership
-    // ----------------------------------------------
-
     const getResult =
       await dynamoDb.send(
         new GetCommand({
@@ -332,7 +332,8 @@ const renameFolder = async (
             "SET #name = :name, updatedAt = :updatedAt",
 
           ExpressionAttributeNames: {
-            "#name": "name",
+            "#name":
+              "name",
           },
 
           ExpressionAttributeValues: {
@@ -393,9 +394,9 @@ const deleteFolder = async (
     const userId =
       req.user.userId;
 
-    // ----------------------------------------------
+    // ------------------------------------------------
     // Verify ownership
-    // ----------------------------------------------
+    // ------------------------------------------------
 
     const getResult =
       await dynamoDb.send(
@@ -430,12 +431,13 @@ const deleteFolder = async (
       });
     }
 
-    // ----------------------------------------------
+    // ------------------------------------------------
     // Delete folder
     //
-    // Photos are NOT deleted.
-    // Photo objects in S3 remain safe.
-    // ----------------------------------------------
+    // IMPORTANT:
+    // Photos are not deleted from S3.
+    // Their metadata remains safe.
+    // ------------------------------------------------
 
     await dynamoDb.send(
       new DeleteCommand({
@@ -450,7 +452,8 @@ const deleteFolder = async (
           "userId = :userId",
 
         ExpressionAttributeValues: {
-          ":userId": userId,
+          ":userId":
+            userId,
         },
       })
     );

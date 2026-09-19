@@ -1,3 +1,4 @@
+
 AWSTemplateFormatVersion: "2010-09-09"
 
 Transform: AWS::Serverless-2016-10-31
@@ -7,7 +8,7 @@ Description: Serverless backend for Photo App
 Globals:
   Function:
     Runtime: nodejs24.x
-    Timeout: 20
+    Timeout: 20 
     MemorySize: 512
 
     Environment:
@@ -15,9 +16,11 @@ Globals:
         # Existing manually created DynamoDB table
         DYNAMODB_TABLE: PhotoTable
 
-        # Folder manully creatted
-
+        # Existing manually created Folder table
         FOLDER_TABLE: FolderTable
+
+        # Existing manually created Users table
+        USERS_TABLE_NAME: UsersTable
 
         # S3 bucket managed by this SAM stack
         S3_BUCKET_NAME: !Ref PhotosBucket
@@ -69,31 +72,51 @@ Resources:
         # ------------------------------------------------
         # DynamoDB
         #
-        # PhotoTable is an EXISTING manually-created table.
-        # It is NOT managed by CloudFormation.
+        # PhotoTable, FolderTable and UsersTable are
+        # existing manually-created tables.
         # ------------------------------------------------
 
         - Statement:
-            - Effect: Allow
+            Effect: Allow
 
-              Action:
-                - dynamodb:GetItem
-                - dynamodb:PutItem
-                - dynamodb:UpdateItem
-                - dynamodb:DeleteItem
-                - dynamodb:Query
-                - dynamodb:Scan
+            Action:
+              - dynamodb:GetItem
+              - dynamodb:PutItem
+              - dynamodb:UpdateItem
+              - dynamodb:DeleteItem
+              - dynamodb:Query
+              - dynamodb:Scan
 
-              Resource:
-                # Main table
-                - !Sub "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/PhotoTable"
+            Resource:
 
-                # Global Secondary Index
-                - !Sub "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/PhotoTable/index/*"
+              # ------------------------------------------
+              # PhotoTable
+              # ------------------------------------------
 
-                - !Sub "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/FolderTable"
-                
-                - !Sub "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/FolderTable/index/*"
+              - !Sub "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/PhotoTable"
+
+              # PhotoTable GSI
+              - !Sub "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/PhotoTable/index/*"
+
+
+              # ------------------------------------------
+              # FolderTable
+              # ------------------------------------------
+
+              - !Sub "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/FolderTable"
+
+              # FolderTable GSI
+              - !Sub "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/FolderTable/index/*"
+
+
+              # ------------------------------------------
+              # UsersTable
+              # ------------------------------------------
+
+              - !Sub "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/UsersTable"
+
+              # UsersTable email-index
+              - !Sub "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/UsersTable/index/*"
 
 
         # ------------------------------------------------
@@ -109,20 +132,22 @@ Resources:
         # ------------------------------------------------
         # SSM Parameter Store
         #
-        # JWT_SECRET
-        # MONGO_URI
+        # JWT_SECRET is currently used by Lambda.
+        # MONGO_URI is retained because it exists in
+        # Parameter Store and may be used by old code
+        # until MongoDB migration is completely removed.
         # ------------------------------------------------
 
         - Statement:
-            - Effect: Allow
+            Effect: Allow
 
-              Action:
-                - ssm:GetParameter
+            Action:
+              - ssm:GetParameter
 
-              Resource:
-                - !Sub "arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter/photo-app/JWT_SECRET"
+            Resource:
+              - !Sub "arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter/photo-app/JWT_SECRET"
 
-                - !Sub "arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter/photo-app/MONGO_URI"
+              - !Sub "arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter/photo-app/MONGO_URI"
 
 
       # ------------------------------------------------
@@ -221,14 +246,26 @@ Outputs:
   # --------------------------------------------------
   # DynamoDB
   #
-  # External table — only displaying its name.
-  # CloudFormation does NOT create/delete it.
+  # External tables — only displaying their names.
+  # CloudFormation does NOT create/delete them.
   # --------------------------------------------------
 
   PhotoTable:
     Description: Existing DynamoDB Photo Metadata Table
 
     Value: "PhotoTable"
+
+
+  FolderTable:
+    Description: Existing DynamoDB Folder Metadata Table
+
+    Value: "FolderTable"
+
+
+  UsersTable:
+    Description: Existing DynamoDB Users Table
+
+    Value: "UsersTable"
 
 
   # --------------------------------------------------

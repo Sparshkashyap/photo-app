@@ -1,29 +1,54 @@
-export type Photo = {
-  id: string;
-
-  photoId: string;
-
-  key: string;
-
-  // Custom photo name
+export interface Photo {
+  url: string | undefined;
   name: string;
+  photoId: string;
+  userId: string;
 
-  // Original uploaded filename
-  originalFileName: string;
-
-  // Backward-compatible filename
   fileName: string;
-
-  // Presigned S3 URL
-  url: string;
+  originalFileName?: string | undefined;
 
   contentType: string;
 
-  fileSize: number;
+  s3Key: string;
 
-  uploadedAt: string;
+  folderId?: string | null | undefined;
 
-  createdAt: string;
+  status?: "UPLOADING" | "READY" | "FAILED" | string | undefined;
 
-  updatedAt?: string;
-};
+  createdAt?: string | undefined;
+  updatedAt?: string | undefined;
+}
+
+export interface UploadUrlResponse {
+  success: boolean;
+  uploadUrl: string;
+  photoId: string;
+  key: string;
+  fileName: string;
+  expiresIn?: number;
+}
+
+export interface DownloadUrlResponse {
+  success: boolean;
+  downloadUrl: string;
+  url?: string;
+  expiresIn?: number;
+
+  photo?: {
+    photoId: string;
+    fileName: string;
+    contentType: string;
+    s3Key: string;
+  };
+}
+
+export interface PhotosResponse {
+  success: boolean;
+  photos: Photo[];
+}
+
+export interface PhotoResponse {
+  success: boolean;
+  photo?: Photo;
+  message?: string;
+}

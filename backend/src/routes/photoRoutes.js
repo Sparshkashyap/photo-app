@@ -1,16 +1,19 @@
 const express = require("express");
 
-const authMiddleware = require("../middleware/authMiddleware");
+const authMiddleware =
+  require("../middleware/authMiddleware");
 
 const {
   uploadUrl,
   confirmUpload,
   getPhotos,
   renamePhoto,
+  movePhotoToFolder,
   downloadUrl,
 } = require("../controllers/photoController");
 
-const router = express.Router();
+const router =
+  express.Router();
 
 // --------------------------------------------------
 // Upload
@@ -19,33 +22,44 @@ const router = express.Router();
 router.post(
   "/upload-url",
   authMiddleware,
-  uploadUrl,
+  uploadUrl
 );
 
 router.post(
   "/confirm",
   authMiddleware,
-  confirmUpload,
+  confirmUpload
 );
 
 // --------------------------------------------------
-// Photos
+// Get Photos
 // --------------------------------------------------
 
 router.get(
   "/",
   authMiddleware,
-  getPhotos,
+  getPhotos
 );
 
 // --------------------------------------------------
-// Rename
+// Move Photo To Folder
+// IMPORTANT: Keep this before /:photoId
+// --------------------------------------------------
+
+router.patch(
+  "/:photoId/folder",
+  authMiddleware,
+  movePhotoToFolder
+);
+
+// --------------------------------------------------
+// Rename Photo
 // --------------------------------------------------
 
 router.patch(
   "/:photoId",
   authMiddleware,
-  renamePhoto,
+  renamePhoto
 );
 
 // --------------------------------------------------
@@ -55,7 +69,7 @@ router.patch(
 router.get(
   "/download-url",
   authMiddleware,
-  downloadUrl,
+  downloadUrl
 );
 
 module.exports = router;

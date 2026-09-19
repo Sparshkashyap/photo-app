@@ -16,20 +16,20 @@ const getSecret = async (name) => {
   const response = await ssm.send(command);
 
   if (!response.Parameter?.Value) {
-    throw new Error(`SSM parameter not found: ${name}`);
+    throw new Error(
+      `SSM parameter not found: ${name}`
+    );
   }
 
   return response.Parameter.Value;
 };
 
 const loadSecrets = async () => {
-  const [jwtSecret, mongoUri] = await Promise.all([
-    getSecret("/photo-app/JWT_SECRET"),
-    getSecret("/photo-app/MONGO_URI"),
-  ]);
+  const jwtSecret = await getSecret(
+    "/photo-app/JWT_SECRET"
+  );
 
   process.env.JWT_SECRET = jwtSecret;
-  process.env.MONGO_URI = mongoUri;
 };
 
 module.exports = {

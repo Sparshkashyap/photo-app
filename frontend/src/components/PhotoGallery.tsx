@@ -1,25 +1,60 @@
-import { ImagePlus } from "lucide-react";
+import {
+  ImagePlus,
+  Loader2,
+} from "lucide-react";
+
+import { useState } from "react";
 
 import { PhotoCard } from "@/components/PhotoCard";
+
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 
+import type { Folder } from "@/types/folder";
 import type { Photo } from "@/types/photo";
 
 const gridClass =
   "grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6";
 
+type PhotoGalleryProps = {
+  photos: Photo[];
+
+  folders: Folder[];
+
+  loading: boolean;
+
+  onUploadClick: () => void;
+
+  onRenamed: (
+    photo: Photo,
+  ) => void;
+
+  onMoved: (
+    photo: Photo,
+    folderId: string | null,
+  ) => void;
+
+  onRetry?: () => void;
+
+  error?: string;
+
+  deletingPhotoId?: string | null;
+};
+
 export function PhotoGallery({
   photos,
+  folders,
   loading,
   onUploadClick,
   onRenamed,
-}: {
-  photos: Photo[];
-  loading: boolean;
-  onUploadClick: () => void;
-  onRenamed: (photo: Photo) => void;
-}) {
+  onMoved,
+  onRetry,
+  error,
+}: PhotoGalleryProps) {
+  // --------------------------------------------------
+  // Loading
+  // --------------------------------------------------
+
   if (loading) {
     return (
       <div
@@ -27,21 +62,59 @@ export function PhotoGallery({
         aria-busy="true"
         aria-label="Loading photos"
       >
-        {Array.from({ length: 10 }).map(
-          (_, index) => (
-            <Skeleton
-              key={index}
-              className="aspect-square w-full rounded-xl"
-            />
-          ),
-        )}
+        {Array.from({
+          length: 10,
+        }).map((_, index) => (
+          <Skeleton
+            key={index}
+            className="aspect-square w-full rounded-xl"
+          />
+        ))}
       </div>
     );
   }
 
+  // --------------------------------------------------
+  // Error
+  // --------------------------------------------------
+
+  if (error) {
+    return (
+      <div className="flex min-h-[300px] flex-col items-center justify-center gap-4 rounded-xl border border-border bg-surface px-6 py-12 text-center">
+        <div className="flex size-14 items-center justify-center rounded-full bg-destructive/10">
+          <Loader2 className="size-6 text-destructive" />
+        </div>
+
+        <div>
+          <h3 className="font-semibold">
+            Failed to load photos
+          </h3>
+
+          <p className="mt-1 max-w-md text-sm text-muted-foreground">
+            {error}
+          </p>
+        </div>
+
+        {onRetry ? (
+          <Button
+            type="button"
+            variant="outline"
+            onClick={onRetry}
+          >
+            Try Again
+          </Button>
+        ) : null}
+      </div>
+    );
+  }
+
+  // --------------------------------------------------
+  // Empty state
+  // --------------------------------------------------
+
   if (photos.length === 0) {
     return (
-      <div className="panel flex flex-col items-center px-6 py-16 text-center">
+      <div className="panel flex min-h-[300px] flex-col items-center justify-center px-6 py-16 text-center">
         <span className="mb-5 inline-flex size-14 items-center justify-center rounded-2xl bg-accent text-accent-foreground">
           <ImagePlus
             className="size-6"
@@ -68,15 +141,26 @@ export function PhotoGallery({
     );
   }
 
+  // --------------------------------------------------
+  // Photo grid
+  // --------------------------------------------------
+
   return (
-    <div className={gridClass}>
+    <div
+      className={gridClass}
+      aria-label="Photo gallery"
+    >
       {photos.map((photo) => (
         <PhotoCard
-          key={photo.id}
+          key={photo.photoId}
           photo={photo}
+          folders={folders}
           onRenamed={onRenamed}
+          onMoved={onMoved}
         />
       ))}
     </div>
   );
 }
+
+export default PhotoGallery;

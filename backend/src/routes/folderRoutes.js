@@ -1,6 +1,7 @@
 const express = require("express");
 
-const authMiddleware = require("../middleware/authMiddleware");
+const authMiddleware =
+  require("../middleware/authMiddleware");
 
 const {
   createFolder,
@@ -12,28 +13,44 @@ const {
 const router =
   express.Router();
 
-// Create folder
+// --------------------------------------------------
+// Create Folder
+// POST /folders
+// --------------------------------------------------
+
 router.post(
   "/",
   authMiddleware,
   createFolder
 );
 
-// Get current user's folders
+// --------------------------------------------------
+// Get Current User Folders
+// GET /folders
+// --------------------------------------------------
+
 router.get(
   "/",
   authMiddleware,
   getFolders
 );
 
-// Rename folder
+// --------------------------------------------------
+// Rename Folder
+// PATCH /folders/:folderId
+// --------------------------------------------------
+
 router.patch(
   "/:folderId",
   authMiddleware,
   renameFolder
 );
 
-// Delete folder
+// --------------------------------------------------
+// Delete Folder
+// DELETE /folders/:folderId
+// --------------------------------------------------
+
 router.delete(
   "/:folderId",
   authMiddleware,

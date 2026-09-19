@@ -1,5 +1,6 @@
 import {
   Download,
+  FolderInput,
   Loader2,
   MoreVertical,
   Pencil,
@@ -19,20 +20,38 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 
+import { MoveToFolderDialog } from "@/components/MoveToFolderDialog";
+
 import {
+  movePhotoToFolder,
   renamePhoto,
   requestDownloadUrl,
 } from "@/services/api";
 
+import type { Folder } from "@/types/folder";
 import type { Photo } from "@/types/photo";
+
+type PhotoCardProps = {
+  photo: Photo;
+
+  folders: Folder[];
+
+  onRenamed?: (
+    photo: Photo,
+  ) => void;
+
+  onMoved?: (
+    photo: Photo,
+    folderId: string | null,
+  ) => void;
+};
 
 export function PhotoCard({
   photo,
+  folders,
   onRenamed,
-}: {
-  photo: Photo;
-  onRenamed?: (photo: Photo) => void;
-}) {
+  onMoved,
+}: PhotoCardProps) {
   const [downloading, setDownloading] =
     useState(false);
 
@@ -42,10 +61,16 @@ export function PhotoCard({
   const [renameOpen, setRenameOpen] =
     useState(false);
 
+  const [moveOpen, setMoveOpen] =
+    useState(false);
+
   const [newName, setNewName] =
-    useState(photo.name);
+    useState(photo.name ?? "");
 
   const [renaming, setRenaming] =
+    useState(false);
+
+  const [moving, setMoving] =
     useState(false);
 
   // --------------------------------------------------
@@ -58,7 +83,7 @@ export function PhotoCard({
     setDownloading(true);
 
     try {
-      const { downloadUrl } =
+      const response =
         await requestDownloadUrl(
           photo.photoId,
         );
@@ -66,11 +91,13 @@ export function PhotoCard({
       const link =
         document.createElement("a");
 
-      link.href = downloadUrl;
+      link.href =
+        response.downloadUrl;
 
       link.download =
         photo.name ||
-        photo.fileName;
+        photo.fileName ||
+        "photo";
 
       link.rel =
         "noopener noreferrer";
@@ -88,7 +115,8 @@ export function PhotoCard({
         {
           description:
             photo.name ||
-            photo.fileName,
+            photo.fileName ||
+            "Your file",
         },
       );
     } catch (error) {
@@ -101,7 +129,9 @@ export function PhotoCard({
         "Download failed",
         {
           description:
-            "Please try again.",
+            error instanceof Error
+              ? error.message
+              : "Please try again.",
         },
       );
     } finally {
@@ -133,12 +163,12 @@ export function PhotoCard({
       return;
     }
 
-    if (
-      cleanName === photo.name
-    ) {
+    if (cleanName === photo.name) {
       setRenameOpen(false);
       return;
     }
+
+    if (renaming) return;
 
     setRenaming(true);
 
@@ -155,22 +185,30 @@ export function PhotoCard({
       const updatedPhoto: Photo = {
         ...photo,
 
-        name: updated.name,
+        name:
+          updated.name ??
+          cleanName,
 
         originalFileName:
           updated.originalFileName ??
           photo.originalFileName,
 
         fileName:
-          updated.fileName,
+          updated.fileName ??
+          photo.fileName,
 
         updatedAt:
-          updated.updatedAt,
+          updated.updatedAt ??
+          photo.updatedAt,
       };
 
-      onRenamed?.(updatedPhoto);
+      onRenamed?.(
+        updatedPhoto,
+      );
 
-      setNewName(updated.name);
+      setNewName(
+        updatedPhoto.name,
+      );
 
       setRenameOpen(false);
 
@@ -187,7 +225,9 @@ export function PhotoCard({
         "Rename failed",
         {
           description:
-            "Please try again.",
+            error instanceof Error
+              ? error.message
+              : "Please try again.",
         },
       );
     } finally {
@@ -195,24 +235,106 @@ export function PhotoCard({
     }
   }
 
+  // --------------------------------------------------
+  // Move to Folder
+  // --------------------------------------------------
+
+  async function handleMove(
+    folderId: string | null,
+  ) {
+    if (moving) return;
+
+    setMoving(true);
+
+    try {
+      await movePhotoToFolder(
+        photo.photoId,
+        folderId,
+      );
+
+      onMoved?.(
+        photo,
+        folderId,
+      );
+
+      setMoveOpen(false);
+
+      toast.success(
+        folderId
+          ? "Photo moved to folder"
+          : "Photo moved to My Photos",
+      );
+    } catch (error) {
+      console.error(
+        "Move photo failed:",
+        error,
+      );
+
+      toast.error(
+        "Move failed",
+        {
+          description:
+            error instanceof Error
+              ? error.message
+              : "Please try again.",
+        },
+      );
+    } finally {
+      setMoving(false);
+    }
+  }
+
+  const isVideo =
+    photo.contentType?.startsWith(
+      "video/",
+    ) ?? false;
+
   return (
     <>
+      {/* ------------------------------------------------
+          Photo Card
+      ------------------------------------------------ */}
+
       <figure className="group relative overflow-hidden rounded-xl border border-border bg-surface-muted">
-        <img
-          src={photo.url}
-          alt={photo.name}
-          loading="lazy"
-          decoding="async"
-          className="aspect-square w-full object-cover transition-transform duration-300 ease-out group-hover:scale-[1.04]"
-        />
+        {/* Media */}
 
-        <div className="pointer-events-none absolute inset-x-0 bottom-0 h-20 bg-gradient-to-t from-foreground/45 to-transparent opacity-0 transition-opacity duration-200 group-hover:opacity-100 sm:block" />
+        {isVideo ? (
+          <video
+            src={photo.url}
+            controls
+            preload="metadata"
+            className="aspect-square w-full object-cover"
+          />
+        ) : (
+          <img
+            src={photo.url}
+            alt={
+              photo.name ||
+              photo.fileName ||
+              "Photo"
+            }
+            loading="lazy"
+            decoding="async"
+            className="aspect-square w-full object-cover transition-transform duration-300 ease-out group-hover:scale-[1.04]"
+          />
+        )}
 
-        <figcaption className="pointer-events-none absolute inset-x-3 bottom-3 hidden truncate text-xs font-medium text-background opacity-0 transition-opacity duration-200 group-hover:opacity-100 sm:block">
-          {photo.name}
+        {/* Bottom gradient */}
+
+        <div className="pointer-events-none absolute inset-x-0 bottom-0 h-24 bg-gradient-to-t from-black/60 to-transparent opacity-0 transition-opacity duration-200 group-hover:opacity-100 sm:block" />
+
+        {/* Photo name */}
+
+        <figcaption className="pointer-events-none absolute inset-x-3 bottom-3 hidden truncate text-xs font-medium text-white opacity-0 transition-opacity duration-200 group-hover:opacity-100 sm:block">
+          {photo.name ||
+            photo.fileName ||
+            "Untitled photo"}
         </figcaption>
 
-        {/* Menu */}
+        {/* ------------------------------------------------
+            Menu
+        ------------------------------------------------ */}
+
         <div className="absolute right-2 top-2">
           <button
             type="button"
@@ -222,7 +344,11 @@ export function PhotoCard({
                   !previous,
               )
             }
-            aria-label={`Options for ${photo.name}`}
+            aria-label={`Options for ${
+              photo.name ||
+              photo.fileName ||
+              "photo"
+            }`}
             title="Photo options"
             className="inline-flex size-9 items-center justify-center rounded-full border border-border bg-surface/95 text-foreground shadow-soft transition hover:bg-accent hover:text-accent-foreground sm:opacity-0 sm:group-hover:opacity-100"
           >
@@ -233,24 +359,49 @@ export function PhotoCard({
           </button>
 
           {menuOpen ? (
-            <div className="absolute right-0 top-11 z-20 w-40 overflow-hidden rounded-lg border border-border bg-surface shadow-lg">
+            <div className="absolute right-0 top-11 z-30 w-48 overflow-hidden rounded-lg border border-border bg-surface shadow-lg">
+              {/* Rename */}
+
               <button
                 type="button"
                 onClick={() => {
                   setMenuOpen(false);
 
                   setNewName(
-                    photo.name,
+                    photo.name ||
+                    photo.fileName ||
+                    "",
                   );
 
                   setRenameOpen(true);
                 }}
-                className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-accent"
+                className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm transition hover:bg-accent"
               >
                 <Pencil className="size-4" />
 
-                Rename
+                <span>
+                  Rename
+                </span>
               </button>
+
+              {/* Move */}
+
+              <button
+                type="button"
+                onClick={() => {
+                  setMenuOpen(false);
+                  setMoveOpen(true);
+                }}
+                className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm transition hover:bg-accent"
+              >
+                <FolderInput className="size-4" />
+
+                <span>
+                  Move to folder
+                </span>
+              </button>
+
+              {/* Download */}
 
               <button
                 type="button"
@@ -260,7 +411,7 @@ export function PhotoCard({
                   void handleDownload();
                 }}
                 disabled={downloading}
-                className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-accent disabled:opacity-60"
+                className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm transition hover:bg-accent disabled:cursor-not-allowed disabled:opacity-60"
               >
                 {downloading ? (
                   <Loader2 className="size-4 animate-spin" />
@@ -268,14 +419,31 @@ export function PhotoCard({
                   <Download className="size-4" />
                 )}
 
-                Download
+                <span>
+                  Download
+                </span>
               </button>
             </div>
           ) : null}
         </div>
+
+        {/* ------------------------------------------------
+            Download Loading Overlay
+        ------------------------------------------------ */}
+
+        {downloading ? (
+          <div className="absolute inset-0 z-20 flex items-center justify-center bg-black/30">
+            <span className="flex size-10 items-center justify-center rounded-full bg-background/90 shadow">
+              <Loader2 className="size-5 animate-spin" />
+            </span>
+          </div>
+        ) : null}
       </figure>
 
-      {/* Rename Dialog */}
+      {/* --------------------------------------------------
+          Rename Dialog
+      -------------------------------------------------- */}
+
       <Dialog
         open={renameOpen}
         onOpenChange={(open) => {
@@ -291,8 +459,9 @@ export function PhotoCard({
             </DialogTitle>
 
             <DialogDescription>
-              Give this photo a name you'll
-              recognize in your library.
+              Give this photo a name
+              you'll recognize in
+              your library.
             </DialogDescription>
           </DialogHeader>
 
@@ -317,12 +486,15 @@ export function PhotoCard({
               }
               onKeyDown={(event) => {
                 if (
-                  event.key === "Enter"
+                  event.key ===
+                  "Enter"
                 ) {
+                  event.preventDefault();
+
                   void handleRename();
                 }
               }}
-              className="flex h-10 w-full rounded-md border border-border bg-background px-3 text-sm outline-none focus:border-primary focus:ring-2 focus:ring-primary/20"
+              className="flex h-10 w-full rounded-md border border-border bg-background px-3 text-sm outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 disabled:cursor-not-allowed disabled:opacity-60"
             />
 
             <p className="text-xs text-muted-foreground">
@@ -361,6 +533,25 @@ export function PhotoCard({
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* --------------------------------------------------
+          Move To Folder Dialog
+      -------------------------------------------------- */}
+
+      <MoveToFolderDialog
+        open={moveOpen}
+        onOpenChange={(open) => {
+          if (!moving) {
+            setMoveOpen(open);
+          }
+        }}
+        photoId={photo.photoId}
+        folders={folders}
+        currentFolderId={
+          photo.folderId ?? null
+        }
+        onMoved={handleMove}
+      />
     </>
   );
 }
