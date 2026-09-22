@@ -1,3 +1,8 @@
+
+// ==================================================
+// FILE: src/routes/photoRoutes.js
+// ==================================================
+
 const express = require("express");
 
 const authMiddleware =
@@ -7,6 +12,7 @@ const {
   uploadUrl,
   confirmUpload,
   getPhotos,
+  deletePhoto,
   renamePhoto,
   movePhotoToFolder,
   downloadUrl,
@@ -32,7 +38,7 @@ router.post(
 );
 
 // --------------------------------------------------
-// Get Photos
+// Get photos
 // --------------------------------------------------
 
 router.get(
@@ -42,8 +48,10 @@ router.get(
 );
 
 // --------------------------------------------------
-// Move Photo To Folder
-// IMPORTANT: Keep this before /:photoId
+// Move photo to folder
+//
+// IMPORTANT:
+// Keep this BEFORE /:photoId
 // --------------------------------------------------
 
 router.patch(
@@ -53,7 +61,7 @@ router.patch(
 );
 
 // --------------------------------------------------
-// Rename Photo
+// Rename photo
 // --------------------------------------------------
 
 router.patch(
@@ -63,7 +71,7 @@ router.patch(
 );
 
 // --------------------------------------------------
-// Download
+// Download photo
 // --------------------------------------------------
 
 router.get(
@@ -72,4 +80,21 @@ router.get(
   downloadUrl
 );
 
+// --------------------------------------------------
+// Move photo to Trash
+//
+// DELETE does NOT permanently delete.
+// It only sets:
+// isTrashed = true
+// --------------------------------------------------
+
+router.delete(
+  "/:photoId",
+  authMiddleware,
+  deletePhoto
+);
+
 module.exports = router;
+
+
+

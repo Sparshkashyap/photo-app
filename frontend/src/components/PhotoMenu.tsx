@@ -4,19 +4,31 @@ import {
   Loader2,
   MoreVertical,
   Pencil,
+  Trash2,
 } from "lucide-react";
 
 import { useState } from "react";
+import { toast } from "sonner";
 
-import { MoveToFolderDialog } from "@/components/MoveToFolderDialog";
-import { RenamePhotoDialog } from "@/components/RenamePhotoDialog";
+import { Button } from "@/components/ui/button";
+
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+
+import {
+  movePhotoToFolder,
+  renamePhoto,
+  trashPhoto,
+} from "@/services/api";
 
 import type { Folder } from "@/types/folder";
 import type { Photo } from "@/types/photo";
-
-type PhotoWithFolder = Photo & {
-  folderId?: string | null;
-};
 
 type PhotoMenuProps = {
   photo: Photo;
@@ -32,7 +44,11 @@ type PhotoMenuProps = {
     folderId: string | null,
   ) => void;
 
-  onDownload: () => Promise<void>;
+  onDownload?: () => void;
+
+  onTrashed?: (
+    photo: Photo,
+  ) => void;
 };
 
 export function PhotoMenu({
@@ -41,8 +57,9 @@ export function PhotoMenu({
   onRenamed,
   onMoved,
   onDownload,
+  onTrashed,
 }: PhotoMenuProps) {
-  const [open, setOpen] =
+  const [menuOpen, setMenuOpen] =
     useState(false);
 
   const [renameOpen, setRenameOpen] =
@@ -51,63 +68,245 @@ export function PhotoMenu({
   const [moveOpen, setMoveOpen] =
     useState(false);
 
-  const [downloading, setDownloading] =
+  const [trashOpen, setTrashOpen] =
     useState(false);
 
-  // --------------------------------------------------
-  // Download
-  // --------------------------------------------------
+  const [newName, setNewName] =
+    useState(
+      photo.name ||
+        photo.fileName ||
+        "",
+    );
 
-  async function handleDownload() {
-    if (downloading) return;
+  const [
+    selectedFolderId,
+    setSelectedFolderId,
+  ] = useState<string>(
+    photo.folderId || "",
+  );
 
-    setDownloading(true);
+  const [renaming, setRenaming] =
+    useState(false);
+
+  const [moving, setMoving] =
+    useState(false);
+
+  const [trashing, setTrashing] =
+    useState(false);
+
+  async function handleRename() {
+    const cleanName =
+      newName.trim();
+
+    if (!cleanName) {
+      toast.error(
+        "Photo name cannot be empty",
+      );
+
+      return;
+    }
+
+    if (
+      cleanName.length > 120
+    ) {
+      toast.error(
+        "Photo name cannot exceed 120 characters",
+      );
+
+      return;
+    }
+
+    if (
+      cleanName === photo.name
+    ) {
+      setRenameOpen(false);
+
+      return;
+    }
+
+    if (renaming) {
+      return;
+    }
+
+    setRenaming(true);
 
     try {
-      await onDownload();
+      const response =
+        await renamePhoto(
+          photo.photoId,
+          cleanName,
+        );
+
+      const updated =
+        response.photo;
+
+      const updatedPhoto: Photo =
+        {
+          ...photo,
+
+          ...updated,
+
+          name:
+            updated.name ||
+            cleanName,
+
+          photoId:
+            photo.photoId,
+        };
+
+      onRenamed?.(
+        updatedPhoto,
+      );
+
+      setNewName(
+        updatedPhoto.name,
+      );
+
+      setRenameOpen(false);
+
+      toast.success(
+        "Photo renamed successfully",
+      );
     } catch (error) {
       console.error(
-        "Download failed:",
+        "Rename failed:",
         error,
       );
+
+      toast.error(
+        "Rename failed",
+        {
+          description:
+            error instanceof Error
+              ? error.message
+              : "Please try again.",
+        },
+      );
     } finally {
-      setDownloading(false);
-      setOpen(false);
+      setRenaming(false);
     }
   }
 
-  // --------------------------------------------------
-  // Rename
-  // --------------------------------------------------
+  async function handleMove() {
+    if (moving) {
+      return;
+    }
 
-  function handleRenameOpen() {
-    setOpen(false);
-    setRenameOpen(true);
+    setMoving(true);
+
+    try {
+      const folderId =
+        selectedFolderId ||
+        null;
+
+      const response =
+        await movePhotoToFolder(
+          photo.photoId,
+          folderId,
+        );
+
+      const updatedPhoto: Photo =
+        {
+          ...photo,
+
+          ...response.photo,
+
+          folderId,
+
+          photoId:
+            photo.photoId,
+        };
+
+      onMoved?.(
+        updatedPhoto,
+        folderId,
+      );
+
+      setMoveOpen(false);
+
+      toast.success(
+        folderId
+          ? "Photo moved successfully"
+          : "Photo moved to My Photos",
+      );
+    } catch (error) {
+      console.error(
+        "Move photo failed:",
+        error,
+      );
+
+      toast.error(
+        "Move failed",
+        {
+          description:
+            error instanceof Error
+              ? error.message
+              : "Please try again.",
+        },
+      );
+    } finally {
+      setMoving(false);
+    }
   }
 
-  // --------------------------------------------------
-  // Move
-  // --------------------------------------------------
+  async function handleTrash() {
+    if (trashing) {
+      return;
+    }
 
-  function handleMoveOpen() {
-    setOpen(false);
-    setMoveOpen(true);
+    setTrashing(true);
+
+    try {
+      await trashPhoto(
+        photo.photoId,
+      );
+
+      setTrashOpen(false);
+
+      setMenuOpen(false);
+
+      onTrashed?.(photo);
+
+      toast.success(
+        "Moved to Trash",
+        {
+          description:
+            `${
+              photo.name ||
+              photo.fileName ||
+              "Photo"
+            } can be restored from Trash.`,
+        },
+      );
+    } catch (error) {
+      console.error(
+        "Move to trash failed:",
+        error,
+      );
+
+      toast.error(
+        "Couldn't move photo to Trash",
+        {
+          description:
+            error instanceof Error
+              ? error.message
+              : "Please try again.",
+        },
+      );
+    } finally {
+      setTrashing(false);
+    }
   }
-
-  const photoWithFolder =
-    photo as PhotoWithFolder;
 
   return (
     <>
-      {/* ------------------------------------------------
-          Menu
-      ------------------------------------------------ */}
-
       <div className="relative">
-        <button
+        <Button
           type="button"
+          variant="outline"
+          size="icon"
           onClick={() =>
-            setOpen(
+            setMenuOpen(
               (previous) =>
                 !previous,
             )
@@ -117,126 +316,329 @@ export function PhotoMenu({
             photo.fileName ||
             "photo"
           }`}
-          aria-expanded={open}
           title="Photo options"
-          className="inline-flex size-9 items-center justify-center rounded-full border border-border bg-surface/95 text-foreground shadow-soft transition hover:bg-accent hover:text-accent-foreground sm:opacity-0 sm:group-hover:opacity-100"
+          className="border-border bg-background/95 shadow-sm sm:opacity-0 sm:transition-opacity sm:group-hover:opacity-100"
         >
-          <MoreVertical
-            className="size-4"
-            aria-hidden="true"
-          />
-        </button>
+          <MoreVertical className="size-4" />
+        </Button>
 
-        {open ? (
-          <div className="absolute right-0 top-11 z-30 w-48 overflow-hidden rounded-lg border border-border bg-surface shadow-lg">
-            {/* Rename */}
-
+        {menuOpen ? (
+          <div className="absolute right-0 top-11 z-30 w-48 overflow-hidden rounded-lg border border-border bg-popover p-1 text-popover-foreground shadow-xl">
             <button
               type="button"
-              onClick={handleRenameOpen}
-              className="flex w-full items-center gap-2 px-3 py-2.5 text-left text-sm transition hover:bg-accent"
-            >
-              <Pencil
-                className="size-4"
-                aria-hidden="true"
-              />
-
-              <span>
-                Rename
-              </span>
-            </button>
-
-            {/* Move */}
-
-            <button
-              type="button"
-              onClick={handleMoveOpen}
-              className="flex w-full items-center gap-2 px-3 py-2.5 text-left text-sm transition hover:bg-accent"
-            >
-              <FolderInput
-                className="size-4"
-                aria-hidden="true"
-              />
-
-              <span>
-                Move to folder
-              </span>
-            </button>
-
-            {/* Download */}
-
-            <button
-              type="button"
-              disabled={downloading}
               onClick={() => {
-                void handleDownload();
-              }}
-              className="flex w-full items-center gap-2 px-3 py-2.5 text-left text-sm transition hover:bg-accent disabled:cursor-not-allowed disabled:opacity-60"
-            >
-              {downloading ? (
-                <Loader2 className="size-4 animate-spin" />
-              ) : (
-                <Download
-                  className="size-4"
-                  aria-hidden="true"
-                />
-              )}
+                setMenuOpen(false);
 
-              <span>
-                Download
-              </span>
+                setNewName(
+                  photo.name ||
+                    photo.fileName ||
+                    "",
+                );
+
+                setRenameOpen(true);
+              }}
+              className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-sm hover:bg-accent"
+            >
+              <Pencil className="size-4" />
+
+              Rename
+            </button>
+
+            <button
+              type="button"
+              onClick={() => {
+                setMenuOpen(false);
+
+                setSelectedFolderId(
+                  photo.folderId ||
+                    "",
+                );
+
+                setMoveOpen(true);
+              }}
+              className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-sm hover:bg-accent"
+            >
+              <FolderInput className="size-4" />
+
+              Move to folder
+            </button>
+
+            <button
+              type="button"
+              onClick={() => {
+                setMenuOpen(false);
+
+                onDownload?.();
+              }}
+              className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-sm hover:bg-accent"
+            >
+              <Download className="size-4" />
+
+              Download
+            </button>
+
+            <div className="my-1 h-px bg-border" />
+
+            <button
+              type="button"
+              onClick={() => {
+                setMenuOpen(false);
+
+                setTrashOpen(true);
+              }}
+              className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-sm text-destructive hover:bg-destructive/10"
+            >
+              <Trash2 className="size-4" />
+
+              Move to Trash
             </button>
           </div>
         ) : null}
       </div>
 
-      {/* ------------------------------------------------
-          Rename Dialog
-      ------------------------------------------------ */}
+      {/* Rename */}
 
-      <RenamePhotoDialog
+      <Dialog
         open={renameOpen}
-        onOpenChange={
-          setRenameOpen
-        }
-        photo={photo}
-        onRenamed={(
-          updatedPhoto,
-        ) => {
-          onRenamed?.(
-            updatedPhoto,
-          );
+        onOpenChange={(open) => {
+          if (!renaming) {
+            setRenameOpen(open);
+          }
         }}
-      />
+      >
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>
+              Rename photo
+            </DialogTitle>
 
-      {/* ------------------------------------------------
-          Move To Folder Dialog
-      ------------------------------------------------ */}
+            <DialogDescription>
+              Give this photo a name
+              you'll recognize in
+              your library.
+            </DialogDescription>
+          </DialogHeader>
 
-      <MoveToFolderDialog
+          <div className="space-y-2">
+            <label
+              htmlFor={`rename-${photo.photoId}`}
+              className="text-sm font-medium"
+            >
+              Photo name
+            </label>
+
+            <input
+              id={`rename-${photo.photoId}`}
+              value={newName}
+              maxLength={120}
+              disabled={renaming}
+              autoFocus
+              onChange={(event) =>
+                setNewName(
+                  event.target.value,
+                )
+              }
+              onKeyDown={(event) => {
+                if (
+                  event.key ===
+                  "Enter"
+                ) {
+                  event.preventDefault();
+
+                  void handleRename();
+                }
+              }}
+              className="flex h-10 w-full rounded-md border border-border bg-background px-3 text-sm outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 disabled:opacity-60"
+            />
+
+            <p className="text-xs text-muted-foreground">
+              {newName.length}/120
+            </p>
+          </div>
+
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() =>
+                setRenameOpen(false)
+              }
+              disabled={renaming}
+            >
+              Cancel
+            </Button>
+
+            <Button
+              onClick={() =>
+                void handleRename()
+              }
+              disabled={
+                renaming ||
+                !newName.trim()
+              }
+            >
+              {renaming ? (
+                <Loader2 className="size-4 animate-spin" />
+              ) : (
+                <Pencil className="size-4" />
+              )}
+
+              Rename
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Move */}
+
+      <Dialog
         open={moveOpen}
-        onOpenChange={
-          setMoveOpen
-        }
-        photoId={
-          photo.photoId
-        }
-        folders={folders}
-        currentFolderId={
-          photoWithFolder.folderId ??
-          null
-        }
-        onMoved={(
-          folderId,
-        ) => {
-          onMoved?.(
-            photo,
-            folderId,
-          );
+        onOpenChange={(open) => {
+          if (!moving) {
+            setMoveOpen(open);
+          }
         }}
-      />
+      >
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>
+              Move photo
+            </DialogTitle>
+
+            <DialogDescription>
+              Choose where you want
+              to store this photo.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-2">
+            <label
+              htmlFor={`move-${photo.photoId}`}
+              className="text-sm font-medium"
+            >
+              Folder
+            </label>
+
+            <select
+              id={`move-${photo.photoId}`}
+              value={
+                selectedFolderId
+              }
+              disabled={moving}
+              onChange={(event) =>
+                setSelectedFolderId(
+                  event.target.value,
+                )
+              }
+              className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm outline-none focus:border-ring focus:ring-2 focus:ring-ring/20"
+            >
+              <option value="">
+                Root / My Photos
+              </option>
+
+              {folders.map(
+                (folder) => (
+                  <option
+                    key={
+                      folder.folderId
+                    }
+                    value={
+                      folder.folderId
+                    }
+                  >
+                    {folder.name}
+                  </option>
+                ),
+              )}
+            </select>
+          </div>
+
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() =>
+                setMoveOpen(false)
+              }
+              disabled={moving}
+            >
+              Cancel
+            </Button>
+
+            <Button
+              onClick={() =>
+                void handleMove()
+              }
+              disabled={moving}
+            >
+              {moving ? (
+                <Loader2 className="size-4 animate-spin" />
+              ) : (
+                <FolderInput className="size-4" />
+              )}
+
+              Move
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Trash */}
+
+      <Dialog
+        open={trashOpen}
+        onOpenChange={(open) => {
+          if (!trashing) {
+            setTrashOpen(open);
+          }
+        }}
+      >
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>
+              Move to Trash?
+            </DialogTitle>
+
+            <DialogDescription>
+              <strong className="text-foreground">
+                {photo.name ||
+                  photo.fileName ||
+                  "This photo"}
+              </strong>{" "}
+              will be moved to
+              Trash. You can restore
+              it later. It will not be
+              permanently deleted.
+            </DialogDescription>
+          </DialogHeader>
+
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() =>
+                setTrashOpen(false)
+              }
+              disabled={trashing}
+            >
+              Cancel
+            </Button>
+
+            <Button
+              variant="destructive"
+              onClick={() =>
+                void handleTrash()
+              }
+              disabled={trashing}
+            >
+              {trashing ? (
+                <Loader2 className="size-4 animate-spin" />
+              ) : (
+                <Trash2 className="size-4" />
+              )}
+
+              Move to Trash
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </>
   );
 }
-
-export default PhotoMenu;

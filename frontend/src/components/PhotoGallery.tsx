@@ -3,8 +3,6 @@ import {
   Loader2,
 } from "lucide-react";
 
-import { useState } from "react";
-
 import { PhotoCard } from "@/components/PhotoCard";
 
 import { Button } from "@/components/ui/button";
@@ -34,11 +32,13 @@ type PhotoGalleryProps = {
     folderId: string | null,
   ) => void;
 
-  onRetry?: () => void;
+  onTrashed?: ((photo: Photo) => void) | undefined;
 
-  error?: string;
+  onRetry?: (() => void) | undefined;
 
-  deletingPhotoId?: string | null;
+  error?: string | undefined;
+
+  deletingPhotoId?: string | null | undefined;
 };
 
 export function PhotoGallery({
@@ -48,13 +48,10 @@ export function PhotoGallery({
   onUploadClick,
   onRenamed,
   onMoved,
+  onTrashed,
   onRetry,
   error,
 }: PhotoGalleryProps) {
-  // --------------------------------------------------
-  // Loading
-  // --------------------------------------------------
-
   if (loading) {
     return (
       <div
@@ -73,10 +70,6 @@ export function PhotoGallery({
       </div>
     );
   }
-
-  // --------------------------------------------------
-  // Error
-  // --------------------------------------------------
 
   if (error) {
     return (
@@ -108,10 +101,6 @@ export function PhotoGallery({
     );
   }
 
-  // --------------------------------------------------
-  // Empty state
-  // --------------------------------------------------
-
   if (photos.length === 0) {
     return (
       <div className="panel flex min-h-[300px] flex-col items-center justify-center px-6 py-16 text-center">
@@ -127,8 +116,7 @@ export function PhotoGallery({
         </h3>
 
         <p className="mt-1.5 max-w-sm text-sm text-muted-foreground">
-          Upload your first memory to get
-          started.
+          Upload your first memory to get started.
         </p>
 
         <Button
@@ -141,11 +129,7 @@ export function PhotoGallery({
     );
   }
 
-  // --------------------------------------------------
-  // Photo grid
-  // --------------------------------------------------
-
-  return (
+    return (
     <div
       className={gridClass}
       aria-label="Photo gallery"
@@ -157,6 +141,7 @@ export function PhotoGallery({
           folders={folders}
           onRenamed={onRenamed}
           onMoved={onMoved}
+          onTrashed={onTrashed ?? ((_: Photo) => {})}
         />
       ))}
     </div>

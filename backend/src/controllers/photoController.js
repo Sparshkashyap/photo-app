@@ -15,7 +15,9 @@ const {
   UpdateCommand,
 } = require("@aws-sdk/lib-dynamodb");
 
-const { getSignedUrl } = require("@aws-sdk/s3-request-presigner");
+const {
+  getSignedUrl,
+} = require("@aws-sdk/s3-request-presigner");
 
 const crypto = require("crypto");
 const path = require("path");
@@ -99,6 +101,7 @@ const sanitizeFileName = (fileName) => {
 
 // --------------------------------------------------
 // Generate S3 Upload URL
+// POST /photos/upload-url
 // --------------------------------------------------
 
 const uploadUrl = async (
@@ -183,6 +186,7 @@ const uploadUrl = async (
 
 // --------------------------------------------------
 // Confirm S3 Upload + Save DynamoDB Metadata
+// POST /photos/confirm
 // --------------------------------------------------
 
 const confirmUpload = async (
@@ -217,10 +221,6 @@ const confirmUpload = async (
 
     const userId =
       req.user.userId;
-
-    // ------------------------------------------------
-    // Validate custom photo name
-    // ------------------------------------------------
 
     const trimmedName =
       name.trim();
@@ -266,7 +266,7 @@ const confirmUpload = async (
     }
 
     // ------------------------------------------------
-    // If folderId is provided, verify folder ownership
+    // Verify folder ownership
     // ------------------------------------------------
 
     if (
@@ -309,7 +309,7 @@ const confirmUpload = async (
     }
 
     // ------------------------------------------------
-    // Verify object exists in S3
+    // Verify S3 object
     // ------------------------------------------------
 
     const headCommand =
@@ -326,7 +326,7 @@ const confirmUpload = async (
       );
 
     // ------------------------------------------------
-    // Save metadata in DynamoDB
+    // Save metadata
     // ------------------------------------------------
 
     const now =
@@ -358,6 +358,10 @@ const confirmUpload = async (
       folderId:
         folderId || null,
 
+      // Trash state
+      isTrashed:
+        false,
+
       createdAt:
         now,
 
@@ -370,7 +374,8 @@ const confirmUpload = async (
         TableName:
           getTableName(),
 
-        Item: item,
+        Item:
+          item,
       })
     );
 
@@ -395,6 +400,7 @@ const confirmUpload = async (
 
 // --------------------------------------------------
 // Get Current User Photos
+// GET /photos
 // --------------------------------------------------
 
 const getPhotos = async (
@@ -405,10 +411,6 @@ const getPhotos = async (
   try {
     const userId =
       req.user.userId;
-
-    // ------------------------------------------------
-    // Query parameters
-    // ------------------------------------------------
 
     const search =
       typeof req.query.search ===
@@ -435,10 +437,6 @@ const getPhotos = async (
       "string"
         ? req.query.folderId
         : null;
-
-    // ------------------------------------------------
-    // Validation
-    // ------------------------------------------------
 
     const validSorts = [
       "newest",
@@ -474,7 +472,7 @@ const getPhotos = async (
     }
 
     // ------------------------------------------------
-    // Verify requested folder belongs to user
+    // Verify requested folder
     // ------------------------------------------------
 
     if (
@@ -548,6 +546,17 @@ const getPhotos = async (
       result.Items || [];
 
     // ------------------------------------------------
+    // IMPORTANT:
+    // Never show trashed photos in normal gallery.
+    // ------------------------------------------------
+
+    photos =
+      photos.filter(
+        (photo) =>
+          photo.isTrashed !== true
+      );
+
+    // ------------------------------------------------
     // Folder filter
     // ------------------------------------------------
 
@@ -586,12 +595,13 @@ const getPhotos = async (
             const originalFileName =
               String(
                 photo.originalFileName ||
-                  ""
+                ""
               ).toLowerCase();
 
             const fileName =
               String(
-                photo.fileName || ""
+                photo.fileName ||
+                ""
               ).toLowerCase();
 
             return (
@@ -616,7 +626,7 @@ const getPhotos = async (
             const contentType =
               String(
                 photo.contentType ||
-                  ""
+                ""
               ).toLowerCase();
 
             return contentType.startsWith(
@@ -649,30 +659,26 @@ const getPhotos = async (
           if (
             sort === "newest"
           ) {
-            return (
-              dateB - dateA
-            );
+            return dateB - dateA;
           }
 
-          return (
-            dateA - dateB
-          );
+          return dateA - dateB;
         }
 
         const nameA =
           String(
             a.name ||
-              a.fileName ||
-              a.originalFileName ||
-              ""
+            a.fileName ||
+            a.originalFileName ||
+            ""
           ).toLowerCase();
 
         const nameB =
           String(
             b.name ||
-              b.fileName ||
-              b.originalFileName ||
-              ""
+            b.fileName ||
+            b.originalFileName ||
+            ""
           ).toLowerCase();
 
         const comparison =
@@ -810,7 +816,140 @@ const getPhotos = async (
 };
 
 // --------------------------------------------------
+// Move Photo To Trash
+// DELETE /photos/:photoId
+//
+// IMPORTANT:
+// This is now a SOFT DELETE.
+//
+// S3 object remains safe.
+// DynamoDB metadata remains.
+// Only isTrashed becomes true.
+//
+// User can later:
+// 1. Restore
+// 2. Delete Forever
+// --------------------------------------------------
+
+const deletePhoto = async (
+  req,
+  res,
+  next
+) => {
+  try {
+    const {
+      photoId,
+    } = req.params;
+
+    if (!photoId) {
+      return res.status(400).json({
+        success: false,
+        message:
+          "photoId is required",
+      });
+    }
+
+    const userId =
+      req.user.userId;
+
+    const result =
+      await dynamoDb.send(
+        new GetCommand({
+          TableName:
+            getTableName(),
+
+          Key: {
+            photoId,
+          },
+        })
+      );
+
+    const photo =
+      result.Item;
+
+    if (!photo) {
+      return res.status(404).json({
+        success: false,
+        message:
+          "Photo not found",
+      });
+    }
+
+    if (
+      photo.userId !== userId
+    ) {
+      return res.status(403).json({
+        success: false,
+        message:
+          "You are not allowed to delete this photo",
+      });
+    }
+
+    if (
+      photo.isTrashed === true
+    ) {
+      return res.status(200).json({
+        success: true,
+        message:
+          "Photo is already in trash",
+        photo,
+      });
+    }
+
+    const now =
+      new Date().toISOString();
+
+    const updateResult =
+      await dynamoDb.send(
+        new UpdateCommand({
+          TableName:
+            getTableName(),
+
+          Key: {
+            photoId,
+          },
+
+          UpdateExpression:
+            "SET isTrashed = :isTrashed, trashedAt = :trashedAt, updatedAt = :updatedAt",
+
+          ExpressionAttributeValues: {
+            ":isTrashed":
+              true,
+
+            ":trashedAt":
+              now,
+
+            ":updatedAt":
+              now,
+          },
+
+          ReturnValues:
+            "ALL_NEW",
+        })
+      );
+
+    return res.status(200).json({
+      success: true,
+
+      message:
+        "Photo moved to trash",
+
+      photo:
+        updateResult.Attributes,
+    });
+  } catch (error) {
+    console.error(
+      "Move photo to trash error:",
+      error
+    );
+
+    next(error);
+  }
+};
+
+// --------------------------------------------------
 // Rename Photo
+// PATCH /photos/:photoId
 // --------------------------------------------------
 
 const renamePhoto = async (
@@ -985,10 +1124,6 @@ const movePhotoToFolder = async (
     const userId =
       req.user.userId;
 
-    // ------------------------------------------------
-    // Get photo
-    // ------------------------------------------------
-
     const photoResult =
       await dynamoDb.send(
         new GetCommand({
@@ -1012,10 +1147,6 @@ const movePhotoToFolder = async (
       });
     }
 
-    // ------------------------------------------------
-    // Verify photo ownership
-    // ------------------------------------------------
-
     if (
       photo.userId !== userId
     ) {
@@ -1027,8 +1158,7 @@ const movePhotoToFolder = async (
     }
 
     // ------------------------------------------------
-    // Root folder
-    // folderId = null
+    // Move to root
     // ------------------------------------------------
 
     if (
@@ -1103,10 +1233,6 @@ const movePhotoToFolder = async (
       });
     }
 
-    // ------------------------------------------------
-    // Verify folder ownership
-    // ------------------------------------------------
-
     if (
       folder.userId !== userId
     ) {
@@ -1116,10 +1242,6 @@ const movePhotoToFolder = async (
           "You are not allowed to use this folder",
       });
     }
-
-    // ------------------------------------------------
-    // Update photo folder
-    // ------------------------------------------------
 
     const updatedAt =
       new Date().toISOString();
@@ -1170,7 +1292,8 @@ const movePhotoToFolder = async (
 };
 
 // --------------------------------------------------
-// Generate S3 Download URL
+// Generate Download URL
+// GET /photos/download-url?photoId=...
 // --------------------------------------------------
 
 const downloadUrl = async (
@@ -1183,10 +1306,7 @@ const downloadUrl = async (
       photoId,
     } = req.query;
 
-    if (
-      !photoId ||
-      typeof photoId !== "string"
-    ) {
+    if (!photoId) {
       return res.status(400).json({
         success: false,
         message:
@@ -1226,7 +1346,19 @@ const downloadUrl = async (
       return res.status(403).json({
         success: false,
         message:
-          "You are not allowed to access this photo",
+          "You are not allowed to download this photo",
+      });
+    }
+
+    // Trashed photos cannot be downloaded
+    // from the normal gallery.
+    if (
+      photo.isTrashed === true
+    ) {
+      return res.status(410).json({
+        success: false,
+        message:
+          "This photo is in trash",
       });
     }
 
@@ -1241,9 +1373,9 @@ const downloadUrl = async (
         ResponseContentDisposition:
           `attachment; filename="${sanitizeFileName(
             photo.originalFileName ||
-              photo.fileName ||
-              photo.name ||
-              "photo"
+            photo.fileName ||
+            photo.name ||
+            "photo"
           )}"`,
 
         ResponseContentType:
@@ -1283,6 +1415,7 @@ module.exports = {
   uploadUrl,
   confirmUpload,
   getPhotos,
+  deletePhoto,
   renamePhoto,
   movePhotoToFolder,
   downloadUrl,

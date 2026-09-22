@@ -1,47 +1,167 @@
-import { Images, Settings } from "lucide-react";
+import {
+  Images,
+  Settings,
+  Trash2,
+} from "lucide-react";
+
+import {
+  Link,
+  useLocation,
+} from "@tanstack/react-router";
 
 import { APP_TAGLINE } from "@/lib/constants";
 
+// ==================================================
+// SIDEBAR
+// ==================================================
+
 export function Sidebar() {
+  const location =
+    useLocation();
+
+  const isPhotos =
+    location.pathname ===
+    "/dashboard";
+
+  const isTrash =
+    location.pathname ===
+    "/trash";
+
+  const isSettings =
+    location.pathname ===
+    "/settings";
+
   return (
     <aside className="hidden w-56 shrink-0 border-r border-border bg-sidebar px-3 py-6 md:block lg:w-64">
-      <nav aria-label="Main navigation" className="space-y-1">
-        <span
-          aria-current="page"
-          className="flex items-center gap-3 rounded-full bg-sidebar-accent px-4 py-2.5 text-sm font-semibold text-sidebar-accent-foreground"
+      <nav
+        aria-label="Main navigation"
+        className="space-y-1"
+      >
+        {/* Photos */}
+
+        <Link
+          to="/dashboard"
+          className={
+            isPhotos
+              ? "flex items-center gap-3 rounded-full bg-sidebar-accent px-4 py-2.5 text-sm font-semibold text-sidebar-accent-foreground transition"
+              : "flex items-center gap-3 rounded-full px-4 py-2.5 text-sm text-muted-foreground transition hover:bg-sidebar-accent/60 hover:text-foreground"
+          }
         >
-          <Images className="size-[18px]" aria-hidden="true" />
+          <Images
+            className="size-[18px]"
+            aria-hidden="true"
+          />
+
           Photos
-        </span>
-        <span className="flex cursor-not-allowed items-center gap-3 rounded-full px-4 py-2.5 text-sm text-muted-foreground/70">
-          <Settings className="size-[18px]" aria-hidden="true" />
+        </Link>
+
+        {/* Trash */}
+
+        <Link
+          to="/trash"
+          className={
+            isTrash
+              ? "flex items-center gap-3 rounded-full bg-sidebar-accent px-4 py-2.5 text-sm font-semibold text-sidebar-accent-foreground transition"
+              : "flex items-center gap-3 rounded-full px-4 py-2.5 text-sm text-muted-foreground transition hover:bg-sidebar-accent/60 hover:text-foreground"
+          }
+        >
+          <Trash2
+            className="size-[18px]"
+            aria-hidden="true"
+          />
+
+          Trash
+        </Link>
+
+        {/* Settings */}
+
+        <Link
+          to="/settings"
+          className={
+            isSettings
+              ? "flex items-center gap-3 rounded-full bg-sidebar-accent px-4 py-2.5 text-sm font-semibold text-sidebar-accent-foreground transition"
+              : "flex items-center gap-3 rounded-full px-4 py-2.5 text-sm text-muted-foreground transition hover:bg-sidebar-accent/60 hover:text-foreground"
+          }
+        >
+          <Settings
+            className="size-[18px]"
+            aria-hidden="true"
+          />
+
           Settings
-          <span className="ml-auto text-[10px] uppercase tracking-wide">Soon</span>
-        </span>
+        </Link>
       </nav>
-      <p className="mt-8 px-4 text-xs leading-relaxed text-muted-foreground">{APP_TAGLINE}</p>
+
+      <p className="mt-8 px-4 text-xs leading-relaxed text-muted-foreground">
+        {APP_TAGLINE}
+      </p>
     </aside>
   );
 }
 
-/** Compact navigation shown on small screens. */
+// ==================================================
+// MOBILE NAV
+// ==================================================
+
 export function MobileNav() {
+  const location =
+    useLocation();
+
+  const isPhotos =
+    location.pathname ===
+    "/dashboard";
+
+  const isTrash =
+    location.pathname ===
+    "/trash";
+
+  const isSettings =
+    location.pathname ===
+    "/settings";
+
   return (
     <nav
       aria-label="Main navigation"
-      className="flex items-center gap-2 border-b border-border bg-surface px-4 py-2.5 md:hidden"
+      className="flex items-center gap-1 overflow-x-auto border-b border-border bg-surface px-4 py-2.5 md:hidden"
     >
-      <span
-        aria-current="page"
-        className="inline-flex items-center gap-2 rounded-full bg-accent px-3.5 py-1.5 text-sm font-semibold text-accent-foreground"
+      <Link
+        to="/dashboard"
+        className={
+          isPhotos
+            ? "inline-flex shrink-0 items-center gap-2 rounded-full bg-accent px-3.5 py-1.5 text-sm font-semibold text-accent-foreground"
+            : "inline-flex shrink-0 items-center gap-2 rounded-full px-3.5 py-1.5 text-sm text-muted-foreground hover:bg-muted"
+        }
       >
-        <Images className="size-4" aria-hidden="true" />
+        <Images className="size-4" />
+
         Photos
-      </span>
-      <span className="inline-flex items-center gap-2 rounded-full px-3.5 py-1.5 text-sm text-muted-foreground/70">
-        <Settings className="size-4" aria-hidden="true" />
+      </Link>
+
+      <Link
+        to="/trash"
+        className={
+          isTrash
+            ? "inline-flex shrink-0 items-center gap-2 rounded-full bg-accent px-3.5 py-1.5 text-sm font-semibold text-accent-foreground"
+            : "inline-flex shrink-0 items-center gap-2 rounded-full px-3.5 py-1.5 text-sm text-muted-foreground hover:bg-muted"
+        }
+      >
+        <Trash2 className="size-4" />
+
+        Trash
+      </Link>
+
+      <Link
+        to="/settings"
+        className={
+          isSettings
+            ? "inline-flex shrink-0 items-center gap-2 rounded-full bg-accent px-3.5 py-1.5 text-sm font-semibold text-accent-foreground"
+            : "inline-flex shrink-0 items-center gap-2 rounded-full px-3.5 py-1.5 text-sm text-muted-foreground hover:bg-muted"
+        }
+      >
+        <Settings className="size-4" />
+
         Settings
-      </span>
+      </Link>
     </nav>
   );
 }

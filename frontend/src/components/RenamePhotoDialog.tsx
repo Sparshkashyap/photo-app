@@ -120,13 +120,19 @@ export function RenamePhotoDialog({
           updated.fileName ??
           photo.fileName,
 
-        originalFileName:
-          updated.originalFileName ??
-          photo.originalFileName,
+        ...(updated.originalFileName !== undefined
+          ? {
+              originalFileName:
+                updated.originalFileName,
+            }
+          : {}),
 
-        updatedAt:
-          updated.updatedAt ??
-          photo.updatedAt,
+        ...(updated.updatedAt !== undefined
+          ? {
+              updatedAt:
+                updated.updatedAt,
+            }
+          : {}),
       };
 
       // Send the updated photo

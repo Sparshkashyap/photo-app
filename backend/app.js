@@ -1,17 +1,40 @@
-require("dns").setDefaultResultOrder("ipv4first");
+
+// ==================================================
+// FILE: app.js
+// ==================================================
+
+require("dns").setDefaultResultOrder(
+  "ipv4first"
+);
+
 require("dotenv").config();
 
-const express = require("express");
-const cors = require("cors");
+const express =
+  require("express");
 
-const connectDB = require("./src/config/database");
+const cors =
+  require("cors");
 
-const authRoutes = require("./src/routes/authRoutes");
-const userRoutes = require("./src/routes/userRoutes");
-const photoRoutes = require("./src/routes/photoRoutes");
-const folderRoutes = require("./src/routes/folderRoutes");
+const connectDB =
+  require("./src/config/database");
 
-const app = express();
+const authRoutes =
+  require("./src/routes/authRoutes");
+
+const userRoutes =
+  require("./src/routes/userRoutes");
+
+const photoRoutes =
+  require("./src/routes/photoRoutes");
+
+const folderRoutes =
+  require("./src/routes/folderRoutes");
+
+const trashRoutes =
+  require("./src/routes/trashRoutes");
+
+const app =
+  express();
 
 // --------------------------------------------------
 // CORS
@@ -20,6 +43,7 @@ const app = express();
 app.use(
   cors({
     origin: true,
+    credentials: true,
 
     methods: [
       "GET",
@@ -34,8 +58,6 @@ app.use(
       "Content-Type",
       "Authorization",
     ],
-
-    credentials: true,
   })
 );
 
@@ -45,7 +67,14 @@ app.use(
 
 app.use(
   express.json({
-    limit: "1mb",
+    limit: "10mb",
+  })
+);
+
+app.use(
+  express.urlencoded({
+    extended: true,
+    limit: "10mb",
   })
 );
 
@@ -53,108 +82,127 @@ app.use(
 // Health Check
 // --------------------------------------------------
 
-app.get("/health", (req, res) => {
-  return res.status(200).json({
-    success: true,
-    message: "Photo App API is running",
-  });
-});
+app.get(
+  "/health",
+  (req, res) => {
+    return res.status(200).json({
+      success: true,
+      message:
+        "Photo App API is running",
+    });
+  }
+);
 
 // --------------------------------------------------
 // Routes
 // --------------------------------------------------
 
-/*
- * Authentication
- *
- * POST /auth/signup
- * POST /auth/login
- */
-app.use("/auth", authRoutes);
+app.use(
+  "/auth",
+  authRoutes
+);
 
-/*
- * User
- *
- * GET /user/profile
- */
-app.use("/user", userRoutes);
+app.use(
+  "/user",
+  userRoutes
+);
 
 app.use(
   "/folders",
   folderRoutes
 );
 
-/*
- * Photos
- *
- * POST  /photos/upload-url
- * POST  /photos/confirm
- * GET   /photos
- * GET   /photos/download-url
- * PATCH /photos/:photoId
- */
-app.use("/photos", photoRoutes);
+app.use(
+  "/photos",
+  photoRoutes
+);
+
+app.use(
+  "/trash",
+  trashRoutes
+);
 
 // --------------------------------------------------
 // 404 Handler
 // --------------------------------------------------
 
-app.use((req, res) => {
-  return res.status(404).json({
-    success: false,
-    message: `Route not found: ${req.method} ${req.originalUrl}`,
-  });
-});
+app.use(
+  (req, res) => {
+    return res.status(404).json({
+      success: false,
+      message:
+        `Route not found: ${req.method} ${req.originalUrl}`,
+    });
+  }
+);
 
 // --------------------------------------------------
 // Global Error Handler
 // --------------------------------------------------
 
-app.use((err, req, res, next) => {
-  console.error("API Error:", err);
-
-  return res.status(err.status || 500).json({
-    success: false,
-    message:
-      err.message || "Internal server error",
-  });
-});
-
-// --------------------------------------------------
-// Local Development Server
-// --------------------------------------------------
-
-const PORT = process.env.PORT || 3000;
-
-const startServer = async () => {
-  try {
-    await connectDB();
-
-    app.listen(PORT, () => {
-      console.log(
-        `Server running on http://localhost:${PORT}`
-      );
-    });
-  } catch (error) {
+app.use(
+  (err, req, res, next) => {
     console.error(
-      "Failed to start server:",
-      error.message
+      "Global error:",
+      err
     );
 
-    process.exit(1);
+    const statusCode =
+      err.statusCode ||
+      err.status ||
+      500;
+
+    return res.status(
+      statusCode
+    ).json({
+      success: false,
+
+      message:
+        err.message ||
+        "Internal server error",
+    });
   }
-};
+);
 
 // --------------------------------------------------
-// Start only when running directly
+// Local Development
+//
+// IMPORTANT:
+// Lambda does NOT call connectDB().
+// This is only for local Express development.
 // --------------------------------------------------
 
-if (require.main === module) {
-  startServer();
+if (
+  require.main === module
+) {
+  const PORT =
+    process.env.PORT || 5000;
+
+  connectDB()
+    .then(() => {
+      app.listen(
+        PORT,
+        () => {
+          console.log(
+            `Server running on port ${PORT}`
+          );
+        }
+      );
+    })
+    .catch(
+      (error) => {
+        console.error(
+          "Failed to start server:",
+          error
+        );
+
+        process.exit(1);
+      }
+    );
 }
 
 // --------------------------------------------------
-// Export Express App
+// Export
 // --------------------------------------------------
 
 module.exports = app;

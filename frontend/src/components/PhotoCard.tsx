@@ -1,30 +1,18 @@
 import {
-  Download,
-  FolderInput,
   Loader2,
-  MoreVertical,
-  Pencil,
+  X,
 } from "lucide-react";
 
-import { useState } from "react";
+import {
+  useEffect,
+  useState,
+} from "react";
+
 import { toast } from "sonner";
 
-import { Button } from "@/components/ui/button";
+import { PhotoMenu } from "@/components/PhotoMenu";
 
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-
-import { MoveToFolderDialog } from "@/components/MoveToFolderDialog";
-
-import {
-  movePhotoToFolder,
-  renamePhoto,
   requestDownloadUrl,
 } from "@/services/api";
 
@@ -44,6 +32,10 @@ type PhotoCardProps = {
     photo: Photo,
     folderId: string | null,
   ) => void;
+
+  onTrashed?: (
+    photo: Photo,
+  ) => void;
 };
 
 export function PhotoCard({
@@ -51,26 +43,12 @@ export function PhotoCard({
   folders,
   onRenamed,
   onMoved,
+  onTrashed,
 }: PhotoCardProps) {
   const [downloading, setDownloading] =
     useState(false);
 
-  const [menuOpen, setMenuOpen] =
-    useState(false);
-
-  const [renameOpen, setRenameOpen] =
-    useState(false);
-
-  const [moveOpen, setMoveOpen] =
-    useState(false);
-
-  const [newName, setNewName] =
-    useState(photo.name ?? "");
-
-  const [renaming, setRenaming] =
-    useState(false);
-
-  const [moving, setMoving] =
+  const [viewerOpen, setViewerOpen] =
     useState(false);
 
   // --------------------------------------------------
@@ -78,7 +56,9 @@ export function PhotoCard({
   // --------------------------------------------------
 
   async function handleDownload() {
-    if (downloading) return;
+    if (downloading) {
+      return;
+    }
 
     setDownloading(true);
 
@@ -99,10 +79,10 @@ export function PhotoCard({
         photo.fileName ||
         "photo";
 
+      link.target = "_blank";
+
       link.rel =
         "noopener noreferrer";
-
-      link.target = "_blank";
 
       document.body.appendChild(link);
 
@@ -140,291 +120,147 @@ export function PhotoCard({
   }
 
   // --------------------------------------------------
-  // Rename
+  // Photo Viewer
   // --------------------------------------------------
 
-  async function handleRename() {
-    const cleanName =
-      newName.trim();
-
-    if (!cleanName) {
+  function openViewer() {
+    if (!mediaUrl) {
       toast.error(
-        "Photo name cannot be empty",
+        "Photo preview is not available",
       );
 
       return;
     }
 
-    if (cleanName.length > 120) {
-      toast.error(
-        "Photo name cannot exceed 120 characters",
-      );
+    setViewerOpen(true);
+  }
 
-      return;
-    }
-
-    if (cleanName === photo.name) {
-      setRenameOpen(false);
-      return;
-    }
-
-    if (renaming) return;
-
-    setRenaming(true);
-
-    try {
-      const response =
-        await renamePhoto(
-          photo.photoId,
-          cleanName,
-        );
-
-      const updated =
-        response.photo;
-
-      const updatedPhoto: Photo = {
-        ...photo,
-
-        name:
-          updated.name ??
-          cleanName,
-
-        originalFileName:
-          updated.originalFileName ??
-          photo.originalFileName,
-
-        fileName:
-          updated.fileName ??
-          photo.fileName,
-
-        updatedAt:
-          updated.updatedAt ??
-          photo.updatedAt,
-      };
-
-      onRenamed?.(
-        updatedPhoto,
-      );
-
-      setNewName(
-        updatedPhoto.name,
-      );
-
-      setRenameOpen(false);
-
-      toast.success(
-        "Photo renamed successfully",
-      );
-    } catch (error) {
-      console.error(
-        "Rename failed:",
-        error,
-      );
-
-      toast.error(
-        "Rename failed",
-        {
-          description:
-            error instanceof Error
-              ? error.message
-              : "Please try again.",
-        },
-      );
-    } finally {
-      setRenaming(false);
-    }
+  function closeViewer() {
+    setViewerOpen(false);
   }
 
   // --------------------------------------------------
-  // Move to Folder
+  // ESC key
   // --------------------------------------------------
 
-  async function handleMove(
-    folderId: string | null,
-  ) {
-    if (moving) return;
-
-    setMoving(true);
-
-    try {
-      await movePhotoToFolder(
-        photo.photoId,
-        folderId,
-      );
-
-      onMoved?.(
-        photo,
-        folderId,
-      );
-
-      setMoveOpen(false);
-
-      toast.success(
-        folderId
-          ? "Photo moved to folder"
-          : "Photo moved to My Photos",
-      );
-    } catch (error) {
-      console.error(
-        "Move photo failed:",
-        error,
-      );
-
-      toast.error(
-        "Move failed",
-        {
-          description:
-            error instanceof Error
-              ? error.message
-              : "Please try again.",
-        },
-      );
-    } finally {
-      setMoving(false);
+  useEffect(() => {
+    if (!viewerOpen) {
+      return;
     }
-  }
+
+    function handleKeyDown(
+      event: KeyboardEvent,
+    ) {
+      if (event.key === "Escape") {
+        closeViewer();
+      }
+    }
+
+    document.addEventListener(
+      "keydown",
+      handleKeyDown,
+    );
+
+    const previousOverflow =
+      document.body.style.overflow;
+
+    document.body.style.overflow = "hidden";
+
+    return () => {
+      document.removeEventListener(
+        "keydown",
+        handleKeyDown,
+      );
+
+      document.body.style.overflow =
+        previousOverflow;
+    };
+  }, [viewerOpen]);
 
   const isVideo =
     photo.contentType?.startsWith(
       "video/",
     ) ?? false;
 
+  const mediaUrl =
+    photo.url ||
+    photo.downloadUrl ||
+    "";
+
+  const displayName =
+    photo.name ||
+    photo.fileName ||
+    photo.originalFileName ||
+    "Untitled photo";
+
   return (
     <>
-      {/* ------------------------------------------------
-          Photo Card
-      ------------------------------------------------ */}
+      {/* =================================================
+          PHOTO CARD
+      ================================================= */}
 
       <figure className="group relative overflow-hidden rounded-xl border border-border bg-surface-muted">
-        {/* Media */}
+        {/* ------------------------------------------------
+            Media
+        ------------------------------------------------ */}
 
         {isVideo ? (
           <video
-            src={photo.url}
+            src={mediaUrl}
             controls
             preload="metadata"
-            className="aspect-square w-full object-cover"
+            onDoubleClick={openViewer}
+            className="aspect-square w-full cursor-zoom-in object-cover"
           />
         ) : (
           <img
-            src={photo.url}
-            alt={
-              photo.name ||
-              photo.fileName ||
-              "Photo"
-            }
+            src={mediaUrl}
+            alt={displayName}
             loading="lazy"
             decoding="async"
-            className="aspect-square w-full object-cover transition-transform duration-300 ease-out group-hover:scale-[1.04]"
+            onDoubleClick={openViewer}
+            className="aspect-square w-full cursor-zoom-in object-cover transition-transform duration-300 ease-out group-hover:scale-[1.04]"
           />
         )}
 
-        {/* Bottom gradient */}
+        {/* ------------------------------------------------
+            Bottom Gradient
+        ------------------------------------------------ */}
 
         <div className="pointer-events-none absolute inset-x-0 bottom-0 h-24 bg-gradient-to-t from-black/60 to-transparent opacity-0 transition-opacity duration-200 group-hover:opacity-100 sm:block" />
 
-        {/* Photo name */}
+        {/* ------------------------------------------------
+            Photo Name
+        ------------------------------------------------ */}
 
         <figcaption className="pointer-events-none absolute inset-x-3 bottom-3 hidden truncate text-xs font-medium text-white opacity-0 transition-opacity duration-200 group-hover:opacity-100 sm:block">
-          {photo.name ||
-            photo.fileName ||
-            "Untitled photo"}
+          {displayName}
         </figcaption>
 
         {/* ------------------------------------------------
-            Menu
+            Photo Menu
         ------------------------------------------------ */}
 
         <div className="absolute right-2 top-2">
-          <button
-            type="button"
-            onClick={() =>
-              setMenuOpen(
-                (previous) =>
-                  !previous,
-              )
+          <PhotoMenu
+            photo={photo}
+            folders={folders}
+            onRenamed={
+              onRenamed ??
+              ((_: Photo) => {})
             }
-            aria-label={`Options for ${
-              photo.name ||
-              photo.fileName ||
-              "photo"
-            }`}
-            title="Photo options"
-            className="inline-flex size-9 items-center justify-center rounded-full border border-border bg-surface/95 text-foreground shadow-soft transition hover:bg-accent hover:text-accent-foreground sm:opacity-0 sm:group-hover:opacity-100"
-          >
-            <MoreVertical
-              className="size-4"
-              aria-hidden="true"
-            />
-          </button>
-
-          {menuOpen ? (
-            <div className="absolute right-0 top-11 z-30 w-48 overflow-hidden rounded-lg border border-border bg-surface shadow-lg">
-              {/* Rename */}
-
-              <button
-                type="button"
-                onClick={() => {
-                  setMenuOpen(false);
-
-                  setNewName(
-                    photo.name ||
-                    photo.fileName ||
-                    "",
-                  );
-
-                  setRenameOpen(true);
-                }}
-                className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm transition hover:bg-accent"
-              >
-                <Pencil className="size-4" />
-
-                <span>
-                  Rename
-                </span>
-              </button>
-
-              {/* Move */}
-
-              <button
-                type="button"
-                onClick={() => {
-                  setMenuOpen(false);
-                  setMoveOpen(true);
-                }}
-                className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm transition hover:bg-accent"
-              >
-                <FolderInput className="size-4" />
-
-                <span>
-                  Move to folder
-                </span>
-              </button>
-
-              {/* Download */}
-
-              <button
-                type="button"
-                onClick={() => {
-                  setMenuOpen(false);
-
-                  void handleDownload();
-                }}
-                disabled={downloading}
-                className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm transition hover:bg-accent disabled:cursor-not-allowed disabled:opacity-60"
-              >
-                {downloading ? (
-                  <Loader2 className="size-4 animate-spin" />
-                ) : (
-                  <Download className="size-4" />
-                )}
-
-                <span>
-                  Download
-                </span>
-              </button>
-            </div>
-          ) : null}
+            onMoved={
+              onMoved ??
+              ((_: Photo, __: string | null) => {})
+            }
+            onDownload={() => {
+              void handleDownload();
+            }}
+            onTrashed={
+              onTrashed ??
+              ((_: Photo) => {})
+            }
+          />
         </div>
 
         {/* ------------------------------------------------
@@ -440,118 +276,93 @@ export function PhotoCard({
         ) : null}
       </figure>
 
-      {/* --------------------------------------------------
-          Rename Dialog
-      -------------------------------------------------- */}
+      {/* =================================================
+          FULLSCREEN PHOTO VIEWER
+      ================================================= */}
 
-      <Dialog
-        open={renameOpen}
-        onOpenChange={(open) => {
-          if (!renaming) {
-            setRenameOpen(open);
-          }
-        }}
-      >
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle>
-              Rename photo
-            </DialogTitle>
+      {viewerOpen ? (
+        <div
+          className="fixed inset-0 z-[9999] flex h-[100dvh] w-screen items-center justify-center bg-black/95 p-3 backdrop-blur-sm sm:p-6"
+          role="dialog"
+          aria-modal="true"
+          aria-label={`Viewing ${displayName}`}
+          onMouseDown={(event) => {
+            if (
+              event.target ===
+              event.currentTarget
+            ) {
+              closeViewer();
+            }
+          }}
+        >
+          {/* ------------------------------------------------
+              Top Bar
+          ------------------------------------------------ */}
 
-            <DialogDescription>
-              Give this photo a name
-              you'll recognize in
-              your library.
-            </DialogDescription>
-          </DialogHeader>
+          <div className="pointer-events-none absolute inset-x-0 top-0 z-20 flex items-center justify-between px-3 py-3 sm:px-5 sm:py-4">
+            {/* Photo Name */}
 
-          <div className="space-y-2">
-            <label
-              htmlFor={`rename-${photo.photoId}`}
-              className="text-sm font-medium"
+            <div className="pointer-events-auto min-w-0 max-w-[70%]">
+              <p className="truncate rounded-full bg-black/45 px-4 py-2 text-sm font-medium text-white/90 backdrop-blur-md">
+                {displayName}
+              </p>
+            </div>
+
+            {/* Close */}
+
+            <button
+              type="button"
+              onClick={closeViewer}
+              aria-label="Close photo viewer"
+              title="Close"
+              className="pointer-events-auto flex size-11 shrink-0 items-center justify-center rounded-full border border-white/20 bg-black/50 text-white shadow-lg backdrop-blur-md transition-all duration-200 hover:scale-105 hover:bg-white/15 active:scale-95 focus:outline-none focus:ring-2 focus:ring-white/70"
             >
-              Photo name
-            </label>
-
-            <input
-              id={`rename-${photo.photoId}`}
-              value={newName}
-              maxLength={120}
-              disabled={renaming}
-              autoFocus
-              onChange={(event) =>
-                setNewName(
-                  event.target.value,
-                )
-              }
-              onKeyDown={(event) => {
-                if (
-                  event.key ===
-                  "Enter"
-                ) {
-                  event.preventDefault();
-
-                  void handleRename();
-                }
-              }}
-              className="flex h-10 w-full rounded-md border border-border bg-background px-3 text-sm outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 disabled:cursor-not-allowed disabled:opacity-60"
-            />
-
-            <p className="text-xs text-muted-foreground">
-              {newName.length}/120
-            </p>
+              <X className="size-5" />
+            </button>
           </div>
 
-          <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={() =>
-                setRenameOpen(false)
-              }
-              disabled={renaming}
-            >
-              Cancel
-            </Button>
+          {/* ------------------------------------------------
+              Main Viewer Area
+          ------------------------------------------------ */}
 
-            <Button
-              onClick={() =>
-                void handleRename()
-              }
-              disabled={
-                renaming ||
-                !newName.trim()
-              }
-            >
-              {renaming ? (
-                <Loader2 className="size-4 animate-spin" />
-              ) : (
-                <Pencil className="size-4" />
-              )}
+          <div className="flex h-full w-full items-center justify-center overflow-hidden">
+            {isVideo ? (
+              <video
+                src={mediaUrl}
+                controls
+                autoPlay
+                playsInline
+                className="max-h-full max-w-full rounded-lg object-contain shadow-2xl"
+                onClick={(event) => {
+                  event.stopPropagation();
+                }}
+              />
+            ) : (
+              <img
+                src={mediaUrl}
+                alt={displayName}
+                draggable={false}
+                className="max-h-full max-w-full select-none rounded-lg object-contain shadow-2xl transition-transform duration-300 ease-out"
+                onClick={(event) => {
+                  event.stopPropagation();
+                }}
+              />
+            )}
+          </div>
 
-              Rename
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+          {/* ------------------------------------------------
+              Bottom Hint
+          ------------------------------------------------ */}
 
-      {/* --------------------------------------------------
-          Move To Folder Dialog
-      -------------------------------------------------- */}
-
-      <MoveToFolderDialog
-        open={moveOpen}
-        onOpenChange={(open) => {
-          if (!moving) {
-            setMoveOpen(open);
-          }
-        }}
-        photoId={photo.photoId}
-        folders={folders}
-        currentFolderId={
-          photo.folderId ?? null
-        }
-        onMoved={handleMove}
-      />
+          <div className="pointer-events-none absolute bottom-4 left-1/2 hidden -translate-x-1/2 sm:block">
+            <span className="rounded-full bg-black/45 px-4 py-2 text-xs text-white/60 backdrop-blur-md">
+              Press ESC to close
+            </span>
+          </div>
+        </div>
+      ) : null}
     </>
   );
 }
+
+export default PhotoCard;
