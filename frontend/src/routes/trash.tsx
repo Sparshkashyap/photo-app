@@ -1,14 +1,12 @@
 import {
-  createFileRoute,
-  useNavigate,
-} from "@tanstack/react-router";
-
-import {
+  AlertTriangle,
   ArrowLeft,
-  ImageOff,
+  Image as ImageIcon,
   Loader2,
+  RefreshCw,
   RotateCcw,
   Trash2,
+  Video,
 } from "lucide-react";
 
 import {
@@ -17,16 +15,10 @@ import {
   useState,
 } from "react";
 
-import { toast } from "sonner";
-
-import { Navbar } from "@/components/Navbar";
-
 import {
-  MobileNav,
-  Sidebar,
-} from "@/components/Sidebar";
-
-import { Button } from "@/components/ui/button";
+  Link,
+  createFileRoute,
+} from "@tanstack/react-router";
 
 import {
   deletePhotoForever,
@@ -35,436 +27,758 @@ import {
   restorePhoto,
 } from "@/services/api";
 
-type TrashPhoto = {
-  photoId: string;
-  name: string;
-  url?: string | null;
-  contentType?: string | null;
-};
+import type { TrashPhoto } from "@/types/photo";
 
-export const Route =
-  createFileRoute("/trash")({
-    component:
-      TrashPage,
-  });
+import { useAuth } from "@/hooks/useAuth";
+
+import { Button } from "@/components/ui/button";
+
+import {
+  Card,
+  CardContent,
+} from "@/components/ui/card";
+
+export const Route = createFileRoute("/trash")({
+  component: TrashPage,
+});
+
+// ======================================================
+// Helpers
+// ======================================================
+
+function formatDate(
+  date?: string | null,
+) {
+  if (!date) {
+    return "Unknown date";
+  }
+
+  const parsed = new Date(date);
+
+  if (Number.isNaN(parsed.getTime())) {
+    return "Unknown date";
+  }
+
+  return parsed.toLocaleDateString(
+    undefined,
+    {
+      day: "numeric",
+      month: "short",
+      year: "numeric",
+    },
+  );
+}
+
+function formatFileSize(
+  bytes?: number,
+) {
+  if (!bytes || bytes <= 0) {
+    return "";
+  }
+
+  if (bytes < 1024) {
+    return `${bytes} B`;
+  }
+
+  if (bytes < 1024 * 1024) {
+    return `${(
+      bytes / 1024
+    ).toFixed(1)} KB`;
+  }
+
+  if (
+    bytes <
+    1024 * 1024 * 1024
+  ) {
+    return `${(
+      bytes /
+      (1024 * 1024)
+    ).toFixed(1)} MB`;
+  }
+
+  return `${(
+    bytes /
+    (1024 * 1024 * 1024)
+  ).toFixed(1)} GB`;
+}
+
+// ======================================================
+// Trash Page
+// ======================================================
 
 function TrashPage() {
-  const navigate =
-    useNavigate();
+  const {
+    isAuthenticated,
+  } = useAuth();
 
-  const [photos, setPhotos] =
-    useState<TrashPhoto[]>(
+  const [
+    photos,
+    setPhotos,
+  ] = useState<TrashPhoto[]>([]);
+
+  const [
+    loading,
+    setLoading,
+  ] = useState(true);
+
+  const [
+    error,
+    setError,
+  ] = useState("");
+
+  const [
+    busyPhotoId,
+    setBusyPhotoId,
+  ] = useState<string | null>(
+    null,
+  );
+
+  const [
+    emptying,
+    setEmptying,
+  ] = useState(false);
+
+  // ====================================================
+  // Load Trash
+  // ====================================================
+
+  const loadTrash =
+    useCallback(
+      async () => {
+        setLoading(true);
+        setError("");
+
+        try {
+          const response =
+            await getTrashPhotos();
+
+          setPhotos(
+            response.photos ?? [],
+          );
+        } catch (err) {
+          console.error(
+            "Failed to load Trash:",
+            err,
+          );
+
+          setError(
+            err instanceof Error
+              ? err.message
+              : "Failed to load Trash.",
+          );
+        } finally {
+          setLoading(false);
+        }
+      },
       [],
     );
 
-  const [loading, setLoading] =
-    useState(true);
-
-  const [busyPhotoId, setBusyPhotoId] =
-    useState<string | null>(
-      null,
-    );
-
-  const [emptying, setEmptying] =
-    useState(false);
-
-  // --------------------------------------------------
-  // Load trash
-  // --------------------------------------------------
-
-  const loadTrash =
-    useCallback(async () => {
-      try {
-        setLoading(true);
-
-        const response =
-          await getTrashPhotos();
-
-        const normalizedPhotos: TrashPhoto[] =
-          (response.photos ?? []).map(
-            (photo) => ({
-              ...photo,
-              url: photo.url ?? "",
-            }),
-          );
-
-        setPhotos(normalizedPhotos);
-      } catch (error) {
-        console.error(
-          "Failed to load trash:",
-          error,
-        );
-
-        toast.error(
-          "Couldn't load Trash",
-          {
-            description:
-              error instanceof Error
-                ? error.message
-                : "Please try again.",
-          },
-        );
-      } finally {
-        setLoading(false);
-      }
-    }, []);
+  // ====================================================
+  // Authentication + Initial Load
+  // ====================================================
 
   useEffect(() => {
+    if (!isAuthenticated) {
+      setLoading(false);
+      return;
+    }
+
     void loadTrash();
-  }, [loadTrash]);
+  }, [
+    isAuthenticated,
+    loadTrash,
+  ]);
 
-  // --------------------------------------------------
-  // Restore
-  // --------------------------------------------------
+  // ====================================================
+  // Restore Photo
+  // ====================================================
 
-  async function handleRestore(
-    photoId: string,
-  ) {
-    if (busyPhotoId) {
-      return;
-    }
+  const handleRestore =
+    async (
+      photo: TrashPhoto,
+    ) => {
+      if (busyPhotoId || emptying) {
+        return;
+      }
 
-    setBusyPhotoId(
-      photoId,
-    );
-
-    try {
-      await restorePhoto(
-        photoId,
-      );
-
-      setPhotos(
-        (previous) =>
-          previous.filter(
-            (photo) =>
-              photo.photoId !==
-              photoId,
-          ),
-      );
-
-      toast.success(
-        "Photo restored",
-      );
-    } catch (error) {
-      console.error(
-        "Restore failed:",
-        error,
-      );
-
-      toast.error(
-        "Couldn't restore photo",
-        {
-          description:
-            error instanceof Error
-              ? error.message
-              : "Please try again.",
-        },
-      );
-    } finally {
+      setError("");
       setBusyPhotoId(
-        null,
-      );
-    }
-  }
-
-  // --------------------------------------------------
-  // Delete forever
-  // --------------------------------------------------
-
-  async function handleDeleteForever(
-    photoId: string,
-  ) {
-    if (busyPhotoId) {
-      return;
-    }
-
-    const confirmed =
-      window.confirm(
-        "Delete this photo permanently? This action cannot be undone.",
+        photo.photoId,
       );
 
-    if (!confirmed) {
-      return;
-    }
+      try {
+        await restorePhoto(
+          photo.photoId,
+        );
 
-    setBusyPhotoId(
-      photoId,
-    );
+        setPhotos(
+          (current) =>
+            current.filter(
+              (item) =>
+                item.photoId !==
+                photo.photoId,
+            ),
+        );
+      } catch (err) {
+        console.error(
+          "Failed to restore photo:",
+          err,
+        );
 
-    try {
-      await deletePhotoForever(
-        photoId,
-      );
+        setError(
+          err instanceof Error
+            ? err.message
+            : "Failed to restore photo.",
+        );
+      } finally {
+        setBusyPhotoId(null);
+      }
+    };
 
-      setPhotos(
-        (previous) =>
-          previous.filter(
-            (photo) =>
-              photo.photoId !==
-              photoId,
-          ),
-      );
+  // ====================================================
+  // Delete Forever
+  // ====================================================
 
-      toast.success(
-        "Photo permanently deleted",
-      );
-    } catch (error) {
-      console.error(
-        "Permanent delete failed:",
-        error,
-      );
+  const handleDeleteForever =
+    async (
+      photo: TrashPhoto,
+    ) => {
+      if (busyPhotoId || emptying) {
+        return;
+      }
 
-      toast.error(
-        "Couldn't delete photo",
-        {
-          description:
-            error instanceof Error
-              ? error.message
-              : "Please try again.",
-        },
-      );
-    } finally {
+      const confirmed =
+        window.confirm(
+          `Delete "${photo.name}" permanently? This action cannot be undone.`,
+        );
+
+      if (!confirmed) {
+        return;
+      }
+
+      setError("");
       setBusyPhotoId(
-        null,
+        photo.photoId,
       );
-    }
+
+      try {
+        await deletePhotoForever(
+          photo.photoId,
+        );
+
+        setPhotos(
+          (current) =>
+            current.filter(
+              (item) =>
+                item.photoId !==
+                photo.photoId,
+            ),
+        );
+      } catch (err) {
+        console.error(
+          "Failed to permanently delete photo:",
+          err,
+        );
+
+        setError(
+          err instanceof Error
+            ? err.message
+            : "Failed to permanently delete photo.",
+        );
+      } finally {
+        setBusyPhotoId(null);
+      }
+    };
+
+  // ====================================================
+  // Empty Trash
+  // ====================================================
+
+  const handleEmptyTrash =
+    async () => {
+      if (
+        emptying ||
+        photos.length === 0 ||
+        busyPhotoId
+      ) {
+        return;
+      }
+
+      const confirmed =
+        window.confirm(
+          "Empty Trash permanently? All photos in Trash will be deleted and cannot be restored.",
+        );
+
+      if (!confirmed) {
+        return;
+      }
+
+      setEmptying(true);
+      setError("");
+
+      try {
+        await emptyTrash();
+
+        setPhotos([]);
+      } catch (err) {
+        console.error(
+          "Failed to empty Trash:",
+          err,
+        );
+
+        setError(
+          err instanceof Error
+            ? err.message
+            : "Failed to empty Trash.",
+        );
+      } finally {
+        setEmptying(false);
+      }
+    };
+
+  // ====================================================
+  // Loading State
+  // ====================================================
+
+  if (
+    loading
+  ) {
+    return (
+      <div className="min-h-screen bg-background">
+        <div className="flex min-h-[70vh] items-center justify-center">
+          <div className="flex items-center gap-3 text-muted-foreground">
+            <Loader2 className="h-5 w-5 animate-spin" />
+
+            <span>
+              Loading Trash...
+            </span>
+          </div>
+        </div>
+      </div>
+    );
   }
 
-  // --------------------------------------------------
-  // Empty trash
-  // --------------------------------------------------
+  // ====================================================
+  // Authentication State
+  // ====================================================
 
-  async function handleEmptyTrash() {
-    if (
-      emptying ||
-      photos.length === 0
-    ) {
-      return;
-    }
+  if (!isAuthenticated) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-background px-6">
+        <Card className="w-full max-w-md">
+          <CardContent className="p-8 text-center">
+            <Trash2 className="mx-auto mb-4 h-10 w-10 text-muted-foreground" />
 
-    const confirmed =
-      window.confirm(
-        `Permanently delete all ${photos.length} photos from Trash? This cannot be undone.`,
-      );
+            <h1 className="text-xl font-semibold">
+              Sign in required
+            </h1>
 
-    if (!confirmed) {
-      return;
-    }
+            <p className="mt-2 text-sm text-muted-foreground">
+              Please sign in to access your Trash.
+            </p>
 
-    setEmptying(true);
-
-    try {
-      await emptyTrash();
-
-      setPhotos([]);
-
-      toast.success(
-        "Trash emptied",
-      );
-    } catch (error) {
-      console.error(
-        "Empty trash failed:",
-        error,
-      );
-
-      toast.error(
-        "Couldn't empty Trash",
-        {
-          description:
-            error instanceof Error
-              ? error.message
-              : "Please try again.",
-        },
-      );
-    } finally {
-      setEmptying(false);
-    }
+            <Button
+              asChild
+              className="mt-6"
+            >
+              <Link to="/login">
+                Go to Login
+              </Link>
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    );
   }
 
-  // --------------------------------------------------
-  // UI
-  // --------------------------------------------------
+  // ====================================================
+  // Main UI
+  // ====================================================
 
   return (
     <div className="min-h-screen bg-background">
-      <Navbar />
+      {/* ==================================================
+          Header
+      ================================================== */}
 
-      <MobileNav />
+      <header className="sticky top-0 z-30 border-b border-border bg-background/90 backdrop-blur-xl">
+        <div className="mx-auto flex h-16 max-w-[1600px] items-center justify-between gap-4 px-4 sm:px-6">
+          {/* Left */}
 
-      <div className="mx-auto flex w-full max-w-[1600px]">
-        <Sidebar />
+          <div className="flex min-w-0 items-center gap-3">
+            <Button
+              variant="ghost"
+              size="icon"
+              asChild
+              title="Back to Photos"
+            >
+              <Link to="/dashboard">
+                <ArrowLeft className="h-5 w-5" />
+              </Link>
+            </Button>
 
-        <main className="min-w-0 flex-1 px-4 py-6 sm:px-6 sm:py-8">
-          <div className="flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
-            <div>
-              <button
-                type="button"
-                onClick={() =>
-                  void navigate({
-                    to: "/dashboard",
-                  })
-                }
-                className="mb-4 inline-flex items-center gap-2 text-sm text-muted-foreground transition hover:text-foreground"
-              >
-                <ArrowLeft className="size-4" />
+            <div className="flex min-w-0 items-center gap-3">
+              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
+                <Trash2 className="h-5 w-5" />
+              </div>
 
-                Back to Photos
-              </button>
+              <div className="min-w-0">
+                <h1 className="truncate text-lg font-semibold">
+                  Trash
+                </h1>
 
-              <h1 className="text-3xl font-semibold tracking-tight">
-                Trash
-              </h1>
+                <p className="hidden text-xs text-muted-foreground sm:block">
+                  Deleted photos stay here until permanently removed.
+                </p>
+              </div>
+            </div>
+          </div>
 
-              <p className="mt-1 text-sm text-muted-foreground">
-                Photos moved to Trash can be restored or permanently deleted.
+          {/* Right */}
+
+          <div className="flex shrink-0 items-center gap-2">
+            <Button
+              variant="outline"
+              size="icon"
+              onClick={() =>
+                void loadTrash()
+              }
+              disabled={
+                loading ||
+                emptying ||
+                Boolean(busyPhotoId)
+              }
+              title="Refresh"
+            >
+              <RefreshCw
+                className={`h-4 w-4 ${
+                  loading
+                    ? "animate-spin"
+                    : ""
+                }`}
+              />
+            </Button>
+
+            <Button
+              variant="destructive"
+              size="sm"
+              onClick={() =>
+                void handleEmptyTrash()
+              }
+              disabled={
+                photos.length === 0 ||
+                emptying ||
+                Boolean(busyPhotoId)
+              }
+              className="hidden sm:flex"
+            >
+              {emptying ? (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              ) : (
+                <Trash2 className="mr-2 h-4 w-4" />
+              )}
+
+              Empty Trash
+            </Button>
+          </div>
+        </div>
+      </header>
+
+      {/* ==================================================
+          Main
+      ================================================== */}
+
+      <main className="mx-auto w-full max-w-[1600px] px-4 py-6 sm:px-6">
+        {/* ==================================================
+            Error
+        ================================================== */}
+
+        {error ? (
+          <div className="mb-6 flex items-start gap-3 rounded-xl border border-destructive/30 bg-destructive/5 p-4 text-sm">
+            <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-destructive" />
+
+            <div className="flex-1">
+              <p className="font-medium">
+                Something went wrong
+              </p>
+
+              <p className="mt-1 text-muted-foreground">
+                {error}
               </p>
             </div>
 
-            {photos.length > 0 ? (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() =>
+                void loadTrash()
+              }
+              disabled={
+                loading ||
+                emptying ||
+                Boolean(busyPhotoId)
+              }
+            >
+              <RefreshCw className="mr-2 h-4 w-4" />
+              Retry
+            </Button>
+          </div>
+        ) : null}
+
+        {/* ==================================================
+            Empty Trash State
+        ================================================== */}
+
+        {photos.length === 0 ? (
+          <Card className="border-dashed">
+            <CardContent className="flex min-h-[55vh] flex-col items-center justify-center px-6 text-center">
+              <div className="mb-5 flex h-20 w-20 items-center justify-center rounded-full bg-muted">
+                <Trash2 className="h-9 w-9 text-muted-foreground" />
+              </div>
+
+              <h2 className="text-xl font-semibold">
+                Trash is empty
+              </h2>
+
+              <p className="mt-2 max-w-md text-sm text-muted-foreground">
+                Photos you move to Trash will appear here.
+                You can restore them or permanently delete them.
+              </p>
+
+              <Button
+                asChild
+                variant="outline"
+                className="mt-6"
+              >
+                <Link to="/dashboard">
+                  Back to Photos
+                </Link>
+              </Button>
+            </CardContent>
+          </Card>
+        ) : (
+          <>
+            {/* ==================================================
+                Trash Header
+            ================================================== */}
+
+            <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <p className="text-sm font-medium">
+                  {photos.length}{" "}
+                  {photos.length === 1
+                    ? "item"
+                    : "items"}
+                </p>
+
+                <p className="text-xs text-muted-foreground">
+                  Review your deleted photos before permanently removing them.
+                </p>
+              </div>
+
+              {/* Mobile Empty Trash */}
+
               <Button
                 variant="destructive"
+                size="sm"
                 onClick={() =>
                   void handleEmptyTrash()
                 }
-                disabled={emptying}
+                disabled={
+                  emptying ||
+                  Boolean(busyPhotoId)
+                }
+                className="sm:hidden"
               >
                 {emptying ? (
-                  <Loader2 className="size-4 animate-spin" />
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                 ) : (
-                  <Trash2 className="size-4" />
+                  <Trash2 className="mr-2 h-4 w-4" />
                 )}
 
                 Empty Trash
               </Button>
-            ) : null}
-          </div>
-
-          {loading ? (
-            <div className="mt-10 flex min-h-[300px] items-center justify-center">
-              <Loader2 className="size-7 animate-spin text-primary" />
             </div>
-          ) : photos.length === 0 ? (
-            <div className="mt-8 flex min-h-[360px] flex-col items-center justify-center rounded-2xl border border-dashed border-border bg-card px-6 text-center">
-              <div className="mb-4 flex size-16 items-center justify-center rounded-2xl bg-muted">
-                <ImageOff className="size-7 text-muted-foreground" />
-              </div>
 
-              <h2 className="text-lg font-semibold">
-                Trash is empty
-              </h2>
+            {/* ==================================================
+                Photo Grid
+            ================================================== */}
 
-              <p className="mt-1 max-w-md text-sm text-muted-foreground">
-                Photos you move to Trash will appear here. You can restore them later or permanently delete them.
-              </p>
-
-              <Button
-                className="mt-6"
-                onClick={() =>
-                  void navigate({
-                    to: "/dashboard",
-                  })
-                }
-              >
-                Go to Photos
-              </Button>
-            </div>
-          ) : (
-            <div className="mt-8 grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
               {photos.map(
                 (photo) => {
-                  const busy =
-                    busyPhotoId ===
-                    photo.photoId;
+                  const mediaUrl =
+                    photo.url ||
+                    photo.downloadUrl ||
+                    "";
 
                   const isVideo =
                     photo.contentType?.startsWith(
                       "video/",
-                    );
+                    ) ?? false;
+
+                  const busy =
+                    busyPhotoId ===
+                    photo.photoId;
+
+                  const displayName =
+                    photo.name ||
+                    photo.fileName ||
+                    photo.originalFileName ||
+                    "Untitled photo";
 
                   return (
-                    <article
+                    <Card
                       key={
                         photo.photoId
                       }
-                      className="group overflow-hidden rounded-2xl border border-border bg-card shadow-sm"
+                      className="group overflow-hidden"
                     >
+                      {/* Media */}
+
                       <div className="relative aspect-square overflow-hidden bg-muted">
-                        {isVideo ? (
-                          <video
-                            src={photo.url ?? undefined}
-                            className="size-full object-cover"
-                            muted
-                            playsInline
-                          />
+                        {mediaUrl ? (
+                          isVideo ? (
+                            <video
+                              src={mediaUrl}
+                              className="h-full w-full object-cover"
+                              muted
+                              playsInline
+                              preload="metadata"
+                            />
+                          ) : (
+                            <img
+                              src={
+                                mediaUrl
+                              }
+                              alt={
+                                displayName
+                              }
+                              className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-[1.02]"
+                              loading="lazy"
+                              decoding="async"
+                            />
+                          )
                         ) : (
-                          <img
-                            src={photo.url ?? undefined}
-                            alt={
-                              photo.name
-                            }
-                            className="size-full object-cover transition duration-300 group-hover:scale-105"
-                            loading="lazy"
-                          />
+                          <div className="flex h-full items-center justify-center">
+                            {isVideo ? (
+                              <Video className="h-10 w-10 text-muted-foreground" />
+                            ) : (
+                              <ImageIcon className="h-10 w-10 text-muted-foreground" />
+                            )}
+                          </div>
                         )}
 
-                        <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/70 to-transparent p-3 pt-10">
-                          <p className="truncate text-sm font-medium text-white">
-                            {
-                              photo.name
-                            }
-                          </p>
+                        {/* Trash Badge */}
+
+                        <div className="absolute left-3 top-3 rounded-full bg-black/60 px-2.5 py-1 text-[11px] font-medium text-white backdrop-blur">
+                          In Trash
                         </div>
+
+                        {/* Loading Overlay */}
+
+                        {busy ? (
+                          <div className="absolute inset-0 z-10 flex items-center justify-center bg-black/30 backdrop-blur-[2px]">
+                            <div className="flex size-11 items-center justify-center rounded-full bg-background/90 shadow-lg">
+                              <Loader2 className="size-5 animate-spin" />
+                            </div>
+                          </div>
+                        ) : null}
                       </div>
 
-                      <div className="flex gap-2 p-3">
-                        <Button
-                          size="sm"
-                          className="flex-1"
-                          onClick={() =>
-                            void handleRestore(
-                              photo.photoId,
-                            )
-                          }
-                          disabled={
-                            busy ||
-                            emptying
-                          }
-                        >
-                          {busy ? (
-                            <Loader2 className="size-4 animate-spin" />
-                          ) : (
-                            <RotateCcw className="size-4" />
-                          )}
+                      {/* Information */}
 
-                          Restore
-                        </Button>
+                      <CardContent className="p-4">
+                        <div className="min-w-0">
+                          <p
+                            className="truncate text-sm font-medium"
+                            title={
+                              displayName
+                            }
+                          >
+                            {displayName}
+                          </p>
 
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          className="px-3"
-                          onClick={() =>
-                            void handleDeleteForever(
-                              photo.photoId,
-                            )
-                          }
-                          disabled={
-                            busy ||
-                            emptying
-                          }
-                          aria-label={`Delete ${photo.name} forever`}
-                        >
-                          <Trash2 className="size-4 text-destructive" />
-                        </Button>
-                      </div>
-                    </article>
+                          <div className="mt-1 flex flex-wrap gap-x-2 text-xs text-muted-foreground">
+                            <span>
+                              Deleted{" "}
+                              {formatDate(
+                                photo.trashedAt,
+                              )}
+                            </span>
+
+                            {photo.fileSize ? (
+                              <>
+                                <span>
+                                  •
+                                </span>
+
+                                <span>
+                                  {formatFileSize(
+                                    photo.fileSize,
+                                  )}
+                                </span>
+                              </>
+                            ) : null}
+                          </div>
+                        </div>
+
+                        {/* Actions */}
+
+                        <div className="mt-4 flex gap-2">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="flex-1"
+                            disabled={
+                              busy ||
+                              emptying
+                            }
+                            onClick={() =>
+                              void handleRestore(
+                                photo,
+                              )
+                            }
+                          >
+                            {busy ? (
+                              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                            ) : (
+                              <RotateCcw className="mr-2 h-4 w-4" />
+                            )}
+
+                            Restore
+                          </Button>
+
+                          <Button
+                            variant="destructive"
+                            size="sm"
+                            className="flex-1"
+                            disabled={
+                              busy ||
+                              emptying
+                            }
+                            onClick={() =>
+                              void handleDeleteForever(
+                                photo,
+                              )
+                            }
+                          >
+                            <Trash2 className="mr-2 h-4 w-4" />
+
+                            Delete
+                          </Button>
+                        </div>
+                      </CardContent>
+                    </Card>
                   );
                 },
               )}
             </div>
-          )}
-        </main>
-      </div>
+          </>
+        )}
+      </main>
     </div>
   );
 }
+
+export default TrashPage;

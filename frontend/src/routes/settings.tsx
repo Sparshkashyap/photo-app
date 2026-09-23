@@ -13,11 +13,16 @@ import {
   Trash2,
   User,
   Images,
+  LayoutGrid,
+  Play,
+  RotateCcw,
+  Info,
 } from "lucide-react";
 
 import {
   useEffect,
   useState,
+  type ReactNode,
 } from "react";
 
 import { toast } from "sonner";
@@ -48,14 +53,13 @@ type SettingsState = {
   darkMode: boolean;
 };
 
-const DEFAULT_SETTINGS: SettingsState =
-  {
-    compactGrid: false,
-    confirmTrash: true,
-    autoplayVideos: false,
-    showFileNames: true,
-    darkMode: false,
-  };
+const DEFAULT_SETTINGS: SettingsState = {
+  compactGrid: false,
+  confirmTrash: true,
+  autoplayVideos: false,
+  showFileNames: true,
+  darkMode: false,
+};
 
 // ==================================================
 // ROUTE
@@ -86,7 +90,7 @@ function SettingsPage() {
     );
 
   // --------------------------------------------------
-  // Load settings
+  // LOAD SETTINGS
   // --------------------------------------------------
 
   useEffect(() => {
@@ -118,7 +122,24 @@ function SettingsPage() {
   }, []);
 
   // --------------------------------------------------
-  // Save settings
+  // APPLY DARK MODE
+  // --------------------------------------------------
+
+  useEffect(() => {
+    const root =
+      document.documentElement;
+
+    if (settings.darkMode) {
+      root.classList.add("dark");
+    } else {
+      root.classList.remove("dark");
+    }
+  }, [
+    settings.darkMode,
+  ]);
+
+  // --------------------------------------------------
+  // SAVE SETTINGS
   // --------------------------------------------------
 
   function updateSetting<
@@ -145,7 +166,41 @@ function SettingsPage() {
   }
 
   // --------------------------------------------------
-  // Logout
+  // RESET SETTINGS
+  // --------------------------------------------------
+
+  function handleResetSettings() {
+    const confirmed =
+      window.confirm(
+        "Reset all Photos settings to their default values?",
+      );
+
+    if (!confirmed) {
+      return;
+    }
+
+    setSettings(
+      DEFAULT_SETTINGS,
+    );
+
+    localStorage.setItem(
+      SETTINGS_KEY,
+      JSON.stringify(
+        DEFAULT_SETTINGS,
+      ),
+    );
+
+    document.documentElement.classList.remove(
+      "dark",
+    );
+
+    toast.success(
+      "Settings reset to default",
+    );
+  }
+
+  // --------------------------------------------------
+  // LOGOUT
   // --------------------------------------------------
 
   function handleLogout() {
@@ -176,6 +231,11 @@ function SettingsPage() {
 
         <main className="min-w-0 flex-1 px-4 py-6 sm:px-6 sm:py-8">
           <div className="mx-auto max-w-4xl">
+
+            {/* ==========================================
+                BACK
+            ========================================== */}
+
             <button
               type="button"
               onClick={() =>
@@ -190,6 +250,10 @@ function SettingsPage() {
               Back to Photos
             </button>
 
+            {/* ==========================================
+                HEADER
+            ========================================== */}
+
             <div>
               <h1 className="text-3xl font-semibold tracking-tight">
                 Settings
@@ -200,11 +264,14 @@ function SettingsPage() {
               </p>
             </div>
 
-            {/* Account */}
+            {/* ==========================================
+                ACCOUNT
+            ========================================== */}
 
             <section className="mt-8 overflow-hidden rounded-2xl border border-border bg-card">
               <div className="border-b border-border p-5">
                 <div className="flex items-center gap-3">
+
                   <div className="flex size-10 items-center justify-center rounded-xl bg-accent text-accent-foreground">
                     <User className="size-5" />
                   </div>
@@ -218,10 +285,12 @@ function SettingsPage() {
                       Your Photos account information
                     </p>
                   </div>
+
                 </div>
               </div>
 
               <div className="space-y-4 p-5">
+
                 <div className="rounded-xl border border-border bg-muted/30 p-4">
                   <p className="text-xs text-muted-foreground">
                     Name
@@ -238,19 +307,24 @@ function SettingsPage() {
                     Email
                   </p>
 
-                  <p className="mt-1 font-medium">
+                  <p className="mt-1 break-all font-medium">
                     {user?.email ||
                       "Unknown"}
                   </p>
                 </div>
+
               </div>
             </section>
 
-            {/* Appearance */}
+            {/* ==========================================
+                APPEARANCE
+            ========================================== */}
 
             <section className="mt-6 overflow-hidden rounded-2xl border border-border bg-card">
+
               <div className="border-b border-border p-5">
                 <div className="flex items-center gap-3">
+
                   <div className="flex size-10 items-center justify-center rounded-xl bg-accent text-accent-foreground">
                     <Palette className="size-5" />
                   </div>
@@ -264,10 +338,12 @@ function SettingsPage() {
                       Customize how your gallery looks.
                     </p>
                   </div>
+
                 </div>
               </div>
 
               <div className="divide-y divide-border">
+
                 <SettingRow
                   icon={
                     <Moon className="size-5" />
@@ -289,7 +365,7 @@ function SettingsPage() {
 
                 <SettingRow
                   icon={
-                    <Images className="size-5" />
+                    <LayoutGrid className="size-5" />
                   }
                   title="Compact photo grid"
                   description="Show more photos on the screen at once."
@@ -324,14 +400,19 @@ function SettingsPage() {
                     )
                   }
                 />
+
               </div>
             </section>
 
-            {/* Gallery */}
+            {/* ==========================================
+                GALLERY
+            ========================================== */}
 
             <section className="mt-6 overflow-hidden rounded-2xl border border-border bg-card">
+
               <div className="border-b border-border p-5">
                 <div className="flex items-center gap-3">
+
                   <div className="flex size-10 items-center justify-center rounded-xl bg-accent text-accent-foreground">
                     <Images className="size-5" />
                   </div>
@@ -345,13 +426,15 @@ function SettingsPage() {
                       Control photo and video behaviour.
                     </p>
                   </div>
+
                 </div>
               </div>
 
               <div className="divide-y divide-border">
+
                 <SettingRow
                   icon={
-                    <Images className="size-5" />
+                    <Play className="size-5" />
                   }
                   title="Autoplay videos"
                   description="Automatically play videos while browsing."
@@ -386,14 +469,19 @@ function SettingsPage() {
                     )
                   }
                 />
+
               </div>
             </section>
 
-            {/* Trash */}
+            {/* ==========================================
+                TRASH
+            ========================================== */}
 
             <section className="mt-6 overflow-hidden rounded-2xl border border-border bg-card">
+
               <div className="border-b border-border p-5">
                 <div className="flex items-center gap-3">
+
                   <div className="flex size-10 items-center justify-center rounded-xl bg-destructive/10 text-destructive">
                     <Trash2 className="size-5" />
                   </div>
@@ -407,10 +495,12 @@ function SettingsPage() {
                       Manage photos that you moved to Trash.
                     </p>
                   </div>
+
                 </div>
               </div>
 
               <div className="flex flex-col gap-4 p-5 sm:flex-row sm:items-center sm:justify-between">
+
                 <div>
                   <p className="font-medium">
                     Deleted photos
@@ -433,13 +523,131 @@ function SettingsPage() {
 
                   Open Trash
                 </Button>
+
               </div>
             </section>
 
-            {/* Logout */}
+            {/* ==========================================
+                PREFERENCES RESET
+            ========================================== */}
+
+            <section className="mt-6 overflow-hidden rounded-2xl border border-border bg-card">
+
+              <div className="border-b border-border p-5">
+                <div className="flex items-center gap-3">
+
+                  <div className="flex size-10 items-center justify-center rounded-xl bg-muted text-muted-foreground">
+                    <RotateCcw className="size-5" />
+                  </div>
+
+                  <div>
+                    <h2 className="font-semibold">
+                      Preferences
+                    </h2>
+
+                    <p className="text-sm text-muted-foreground">
+                      Reset local Photos preferences.
+                    </p>
+                  </div>
+
+                </div>
+              </div>
+
+              <div className="flex flex-col gap-4 p-5 sm:flex-row sm:items-center sm:justify-between">
+
+                <div>
+                  <p className="font-medium">
+                    Reset settings
+                  </p>
+
+                  <p className="mt-1 text-sm text-muted-foreground">
+                    Restore appearance and gallery preferences to their defaults.
+                  </p>
+                </div>
+
+                <Button
+                  variant="outline"
+                  onClick={
+                    handleResetSettings
+                  }
+                >
+                  <RotateCcw className="size-4" />
+
+                  Reset
+                </Button>
+
+              </div>
+            </section>
+
+            {/* ==========================================
+                ABOUT
+            ========================================== */}
+
+            <section className="mt-6 overflow-hidden rounded-2xl border border-border bg-card">
+
+              <div className="border-b border-border p-5">
+                <div className="flex items-center gap-3">
+
+                  <div className="flex size-10 items-center justify-center rounded-xl bg-accent text-accent-foreground">
+                    <Info className="size-5" />
+                  </div>
+
+                  <div>
+                    <h2 className="font-semibold">
+                      About
+                    </h2>
+
+                    <p className="text-sm text-muted-foreground">
+                      Information about this Photos application.
+                    </p>
+                  </div>
+
+                </div>
+              </div>
+
+              <div className="space-y-3 p-5">
+
+                <div className="flex items-center justify-between rounded-xl border border-border bg-muted/20 p-4">
+                  <span className="text-sm text-muted-foreground">
+                    Application
+                  </span>
+
+                  <span className="text-sm font-medium">
+                    Photo App
+                  </span>
+                </div>
+
+                <div className="flex items-center justify-between rounded-xl border border-border bg-muted/20 p-4">
+                  <span className="text-sm text-muted-foreground">
+                    Storage
+                  </span>
+
+                  <span className="text-sm font-medium">
+                    AWS S3
+                  </span>
+                </div>
+
+                <div className="flex items-center justify-between rounded-xl border border-border bg-muted/20 p-4">
+                  <span className="text-sm text-muted-foreground">
+                    Database
+                  </span>
+
+                  <span className="text-sm font-medium">
+                    DynamoDB
+                  </span>
+                </div>
+
+              </div>
+            </section>
+
+            {/* ==========================================
+                LOGOUT
+            ========================================== */}
 
             <section className="mt-6 rounded-2xl border border-destructive/20 bg-destructive/5 p-5">
+
               <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+
                 <div>
                   <h2 className="font-semibold">
                     Sign out
@@ -460,8 +668,11 @@ function SettingsPage() {
 
                   Log out
                 </Button>
+
               </div>
+
             </section>
+
           </div>
         </main>
       </div>
@@ -480,7 +691,7 @@ function SettingRow({
   checked,
   onChange,
 }: {
-  icon: React.ReactNode;
+  icon: ReactNode;
   title: string;
   description: string;
   checked: boolean;
@@ -490,11 +701,13 @@ function SettingRow({
 }) {
   return (
     <div className="flex items-center gap-4 p-5 transition hover:bg-muted/30">
+
       <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-muted text-muted-foreground">
         {icon}
       </div>
 
       <div className="min-w-0 flex-1">
+
         <p className="font-medium">
           {title}
         </p>
@@ -502,12 +715,14 @@ function SettingRow({
         <p className="mt-0.5 text-sm text-muted-foreground">
           {description}
         </p>
+
       </div>
 
       <button
         type="button"
         role="switch"
         aria-checked={checked}
+        aria-label={title}
         onClick={() =>
           onChange(!checked)
         }
@@ -529,6 +744,7 @@ function SettingRow({
           ) : null}
         </span>
       </button>
+
     </div>
   );
 }

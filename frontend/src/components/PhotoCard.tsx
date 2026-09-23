@@ -1,11 +1,14 @@
 import {
+  ImageOff,
   Loader2,
+  Video,
   X,
 } from "lucide-react";
 
 import {
   useEffect,
   useState,
+  type MouseEvent,
 } from "react";
 
 import { toast } from "sonner";
@@ -38,6 +41,42 @@ type PhotoCardProps = {
   ) => void;
 };
 
+type PhotoAppSettings = {
+  compactGrid?: boolean;
+  confirmTrash?: boolean;
+  autoplayVideos?: boolean;
+  showFileNames?: boolean;
+  darkMode?: boolean;
+};
+
+const SETTINGS_KEY =
+  "photo-app-settings";
+
+function getSettings(): PhotoAppSettings {
+  if (
+    typeof window === "undefined"
+  ) {
+    return {};
+  }
+
+  try {
+    const stored =
+      localStorage.getItem(
+        SETTINGS_KEY,
+      );
+
+    if (!stored) {
+      return {};
+    }
+
+    return JSON.parse(
+      stored,
+    ) as PhotoAppSettings;
+  } catch {
+    return {};
+  }
+}
+
 export function PhotoCard({
   photo,
   folders,
@@ -45,15 +84,56 @@ export function PhotoCard({
   onMoved,
   onTrashed,
 }: PhotoCardProps) {
-  const [downloading, setDownloading] =
-    useState(false);
+  const [
+    downloading,
+    setDownloading,
+  ] = useState(false);
 
-  const [viewerOpen, setViewerOpen] =
-    useState(false);
+  const [
+    previewOpen,
+    setPreviewOpen,
+  ] = useState(false);
 
-  // --------------------------------------------------
+  const [
+    settings,
+    setSettings,
+  ] = useState<PhotoAppSettings>(
+    getSettings,
+  );
+
+  const [
+    mediaError,
+    setMediaError,
+  ] = useState(false);
+
+  // ==================================================
+  // Listen for settings changes
+  // ==================================================
+
+  useEffect(() => {
+    const handleStorage =
+      () => {
+        setSettings(
+          getSettings(),
+        );
+      };
+
+    window.addEventListener(
+      "storage",
+      handleStorage,
+    );
+
+    return () => {
+      window.removeEventListener(
+        "storage",
+        handleStorage,
+      );
+    };
+  }, []);
+
+  // ==================================================
   // Download
-  // --------------------------------------------------
+  // ==================================================
 
   async function handleDownload() {
     if (downloading) {
@@ -69,7 +149,9 @@ export function PhotoCard({
         );
 
       const link =
-        document.createElement("a");
+        document.createElement(
+          "a",
+        );
 
       link.href =
         response.downloadUrl;
@@ -84,7 +166,9 @@ export function PhotoCard({
       link.rel =
         "noopener noreferrer";
 
-      document.body.appendChild(link);
+      document.body.appendChild(
+        link,
+      );
 
       link.click();
 
@@ -119,63 +203,9 @@ export function PhotoCard({
     }
   }
 
-  // --------------------------------------------------
-  // Photo Viewer
-  // --------------------------------------------------
-
-  function openViewer() {
-    if (!mediaUrl) {
-      toast.error(
-        "Photo preview is not available",
-      );
-
-      return;
-    }
-
-    setViewerOpen(true);
-  }
-
-  function closeViewer() {
-    setViewerOpen(false);
-  }
-
-  // --------------------------------------------------
-  // ESC key
-  // --------------------------------------------------
-
-  useEffect(() => {
-    if (!viewerOpen) {
-      return;
-    }
-
-    function handleKeyDown(
-      event: KeyboardEvent,
-    ) {
-      if (event.key === "Escape") {
-        closeViewer();
-      }
-    }
-
-    document.addEventListener(
-      "keydown",
-      handleKeyDown,
-    );
-
-    const previousOverflow =
-      document.body.style.overflow;
-
-    document.body.style.overflow = "hidden";
-
-    return () => {
-      document.removeEventListener(
-        "keydown",
-        handleKeyDown,
-      );
-
-      document.body.style.overflow =
-        previousOverflow;
-    };
-  }, [viewerOpen]);
+  // ==================================================
+  // Media information
+  // ==================================================
 
   const isVideo =
     photo.contentType?.startsWith(
@@ -193,172 +223,340 @@ export function PhotoCard({
     photo.originalFileName ||
     "Untitled photo";
 
+  const showFileNames =
+    settings.showFileNames !==
+    false;
+
+  const autoplayVideos =
+    settings.autoplayVideos ===
+    true;
+
+  // ==================================================
+  // Reset media error when photo changes
+  // ==================================================
+
+  useEffect(() => {
+    setMediaError(false);
+  }, [
+    photo.photoId,
+    mediaUrl,
+  ]);
+
+  // ==================================================
+  // Close preview with Escape
+  // ==================================================
+
+  useEffect(() => {
+    if (!previewOpen) {
+      return;
+    }
+
+    function handleKeyDown(
+      event: KeyboardEvent,
+    ) {
+      if (
+        event.key ===
+        "Escape"
+      ) {
+        setPreviewOpen(false);
+      }
+    }
+
+    document.addEventListener(
+      "keydown",
+      handleKeyDown,
+    );
+
+    const previousOverflow =
+      document.body.style.overflow;
+
+    document.body.style.overflow =
+      "hidden";
+
+    return () => {
+      document.removeEventListener(
+        "keydown",
+        handleKeyDown,
+      );
+
+      document.body.style.overflow =
+        previousOverflow;
+    };
+  }, [
+    previewOpen,
+  ]);
+
+  // ==================================================
+  // Open fullscreen preview
+  // ==================================================
+
+  function handlePreviewOpen(
+    event: MouseEvent<HTMLElement>,
+  ) {
+    /*
+     * Do not open the preview when
+     * the user is interacting with
+     * video controls or buttons.
+     */
+
+    if (
+      event.target instanceof
+      HTMLVideoElement
+    ) {
+      return;
+    }
+
+    if (
+      event.target instanceof
+        HTMLElement &&
+      event.target.closest(
+        "button",
+      )
+    ) {
+      return;
+    }
+
+    if (!mediaUrl) {
+      return;
+    }
+
+    setPreviewOpen(true);
+  }
+
+  // ==================================================
+  // Keyboard preview
+  // ==================================================
+
+  function handlePreviewKeyDown(
+    event: React.KeyboardEvent<HTMLElement>,
+  ) {
+    if (
+      event.key ===
+        "Enter" ||
+      event.key === " "
+    ) {
+      event.preventDefault();
+
+      if (mediaUrl) {
+        setPreviewOpen(true);
+      }
+    }
+  }
+
+  // ==================================================
+  // Media error
+  // ==================================================
+
+  function handleMediaError() {
+    setMediaError(true);
+  }
+
   return (
     <>
-      {/* =================================================
-          PHOTO CARD
-      ================================================= */}
+      {/* ==================================================
+          Photo Card
+      ================================================== */}
 
       <figure className="group relative overflow-hidden rounded-xl border border-border bg-surface-muted">
-        {/* ------------------------------------------------
+        {/* ==================================================
             Media
-        ------------------------------------------------ */}
+        ================================================== */}
 
-        {isVideo ? (
-          <video
-            src={mediaUrl}
-            controls
-            preload="metadata"
-            onDoubleClick={openViewer}
-            className="aspect-square w-full cursor-zoom-in object-cover"
-          />
-        ) : (
-          <img
-            src={mediaUrl}
-            alt={displayName}
-            loading="lazy"
-            decoding="async"
-            onDoubleClick={openViewer}
-            className="aspect-square w-full cursor-zoom-in object-cover transition-transform duration-300 ease-out group-hover:scale-[1.04]"
-          />
-        )}
+        <div
+          onDoubleClick={
+            handlePreviewOpen
+          }
+          onKeyDown={
+            handlePreviewKeyDown
+          }
+          role="button"
+          tabIndex={0}
+          aria-label={`Open ${displayName} preview`}
+          className={`relative outline-none ${
+            mediaUrl
+              ? "cursor-zoom-in"
+              : "cursor-default"
+          }`}
+        >
+          {/* ==================================================
+              Media unavailable
+          ================================================== */}
 
-        {/* ------------------------------------------------
-            Bottom Gradient
-        ------------------------------------------------ */}
+          {!mediaUrl ||
+          mediaError ? (
+            <div className="flex aspect-square w-full flex-col items-center justify-center gap-2 bg-muted">
+              {isVideo ? (
+                <Video className="size-10 text-muted-foreground" />
+              ) : (
+                <ImageOff className="size-10 text-muted-foreground" />
+              )}
 
-        <div className="pointer-events-none absolute inset-x-0 bottom-0 h-24 bg-gradient-to-t from-black/60 to-transparent opacity-0 transition-opacity duration-200 group-hover:opacity-100 sm:block" />
+              <span className="px-4 text-center text-xs text-muted-foreground">
+                {mediaError
+                  ? "Unable to load media"
+                  : "Preview unavailable"}
+              </span>
+            </div>
+          ) : isVideo ? (
+            <video
+              src={mediaUrl}
+              controls
+              preload="metadata"
+              autoPlay={
+                autoplayVideos
+              }
+              muted={
+                autoplayVideos
+              }
+              playsInline
+              onError={
+                handleMediaError
+              }
+              className="aspect-square w-full object-cover transition-transform duration-300 ease-out group-hover:scale-[1.04]"
+            />
+          ) : (
+            <img
+              src={mediaUrl}
+              alt={displayName}
+              loading="lazy"
+              decoding="async"
+              onError={
+                handleMediaError
+              }
+              className="aspect-square w-full object-cover transition-transform duration-300 ease-out group-hover:scale-[1.04]"
+            />
+          )}
+        </div>
 
-        {/* ------------------------------------------------
-            Photo Name
-        ------------------------------------------------ */}
+        {/* ==================================================
+            Bottom gradient
+        ================================================== */}
 
-        <figcaption className="pointer-events-none absolute inset-x-3 bottom-3 hidden truncate text-xs font-medium text-white opacity-0 transition-opacity duration-200 group-hover:opacity-100 sm:block">
-          {displayName}
-        </figcaption>
+        {showFileNames ? (
+          <div className="pointer-events-none absolute inset-x-0 bottom-0 h-24 bg-gradient-to-t from-black/60 to-transparent opacity-0 transition-opacity duration-200 group-hover:opacity-100 sm:block" />
+        ) : null}
 
-        {/* ------------------------------------------------
-            Photo Menu
-        ------------------------------------------------ */}
+        {/* ==================================================
+            Name
+        ================================================== */}
 
-        <div className="absolute right-2 top-2">
+        {showFileNames ? (
+          <figcaption className="pointer-events-none absolute inset-x-3 bottom-3 hidden truncate text-xs font-medium text-white opacity-0 transition-opacity duration-200 group-hover:opacity-100 sm:block">
+            {displayName}
+          </figcaption>
+        ) : null}
+
+        {/* ==================================================
+            Menu
+        ================================================== */}
+
+        <div
+          className="absolute right-2 top-2 z-10"
+          onDoubleClick={(
+            event,
+          ) => {
+            event.stopPropagation();
+          }}
+        >
           <PhotoMenu
             photo={photo}
             folders={folders}
             onRenamed={
-              onRenamed ??
-              ((_: Photo) => {})
+              onRenamed ?? ((_: Photo) => {})
             }
             onMoved={
-              onMoved ??
-              ((_: Photo, __: string | null) => {})
+              onMoved ?? ((_: Photo, __: string | null) => {})
             }
             onDownload={() => {
               void handleDownload();
             }}
             onTrashed={
-              onTrashed ??
-              ((_: Photo) => {})
+              onTrashed ?? ((_: Photo) => {})
             }
           />
         </div>
 
-        {/* ------------------------------------------------
-            Download Loading Overlay
-        ------------------------------------------------ */}
+        {/* ==================================================
+            Download overlay
+        ================================================== */}
 
         {downloading ? (
-          <div className="absolute inset-0 z-20 flex items-center justify-center bg-black/30">
-            <span className="flex size-10 items-center justify-center rounded-full bg-background/90 shadow">
+          <div className="absolute inset-0 z-20 flex items-center justify-center bg-black/30 backdrop-blur-[1px]">
+            <span className="flex size-10 items-center justify-center rounded-full bg-background/90 shadow-lg">
               <Loader2 className="size-5 animate-spin" />
             </span>
           </div>
         ) : null}
       </figure>
 
-      {/* =================================================
-          FULLSCREEN PHOTO VIEWER
-      ================================================= */}
+      {/* ==================================================
+          Full Screen Preview
+      ================================================== */}
 
-      {viewerOpen ? (
+      {previewOpen ? (
         <div
-          className="fixed inset-0 z-[9999] flex h-[100dvh] w-screen items-center justify-center bg-black/95 p-3 backdrop-blur-sm sm:p-6"
+          className="fixed inset-0 z-[100] flex items-center justify-center bg-black/85 p-4 backdrop-blur-sm sm:p-8"
           role="dialog"
           aria-modal="true"
-          aria-label={`Viewing ${displayName}`}
-          onMouseDown={(event) => {
-            if (
-              event.target ===
-              event.currentTarget
-            ) {
-              closeViewer();
-            }
+          aria-label={`Preview of ${displayName}`}
+          onClick={() => {
+            setPreviewOpen(false);
           }}
         >
-          {/* ------------------------------------------------
-              Top Bar
-          ------------------------------------------------ */}
+          {/* ==================================================
+              Close button
+          ================================================== */}
 
-          <div className="pointer-events-none absolute inset-x-0 top-0 z-20 flex items-center justify-between px-3 py-3 sm:px-5 sm:py-4">
-            {/* Photo Name */}
+          <button
+            type="button"
+            onClick={() => {
+              setPreviewOpen(false);
+            }}
+            aria-label="Close preview"
+            title="Close preview"
+            className="absolute right-4 top-4 z-[110] flex size-11 items-center justify-center rounded-full border border-white/20 bg-black/50 text-white shadow-lg backdrop-blur transition hover:bg-white/15 focus:outline-none focus:ring-2 focus:ring-white/50 sm:right-6 sm:top-6"
+          >
+            <X className="size-5" />
+          </button>
 
-            <div className="pointer-events-auto min-w-0 max-w-[70%]">
-              <p className="truncate rounded-full bg-black/45 px-4 py-2 text-sm font-medium text-white/90 backdrop-blur-md">
-                {displayName}
-              </p>
-            </div>
+          {/* ==================================================
+              Preview content
+          ================================================== */}
 
-            {/* Close */}
-
-            <button
-              type="button"
-              onClick={closeViewer}
-              aria-label="Close photo viewer"
-              title="Close"
-              className="pointer-events-auto flex size-11 shrink-0 items-center justify-center rounded-full border border-white/20 bg-black/50 text-white shadow-lg backdrop-blur-md transition-all duration-200 hover:scale-105 hover:bg-white/15 active:scale-95 focus:outline-none focus:ring-2 focus:ring-white/70"
-            >
-              <X className="size-5" />
-            </button>
-          </div>
-
-          {/* ------------------------------------------------
-              Main Viewer Area
-          ------------------------------------------------ */}
-
-          <div className="flex h-full w-full items-center justify-center overflow-hidden">
+          <div
+            className="relative flex max-h-[92vh] max-w-[95vw] items-center justify-center"
+            onClick={(
+              event,
+            ) => {
+              event.stopPropagation();
+            }}
+          >
             {isVideo ? (
               <video
                 src={mediaUrl}
                 controls
                 autoPlay
                 playsInline
-                className="max-h-full max-w-full rounded-lg object-contain shadow-2xl"
-                onClick={(event) => {
-                  event.stopPropagation();
-                }}
+                className="max-h-[88vh] max-w-[92vw] rounded-lg object-contain shadow-2xl"
               />
             ) : (
               <img
                 src={mediaUrl}
                 alt={displayName}
-                draggable={false}
-                className="max-h-full max-w-full select-none rounded-lg object-contain shadow-2xl transition-transform duration-300 ease-out"
-                onClick={(event) => {
-                  event.stopPropagation();
-                }}
+                className="max-h-[88vh] max-w-[92vw] rounded-lg object-contain shadow-2xl"
               />
             )}
           </div>
 
-          {/* ------------------------------------------------
-              Bottom Hint
-          ------------------------------------------------ */}
+          {/* ==================================================
+              Photo information
+          ================================================== */}
 
-          <div className="pointer-events-none absolute bottom-4 left-1/2 hidden -translate-x-1/2 sm:block">
-            <span className="rounded-full bg-black/45 px-4 py-2 text-xs text-white/60 backdrop-blur-md">
-              Press ESC to close
-            </span>
-          </div>
+          {showFileNames ? (
+            <div className="absolute bottom-4 left-1/2 max-w-[80vw] -translate-x-1/2 truncate rounded-full border border-white/10 bg-black/60 px-4 py-2 text-sm font-medium text-white backdrop-blur sm:bottom-6">
+              {displayName}
+            </div>
+          ) : null}
         </div>
       ) : null}
     </>

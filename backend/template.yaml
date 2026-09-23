@@ -1,4 +1,3 @@
-
 AWSTemplateFormatVersion: "2010-09-09"
 
 Transform: AWS::Serverless-2016-10-31
@@ -8,7 +7,7 @@ Description: Serverless backend for Photo App
 Globals:
   Function:
     Runtime: nodejs24.x
-    Timeout: 20 
+    Timeout: 20
     MemorySize: 512
 
     Environment:
@@ -27,6 +26,20 @@ Globals:
 
         # JWT configuration
         JWT_EXPIRES_IN: "1d"
+
+        # Share links
+        SHARE_TABLE_NAME: ShareTable
+
+        # Frontend URL used for generated share links.
+        #
+        # IMPORTANT:
+        # Replace this with your deployed frontend URL
+        # before production deployment.
+        #
+        # Example:
+        # https://your-photo-app.vercel.app
+        #
+        FRONTEND_URL: ""
 
 Resources:
 
@@ -53,7 +66,6 @@ Resources:
           - PATCH
           - DELETE
           - OPTIONS
-
 
   # ==================================================
   # LAMBDA
@@ -95,9 +107,7 @@ Resources:
 
               - !Sub "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/PhotoTable"
 
-              # PhotoTable GSI
               - !Sub "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/PhotoTable/index/*"
-
 
               # ------------------------------------------
               # FolderTable
@@ -105,9 +115,7 @@ Resources:
 
               - !Sub "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/FolderTable"
 
-              # FolderTable GSI
               - !Sub "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/FolderTable/index/*"
-
 
               # ------------------------------------------
               # UsersTable
@@ -115,27 +123,23 @@ Resources:
 
               - !Sub "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/UsersTable"
 
-              # UsersTable email-index
               - !Sub "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/UsersTable/index/*"
 
+              # ------------------------------------------
+              # ShareTable
+              # ------------------------------------------
+
+              - !Sub "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/ShareTable"
 
         # ------------------------------------------------
         # S3
-        #
-        # S3 bucket is managed by this SAM stack.
         # ------------------------------------------------
 
         - S3CrudPolicy:
             BucketName: !Ref PhotosBucket
 
-
         # ------------------------------------------------
         # SSM Parameter Store
-        #
-        # JWT_SECRET is currently used by Lambda.
-        # MONGO_URI is retained because it exists in
-        # Parameter Store and may be used by old code
-        # until MongoDB migration is completely removed.
         # ------------------------------------------------
 
         - Statement:
@@ -148,7 +152,6 @@ Resources:
               - !Sub "arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter/photo-app/JWT_SECRET"
 
               - !Sub "arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter/photo-app/MONGO_URI"
-
 
       # ------------------------------------------------
       # API ROUTES
@@ -166,7 +169,6 @@ Resources:
 
             Method: ANY
 
-
         Proxy:
           Type: HttpApi
 
@@ -177,6 +179,29 @@ Resources:
 
             Method: ANY
 
+  # ==================================================
+  # SHARE LINKS TABLE
+  # ==================================================
+
+  ShareTable:
+    Type: AWS::DynamoDB::Table
+
+    Properties:
+      TableName: ShareTable
+
+      BillingMode: PAY_PER_REQUEST
+
+      AttributeDefinitions:
+        - AttributeName: token
+          AttributeType: S
+
+      KeySchema:
+        - AttributeName: token
+          KeyType: HASH
+
+      TimeToLiveSpecification:
+        AttributeName: ttl
+        Enabled: true
 
   # ==================================================
   # S3 PHOTO STORAGE
@@ -201,12 +226,8 @@ Resources:
 
         RestrictPublicBuckets: true
 
-
       # ------------------------------------------------
       # S3 CORS
-      #
-      # Browser uploads directly to S3 using
-      # presigned PUT URLs.
       # ------------------------------------------------
 
       CorsConfiguration:
@@ -226,7 +247,6 @@ Resources:
             ExposedHeaders:
               - ETag
 
-
 # ==================================================
 # OUTPUTS
 # ==================================================
@@ -242,12 +262,8 @@ Outputs:
 
     Value: !Sub "https://${PhotoApi}.execute-api.${AWS::Region}.amazonaws.com"
 
-
   # --------------------------------------------------
   # DynamoDB
-  #
-  # External tables — only displaying their names.
-  # CloudFormation does NOT create/delete them.
   # --------------------------------------------------
 
   PhotoTable:
@@ -255,18 +271,20 @@ Outputs:
 
     Value: "PhotoTable"
 
-
   FolderTable:
     Description: Existing DynamoDB Folder Metadata Table
 
     Value: "FolderTable"
-
 
   UsersTable:
     Description: Existing DynamoDB Users Table
 
     Value: "UsersTable"
 
+  ShareTable:
+    Description: DynamoDB table used for photo share links
+
+    Value: !Ref ShareTable
 
   # --------------------------------------------------
   # S3 Bucket

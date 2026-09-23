@@ -27,13 +27,9 @@ import {
   CreateFolderDialog,
 } from "@/components/CreateFolderDialog";
 
-import {
-  FolderTree,
-} from "@/components/FolderTree";
+import { FolderTree } from "@/components/FolderTree";
 
-import {
-  PhotoGallery,
-} from "@/components/PhotoGallery";
+import { PhotoGallery } from "@/components/PhotoGallery";
 
 import { Button } from "@/components/ui/button";
 
@@ -47,48 +43,24 @@ import {
 } from "@/services/api";
 
 import type { Folder } from "@/types/folder";
-
 import type { Photo } from "@/types/photo";
 
-// ==================================================
-// ROUTE
-// ==================================================
+export const Route = createFileRoute("/dashboard")({
+  head: () => ({
+    meta: [
+      {
+        title: "Your photos — Photos",
+      },
+      {
+        name: "description",
+        content:
+          "Browse your photo library, organize folders, upload new photos and download originals.",
+      },
+    ],
+  }),
 
-export const Route =
-  createFileRoute(
-    "/dashboard",
-  )({
-    head: () => ({
-      meta: [
-        {
-          title:
-            "Your photos — Photos",
-        },
-        {
-          name: "description",
-          content:
-            "Browse your photo library, organize folders, upload new photos and download originals.",
-        },
-      ],
-    }),
-
-    component:
-      DashboardPage,
-  });
-
-// ==================================================
-// TOOLBAR TYPES
-// ==================================================
-
-type ToolbarDetail = {
-  search?: string;
-  sort?: PhotoSort;
-  type?: PhotoType;
-};
-
-// ==================================================
-// PAGE
-// ==================================================
+  component: DashboardPage,
+});
 
 function DashboardPage() {
   const {
@@ -97,15 +69,13 @@ function DashboardPage() {
     ready,
   } = useAuth();
 
-  const navigate =
-    useNavigate();
+  const navigate = useNavigate();
 
   // ==================================================
   // PHOTOS
   // ==================================================
 
-  const [photos, setPhotos] =
-    useState<Photo[]>([]);
+  const [photos, setPhotos] = useState<Photo[]>([]);
 
   const [
     loadingPhotos,
@@ -115,16 +85,13 @@ function DashboardPage() {
   const [
     photoError,
     setPhotoError,
-  ] = useState<
-    string | undefined
-  >();
+  ] = useState<string | undefined>();
 
   // ==================================================
   // FOLDERS
   // ==================================================
 
-  const [folders, setFolders] =
-    useState<Folder[]>([]);
+  const [folders, setFolders] = useState<Folder[]>([]);
 
   const [
     loadingFolders,
@@ -134,9 +101,7 @@ function DashboardPage() {
   const [
     selectedFolderId,
     setSelectedFolderId,
-  ] = useState<
-    string | null
-  >(null);
+  ] = useState<string | null>(null);
 
   const [
     createFolderOpen,
@@ -154,20 +119,22 @@ function DashboardPage() {
 
   // ==================================================
   // SEARCH / SORT / FILTER
+  //
+  // These states are owned by Dashboard.
+  // Navbar receives them as controlled props.
   // ==================================================
 
-  const [search, setSearch] =
-    useState("");
+  const [search, setSearch] = useState("");
 
-  const [sort, setSort] =
-    useState<PhotoSort>(
-      "newest",
-    );
+  const [
+    sort,
+    setSort,
+  ] = useState<PhotoSort>("newest");
 
-  const [type, setType] =
-    useState<PhotoType>(
-      "all",
-    );
+  const [
+    type,
+    setType,
+  ] = useState<PhotoType>("all");
 
   // ==================================================
   // AUTH REDIRECT
@@ -191,98 +158,17 @@ function DashboardPage() {
   ]);
 
   // ==================================================
-  // NAVBAR → DASHBOARD
-  //
-  // This is the important part that makes the
-  // top search/sort/filter actually work.
-  // ==================================================
-
-  useEffect(() => {
-    function handleToolbarChange(
-      event: Event,
-    ) {
-      const customEvent =
-        event as CustomEvent<ToolbarDetail>;
-
-      const detail =
-        customEvent.detail;
-
-      if (!detail) {
-        return;
-      }
-
-      if (
-        detail.search !==
-        undefined
-      ) {
-        setSearch(
-          detail.search,
-        );
-      }
-
-      if (
-        detail.sort !==
-        undefined
-      ) {
-        setSort(
-          detail.sort,
-        );
-      }
-
-      if (
-        detail.type !==
-        undefined
-      ) {
-        setType(
-          detail.type,
-        );
-      }
-    }
-
-    window.addEventListener(
-      "photo-toolbar-change",
-      handleToolbarChange,
-    );
-
-    return () => {
-      window.removeEventListener(
-        "photo-toolbar-change",
-        handleToolbarChange,
-      );
-    };
-  }, []);
-
-  // ==================================================
-  // SYNC DASHBOARD → NAVBAR
-  // ==================================================
-
-  function syncNavbar(
-    detail: ToolbarDetail,
-  ) {
-    window.dispatchEvent(
-      new CustomEvent(
-        "photo-toolbar-sync",
-        {
-          detail,
-        },
-      ),
-    );
-  }
-
-  // ==================================================
   // LOAD FOLDERS
   // ==================================================
 
-  const loadFolders =
-    useCallback(async () => {
+  const loadFolders = useCallback(
+    async () => {
       if (!isAuthenticated) {
         return;
       }
 
       try {
-        setLoadingFolders(
-          true,
-        );
+        setLoadingFolders(true);
 
         const response =
           await getFolders();
@@ -298,32 +184,26 @@ function DashboardPage() {
 
         setFolders([]);
       } finally {
-        setLoadingFolders(
-          false,
-        );
+        setLoadingFolders(false);
       }
-    }, [
-      isAuthenticated,
-    ]);
+    },
+    [isAuthenticated],
+  );
 
   // ==================================================
   // LOAD PHOTOS
   // ==================================================
 
-  const loadPhotos =
-    useCallback(async () => {
+  const loadPhotos = useCallback(
+    async () => {
       if (!isAuthenticated) {
         return;
       }
 
       try {
-        setLoadingPhotos(
-          true,
-        );
+        setLoadingPhotos(true);
 
-        setPhotoError(
-          undefined,
-        );
+        setPhotoError(undefined);
 
         const trimmedSearch =
           search.trim();
@@ -390,8 +270,7 @@ function DashboardPage() {
                 "image/jpeg",
 
               fileSize:
-                photo.fileSize ??
-                0,
+                photo.fileSize ?? 0,
 
               url:
                 photo.downloadUrl ||
@@ -444,17 +323,17 @@ function DashboardPage() {
             : "Unable to load photos. Please try again.",
         );
       } finally {
-        setLoadingPhotos(
-          false,
-        );
+        setLoadingPhotos(false);
       }
-    }, [
+    },
+    [
       isAuthenticated,
       search,
       sort,
       type,
       selectedFolderId,
-    ]);
+    ],
+  );
 
   // ==================================================
   // INITIAL FOLDER LOAD
@@ -558,11 +437,6 @@ function DashboardPage() {
     );
 
     setSearch("");
-
-    // Also clear the top navbar search.
-    syncNavbar({
-      search: "",
-    });
   }
 
   // ==================================================
@@ -595,6 +469,13 @@ function DashboardPage() {
     photo: Photo,
     folderId: string | null,
   ) {
+    /*
+     * Current view is a specific folder.
+     *
+     * If the photo leaves that folder,
+     * remove it immediately.
+     */
+
     if (
       selectedFolderId !==
         null &&
@@ -612,6 +493,13 @@ function DashboardPage() {
 
       return;
     }
+
+    /*
+     * Current view is root.
+     *
+     * If the photo moves into a folder,
+     * remove it from root.
+     */
 
     if (
       selectedFolderId ===
@@ -640,6 +528,14 @@ function DashboardPage() {
   function handlePhotoTrashed(
     photo: Photo,
   ) {
+    /*
+     * Trash is a soft delete.
+     *
+     * Remove the photo from the current
+     * gallery immediately after the API
+     * operation succeeds.
+     */
+
     setPhotos(
       (previous) =>
         previous.filter(
@@ -648,6 +544,14 @@ function DashboardPage() {
             photo.photoId,
         ),
     );
+  }
+
+  // ==================================================
+  // UPLOAD COMPLETED
+  // ==================================================
+
+  function handleUploadCompleted() {
+    void loadPhotos();
   }
 
   // ==================================================
@@ -676,11 +580,6 @@ function DashboardPage() {
   // UI DATA
   // ==================================================
 
-  const firstName =
-    user?.name?.split(
-      " ",
-    )[0] ?? "there";
-
   const selectedFolder =
     folders.find(
       (folder) =>
@@ -694,36 +593,51 @@ function DashboardPage() {
 
   return (
     <div className="min-h-screen bg-background">
-      <Navbar />
+      <Navbar
+        search={search}
+        sort={sort}
+        type={type}
+        onSearchChange={
+          setSearch
+        }
+        onSortChange={
+          setSort
+        }
+        onTypeChange={
+          setType
+        }
+      />
 
       <MobileNav />
 
       <div className="mx-auto flex w-full max-w-[1600px]">
         <Sidebar />
 
-        <main className="min-w-0 flex-1 px-4 py-6 sm:px-6 sm:py-8">
-          {/* ==================================================
-              HEADER
-              ================================================== */}
+        <main className="min-w-0 flex-1 px-4 py-6 pb-24 sm:px-6 sm:py-8 lg:pb-8">
+
+          {/* HEADER */}
 
           <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
             <div>
-              <h1 className="text-2xl font-semibold capitalize sm:text-3xl">
-                Welcome back,{" "}
-                {firstName}
+              <h1 className="text-2xl font-semibold sm:text-3xl">
+                My Photos
               </h1>
 
               <p className="mt-1 text-sm text-muted-foreground">
                 {loadingPhotos
                   ? "Loading your photos..."
                   : selectedFolder
-                    ? `${selectedFolder.name} · ${photos.length} ${
+                    ? `${selectedFolder.name} · ${
+                        photos.length
+                      } ${
                         photos.length ===
                         1
                           ? "photo"
                           : "photos"
                       }`
-                    : `${photos.length} ${
+                    : `${
+                        photos.length
+                      } ${
                         photos.length ===
                         1
                           ? "photo"
@@ -760,21 +674,19 @@ function DashboardPage() {
             </div>
           </div>
 
-          {/* ==================================================
-              FOLDERS
-              ================================================== */}
+          {/* FOLDERS */}
 
           <section
-            className="mt-6 rounded-2xl border border-border bg-card p-4 sm:p-5"
+            className="mt-6 rounded-xl border border-border bg-card p-4"
             aria-label="Folders"
           >
-            <div className="mb-4 flex items-center justify-between">
+            <div className="mb-3 flex items-center justify-between">
               <div>
-                <h2 className="text-base font-semibold">
+                <h2 className="text-sm font-semibold">
                   Folders
                 </h2>
 
-                <p className="mt-0.5 text-xs text-muted-foreground">
+                <p className="text-xs text-muted-foreground">
                   Organize your photos
                 </p>
               </div>
@@ -795,23 +707,14 @@ function DashboardPage() {
             </div>
 
             {loadingFolders ? (
-              <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
-                {Array.from({
-                  length: 5,
-                }).map(
-                  (_, index) => (
-                    <div
-                      key={index}
-                      className="h-24 animate-pulse rounded-xl bg-muted"
-                    />
-                  ),
-                )}
+              <div className="flex items-center gap-2 py-3 text-sm text-muted-foreground">
+                <span className="size-4 animate-spin rounded-full border-2 border-border border-t-primary" />
+
+                Loading folders...
               </div>
             ) : (
               <FolderTree
-                folders={
-                  folders
-                }
+                folders={folders}
                 selectedFolderId={
                   selectedFolderId
                 }
@@ -830,39 +733,31 @@ function DashboardPage() {
             )}
           </section>
 
-          {/* ==================================================
-              SEARCH STATUS
-              ================================================== */}
+          {/* ACTIVE SEARCH STATUS */}
 
           {search.trim() ? (
-            <div className="mt-6 flex items-center gap-2 text-sm text-muted-foreground">
-              <span>
-                Search results for
+            <div className="mt-6 flex flex-wrap items-center gap-2 rounded-lg border border-border bg-card px-4 py-3 text-sm">
+              <span className="text-muted-foreground">
+                Searching for
               </span>
 
-              <span className="font-medium text-foreground">
+              <span className="font-medium">
                 "{search.trim()}"
               </span>
 
               <button
                 type="button"
-                onClick={() => {
-                  setSearch("");
-
-                  syncNavbar({
-                    search: "",
-                  });
-                }}
-                className="font-medium text-primary hover:underline"
+                onClick={() =>
+                  setSearch("")
+                }
+                className="ml-auto text-primary hover:underline"
               >
-                Clear
+                Clear search
               </button>
             </div>
           ) : null}
 
-          {/* ==================================================
-              CURRENT FOLDER / PHOTO COUNT
-              ================================================== */}
+          {/* CURRENT FOLDER */}
 
           <div className="mb-4 mt-8 flex items-center justify-between">
             <div>
@@ -884,16 +779,12 @@ function DashboardPage() {
             ) : null}
           </div>
 
-          {/* ==================================================
-              GALLERY
-              ================================================== */}
+          {/* GALLERY */}
 
           <PhotoGallery
             photos={photos}
             folders={folders}
-            loading={
-              loadingPhotos
-            }
+            loading={loadingPhotos}
             onUploadClick={() =>
               setUploadOpen(true)
             }
@@ -906,31 +797,30 @@ function DashboardPage() {
             onTrashed={
               handlePhotoTrashed
             }
-            onRetry={() =>
-              void loadPhotos()
-            }
-            error={
-              photoError
-            }
+            onRetry={() => {
+              void loadPhotos();
+            }}
+            {...(photoError
+              ? {
+                  error:
+                    photoError,
+                }
+              : {})}
           />
 
-          {/* ==================================================
-              UPLOAD
-              ================================================== */}
+          {/* UPLOAD */}
 
           <UploadPhoto
             open={uploadOpen}
             onOpenChange={
               setUploadOpen
             }
-            onUploaded={() => {
-              void loadPhotos();
-            }}
+            onUploaded={
+              handleUploadCompleted
+            }
           />
 
-          {/* ==================================================
-              CREATE FOLDER
-              ================================================== */}
+          {/* CREATE FOLDER */}
 
           <CreateFolderDialog
             open={
@@ -948,5 +838,3 @@ function DashboardPage() {
     </div>
   );
 }
-
-export default DashboardPage;

@@ -4,13 +4,23 @@ import {
   Loader2,
   MoreVertical,
   Pencil,
+  Share2,
   Trash2,
 } from "lucide-react";
 
-import { useState } from "react";
-import { toast } from "sonner";
+import {
+  useEffect,
+  useRef,
+  useState,
+} from "react";
 
-import { Button } from "@/components/ui/button";
+import {
+  toast,
+} from "sonner";
+
+import {
+  Button,
+} from "@/components/ui/button";
 
 import {
   Dialog,
@@ -27,8 +37,13 @@ import {
   trashPhoto,
 } from "@/services/api";
 
-import type { Folder } from "@/types/folder";
-import type { Photo } from "@/types/photo";
+import type {
+  Folder,
+} from "@/types/folder";
+
+import type {
+  Photo,
+} from "@/types/photo";
 
 type PhotoMenuProps = {
   photo: Photo;
@@ -59,24 +74,30 @@ export function PhotoMenu({
   onDownload,
   onTrashed,
 }: PhotoMenuProps) {
-  const [menuOpen, setMenuOpen] =
-    useState(false);
+  const [
+    menuOpen,
+    setMenuOpen,
+  ] = useState(false);
 
-  const [renameOpen, setRenameOpen] =
-    useState(false);
+  const [
+    renameOpen,
+    setRenameOpen,
+  ] = useState(false);
 
-  const [moveOpen, setMoveOpen] =
-    useState(false);
+  const [
+    moveOpen,
+    setMoveOpen,
+  ] = useState(false);
 
-  const [trashOpen, setTrashOpen] =
-    useState(false);
+  const [
+    deleteOpen,
+    setDeleteOpen,
+  ] = useState(false);
 
-  const [newName, setNewName] =
-    useState(
-      photo.name ||
-        photo.fileName ||
-        "",
-    );
+  const [
+    newName,
+    setNewName,
+  ] = useState(photo.name);
 
   const [
     selectedFolderId,
@@ -85,14 +106,242 @@ export function PhotoMenu({
     photo.folderId || "",
   );
 
-  const [renaming, setRenaming] =
-    useState(false);
+  const [
+    renaming,
+    setRenaming,
+  ] = useState(false);
 
-  const [moving, setMoving] =
-    useState(false);
+  const [
+    moving,
+    setMoving,
+  ] = useState(false);
 
-  const [trashing, setTrashing] =
-    useState(false);
+  const [
+    deleting,
+    setDeleting,
+  ] = useState(false);
+
+  const [
+    sharing,
+    setSharing,
+  ] = useState(false);
+
+  // --------------------------------------------------
+  // Menu Reference
+  // --------------------------------------------------
+
+  const menuRef =
+    useRef<HTMLDivElement | null>(
+      null,
+    );
+
+  // --------------------------------------------------
+  // Close Menu on Outside Click / Escape
+  // --------------------------------------------------
+
+  useEffect(() => {
+    if (!menuOpen) {
+      return;
+    }
+
+    function handleOutsideClick(
+      event: MouseEvent,
+    ) {
+      const target =
+        event.target as Node | null;
+
+      if (
+        menuRef.current &&
+        target &&
+        !menuRef.current.contains(
+          target,
+        )
+      ) {
+        setMenuOpen(false);
+      }
+    }
+
+    function handleEscape(
+      event: KeyboardEvent,
+    ) {
+      if (event.key === "Escape") {
+        setMenuOpen(false);
+      }
+    }
+
+    document.addEventListener(
+      "mousedown",
+      handleOutsideClick,
+    );
+
+    document.addEventListener(
+      "keydown",
+      handleEscape,
+    );
+
+    return () => {
+      document.removeEventListener(
+        "mousedown",
+        handleOutsideClick,
+      );
+
+      document.removeEventListener(
+        "keydown",
+        handleEscape,
+      );
+    };
+  }, [menuOpen]);
+
+  // --------------------------------------------------
+  // Share
+  // --------------------------------------------------
+
+  async function handleShare() {
+    if (sharing) {
+      return;
+    }
+
+    const shareUrl =
+      photo.url ||
+      photo.downloadUrl ||
+      "";
+
+    if (!shareUrl) {
+      toast.error(
+        "Unable to share this photo",
+        {
+          description:
+            "No shareable URL is available for this photo.",
+        },
+      );
+
+      setMenuOpen(false);
+
+      return;
+    }
+
+    setSharing(true);
+    setMenuOpen(false);
+
+    try {
+      const shareTitle =
+        photo.name ||
+        photo.fileName ||
+        "Photo";
+
+      // Native Web Share API
+      if (
+        typeof navigator !==
+          "undefined" &&
+        typeof navigator.share ===
+          "function"
+      ) {
+        await navigator.share({
+          title: shareTitle,
+          text: `Check out ${shareTitle}`,
+          url: shareUrl,
+        });
+
+        toast.success(
+          "Share dialog opened",
+        );
+
+        return;
+      }
+
+      // Fallback: Copy URL
+      if (
+        typeof navigator !==
+          "undefined" &&
+        navigator.clipboard
+      ) {
+        await navigator.clipboard.writeText(
+          shareUrl,
+        );
+
+        toast.success(
+          "Photo link copied",
+          {
+            description:
+              "The shareable photo link has been copied to your clipboard.",
+          },
+        );
+
+        return;
+      }
+
+      // Last fallback
+      const textArea =
+        document.createElement(
+          "textarea",
+        );
+
+      textArea.value = shareUrl;
+      textArea.style.position =
+        "fixed";
+      textArea.style.opacity = "0";
+      textArea.style.pointerEvents =
+        "none";
+
+      document.body.appendChild(
+        textArea,
+      );
+
+      textArea.focus();
+      textArea.select();
+
+      const copied =
+        document.execCommand(
+          "copy",
+        );
+
+      textArea.remove();
+
+      if (copied) {
+        toast.success(
+          "Photo link copied",
+        );
+      } else {
+        toast.error(
+          "Unable to share photo",
+          {
+            description:
+              "Please copy the photo URL manually.",
+          },
+        );
+      }
+    } catch (error) {
+      // User closing/cancelling the native
+      // share dialog is not an application error.
+      if (
+        error instanceof DOMException &&
+        error.name === "AbortError"
+      ) {
+        return;
+      }
+
+      console.error(
+        "Share failed:",
+        error,
+      );
+
+      toast.error(
+        "Share failed",
+        {
+          description:
+            error instanceof Error
+              ? error.message
+              : "Please try again.",
+        },
+      );
+    } finally {
+      setSharing(false);
+    }
+  }
+
+  // --------------------------------------------------
+  // Rename
+  // --------------------------------------------------
 
   async function handleRename() {
     const cleanName =
@@ -120,11 +369,6 @@ export function PhotoMenu({
       cleanName === photo.name
     ) {
       setRenameOpen(false);
-
-      return;
-    }
-
-    if (renaming) {
       return;
     }
 
@@ -140,26 +384,33 @@ export function PhotoMenu({
       const updated =
         response.photo;
 
-      const updatedPhoto: Photo =
-        {
-          ...photo,
+      const updatedAt: string =
+        updated.updatedAt ??
+        photo.updatedAt ??
+        new Date().toISOString();
 
-          ...updated,
+      const updatedPhoto: Photo = {
+        ...photo,
 
-          name:
-            updated.name ||
-            cleanName,
+        name:
+          updated.name,
 
-          photoId:
-            photo.photoId,
-        };
+        ...(updated.originalFileName || photo.originalFileName
+          ? { originalFileName: updated.originalFileName ?? photo.originalFileName }
+          : {}),
+
+        fileName:
+          updated.fileName,
+
+        updatedAt,
+      };
 
       onRenamed?.(
         updatedPhoto,
       );
 
       setNewName(
-        updatedPhoto.name,
+        updated.name,
       );
 
       setRenameOpen(false);
@@ -187,11 +438,11 @@ export function PhotoMenu({
     }
   }
 
-  async function handleMove() {
-    if (moving) {
-      return;
-    }
+  // --------------------------------------------------
+  // Move
+  // --------------------------------------------------
 
+  async function handleMove() {
     setMoving(true);
 
     try {
@@ -205,16 +456,19 @@ export function PhotoMenu({
           folderId,
         );
 
+      const updatedAt: string =
+        response.photo
+          ?.updatedAt ??
+        photo.updatedAt ??
+        new Date().toISOString();
+
       const updatedPhoto: Photo =
         {
           ...photo,
 
-          ...response.photo,
-
           folderId,
 
-          photoId:
-            photo.photoId,
+          updatedAt,
         };
 
       onMoved?.(
@@ -227,7 +481,7 @@ export function PhotoMenu({
       toast.success(
         folderId
           ? "Photo moved successfully"
-          : "Photo moved to My Photos",
+          : "Photo moved to root",
       );
     } catch (error) {
       console.error(
@@ -249,19 +503,23 @@ export function PhotoMenu({
     }
   }
 
+  // --------------------------------------------------
+  // Trash
+  // --------------------------------------------------
+
   async function handleTrash() {
-    if (trashing) {
+    if (deleting) {
       return;
     }
 
-    setTrashing(true);
+    setDeleting(true);
 
     try {
       await trashPhoto(
         photo.photoId,
       );
 
-      setTrashOpen(false);
+      setDeleteOpen(false);
 
       setMenuOpen(false);
 
@@ -271,11 +529,7 @@ export function PhotoMenu({
         "Moved to Trash",
         {
           description:
-            `${
-              photo.name ||
-              photo.fileName ||
-              "Photo"
-            } can be restored from Trash.`,
+            `${photo.name} can be restored from Trash.`,
         },
       );
     } catch (error) {
@@ -294,13 +548,20 @@ export function PhotoMenu({
         },
       );
     } finally {
-      setTrashing(false);
+      setDeleting(false);
     }
   }
 
   return (
     <>
-      <div className="relative">
+      {/* ==================================================
+          Photo Options Menu
+      ================================================== */}
+
+      <div
+        ref={menuRef}
+        className="relative"
+      >
         <Button
           type="button"
           variant="outline"
@@ -311,41 +572,56 @@ export function PhotoMenu({
                 !previous,
             )
           }
-          aria-label={`Options for ${
-            photo.name ||
-            photo.fileName ||
-            "photo"
-          }`}
+          aria-expanded={menuOpen}
+          aria-haspopup="menu"
+          aria-label={`Options for ${photo.name}`}
           title="Photo options"
           className="border-border bg-background/95 shadow-sm sm:opacity-0 sm:transition-opacity sm:group-hover:opacity-100"
         >
-          <MoreVertical className="size-4" />
+          <MoreVertical
+            className="size-4"
+          />
         </Button>
 
         {menuOpen ? (
-          <div className="absolute right-0 top-11 z-30 w-48 overflow-hidden rounded-lg border border-border bg-popover p-1 text-popover-foreground shadow-xl">
+          <div
+            role="menu"
+            className="absolute right-0 top-11 z-30 w-52 overflow-hidden rounded-lg border border-border bg-popover p-1 text-popover-foreground shadow-xl"
+          >
+            {/* ------------------------------------------------
+                Rename
+            ------------------------------------------------ */}
+
             <button
               type="button"
+              role="menuitem"
               onClick={() => {
                 setMenuOpen(false);
 
                 setNewName(
-                  photo.name ||
-                    photo.fileName ||
-                    "",
+                  photo.name,
                 );
 
-                setRenameOpen(true);
+                setRenameOpen(
+                  true,
+                );
               }}
-              className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-sm hover:bg-accent"
+              className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-sm transition-colors hover:bg-accent"
             >
               <Pencil className="size-4" />
 
-              Rename
+              <span>
+                Rename
+              </span>
             </button>
+
+            {/* ------------------------------------------------
+                Move
+            ------------------------------------------------ */}
 
             <button
               type="button"
+              role="menuitem"
               onClick={() => {
                 setMenuOpen(false);
 
@@ -354,55 +630,109 @@ export function PhotoMenu({
                     "",
                 );
 
-                setMoveOpen(true);
+                setMoveOpen(
+                  true,
+                );
               }}
-              className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-sm hover:bg-accent"
+              className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-sm transition-colors hover:bg-accent"
             >
               <FolderInput className="size-4" />
 
-              Move to folder
+              <span>
+                Move to folder
+              </span>
             </button>
+
+            {/* ------------------------------------------------
+                Download
+            ------------------------------------------------ */}
 
             <button
               type="button"
+              role="menuitem"
               onClick={() => {
                 setMenuOpen(false);
 
                 onDownload?.();
               }}
-              className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-sm hover:bg-accent"
+              className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-sm transition-colors hover:bg-accent"
             >
               <Download className="size-4" />
 
-              Download
+              <span>
+                Download
+              </span>
             </button>
 
-            <div className="my-1 h-px bg-border" />
+            {/* ------------------------------------------------
+                Share
+            ------------------------------------------------ */}
 
             <button
               type="button"
+              role="menuitem"
+              onClick={() => {
+                void handleShare();
+              }}
+              disabled={sharing}
+              className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-sm transition-colors hover:bg-accent disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              {sharing ? (
+                <Loader2 className="size-4 animate-spin" />
+              ) : (
+                <Share2 className="size-4" />
+              )}
+
+              <span>
+                {sharing
+                  ? "Preparing..."
+                  : "Share"}
+              </span>
+            </button>
+
+            {/* ------------------------------------------------
+                Separator
+            ------------------------------------------------ */}
+
+            <div className="my-1 h-px bg-border" />
+
+            {/* ------------------------------------------------
+                Move to Trash
+            ------------------------------------------------ */}
+
+            <button
+              type="button"
+              role="menuitem"
               onClick={() => {
                 setMenuOpen(false);
 
-                setTrashOpen(true);
+                setDeleteOpen(
+                  true,
+                );
               }}
-              className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-sm text-destructive hover:bg-destructive/10"
+              className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-sm text-destructive transition-colors hover:bg-destructive/10"
             >
               <Trash2 className="size-4" />
 
-              Move to Trash
+              <span>
+                Move to Trash
+              </span>
             </button>
           </div>
         ) : null}
       </div>
 
-      {/* Rename */}
+      {/* ==================================================
+          Rename Dialog
+      ================================================== */}
 
       <Dialog
         open={renameOpen}
         onOpenChange={(open) => {
           if (!renaming) {
-            setRenameOpen(open);
+            setRenameOpen(
+              open,
+            );
           }
         }}
       >
@@ -435,7 +765,8 @@ export function PhotoMenu({
               autoFocus
               onChange={(event) =>
                 setNewName(
-                  event.target.value,
+                  event.target
+                    .value,
                 )
               }
               onKeyDown={(event) => {
@@ -443,12 +774,10 @@ export function PhotoMenu({
                   event.key ===
                   "Enter"
                 ) {
-                  event.preventDefault();
-
                   void handleRename();
                 }
               }}
-              className="flex h-10 w-full rounded-md border border-border bg-background px-3 text-sm outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 disabled:opacity-60"
+              className="flex h-10 w-full rounded-md border border-border bg-background px-3 text-sm outline-none focus:border-primary focus:ring-2 focus:ring-primary/20"
             />
 
             <p className="text-xs text-muted-foreground">
@@ -460,7 +789,9 @@ export function PhotoMenu({
             <Button
               variant="outline"
               onClick={() =>
-                setRenameOpen(false)
+                setRenameOpen(
+                  false,
+                )
               }
               disabled={renaming}
             >
@@ -488,13 +819,17 @@ export function PhotoMenu({
         </DialogContent>
       </Dialog>
 
-      {/* Move */}
+      {/* ==================================================
+          Move Dialog
+      ================================================== */}
 
       <Dialog
         open={moveOpen}
         onOpenChange={(open) => {
           if (!moving) {
-            setMoveOpen(open);
+            setMoveOpen(
+              open,
+            );
           }
         }}
       >
@@ -526,7 +861,8 @@ export function PhotoMenu({
               disabled={moving}
               onChange={(event) =>
                 setSelectedFolderId(
-                  event.target.value,
+                  event.target
+                    .value,
                 )
               }
               className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm outline-none focus:border-ring focus:ring-2 focus:ring-ring/20"
@@ -556,7 +892,9 @@ export function PhotoMenu({
             <Button
               variant="outline"
               onClick={() =>
-                setMoveOpen(false)
+                setMoveOpen(
+                  false,
+                )
               }
               disabled={moving}
             >
@@ -581,13 +919,17 @@ export function PhotoMenu({
         </DialogContent>
       </Dialog>
 
-      {/* Trash */}
+      {/* ==================================================
+          Trash Confirmation
+      ================================================== */}
 
       <Dialog
-        open={trashOpen}
+        open={deleteOpen}
         onOpenChange={(open) => {
-          if (!trashing) {
-            setTrashOpen(open);
+          if (!deleting) {
+            setDeleteOpen(
+              open,
+            );
           }
         }}
       >
@@ -599,13 +941,11 @@ export function PhotoMenu({
 
             <DialogDescription>
               <strong className="text-foreground">
-                {photo.name ||
-                  photo.fileName ||
-                  "This photo"}
+                {photo.name}
               </strong>{" "}
-              will be moved to
-              Trash. You can restore
-              it later. It will not be
+              will be moved to Trash.
+              You can restore it later.
+              The photo will not be
               permanently deleted.
             </DialogDescription>
           </DialogHeader>
@@ -614,9 +954,11 @@ export function PhotoMenu({
             <Button
               variant="outline"
               onClick={() =>
-                setTrashOpen(false)
+                setDeleteOpen(
+                  false,
+                )
               }
-              disabled={trashing}
+              disabled={deleting}
             >
               Cancel
             </Button>
@@ -626,9 +968,9 @@ export function PhotoMenu({
               onClick={() =>
                 void handleTrash()
               }
-              disabled={trashing}
+              disabled={deleting}
             >
-              {trashing ? (
+              {deleting ? (
                 <Loader2 className="size-4 animate-spin" />
               ) : (
                 <Trash2 className="size-4" />

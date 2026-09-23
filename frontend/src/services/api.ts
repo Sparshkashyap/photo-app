@@ -36,9 +36,7 @@ import type {
 // ==================================================
 
 const API_BASE_URL = (
-  import.meta.env["VITE_API_BASE_URL"] as
-    | string
-    | undefined
+  import.meta.env["VITE_API_BASE_URL"] as string | undefined
 )?.replace(/\/+$/, "");
 
 // ==================================================
@@ -48,14 +46,9 @@ const API_BASE_URL = (
 export class ApiError extends Error {
   status: number;
 
-  constructor(
-    message: string,
-    status = 0,
-  ) {
+  constructor(message: string, status = 0) {
     super(message);
-
     this.name = "ApiError";
-
     this.status = status;
   }
 }
@@ -73,15 +66,12 @@ type RequestOptions = {
     | "DELETE";
 
   body?: unknown;
-
   auth?: boolean;
-
   signal?: AbortSignal;
 };
 
 type BackendErrorResponse = {
   success?: boolean;
-
   message?: string;
 };
 
@@ -105,8 +95,7 @@ async function request<T>(
   const headers: Record<string, string> = {};
 
   if (body !== undefined) {
-    headers["Content-Type"] =
-      "application/json";
+    headers["Content-Type"] = "application/json";
   }
 
   if (auth) {
@@ -119,8 +108,7 @@ async function request<T>(
       );
     }
 
-    headers["Authorization"] =
-      `Bearer ${token}`;
+    headers["Authorization"] = `Bearer ${token}`;
   }
 
   const requestInit: RequestInit = {
@@ -133,8 +121,7 @@ async function request<T>(
   }
 
   if (body !== undefined) {
-    requestInit.body =
-      JSON.stringify(body);
+    requestInit.body = JSON.stringify(body);
   }
 
   let response: Response;
@@ -168,9 +155,7 @@ async function request<T>(
   if (response.status === 401) {
     throw new ApiError(
       (
-        data as
-          | BackendErrorResponse
-          | null
+        data as BackendErrorResponse | null
       )?.message ||
         "Your session has expired. Please log in again.",
       401,
@@ -180,9 +165,7 @@ async function request<T>(
   if (!response.ok) {
     throw new ApiError(
       (
-        data as
-          | BackendErrorResponse
-          | null
+        data as BackendErrorResponse | null
       )?.message ||
         "Something went wrong. Please try again.",
       response.status,
@@ -198,72 +181,48 @@ async function request<T>(
 
 export type AuthResponse = {
   success: boolean;
-
   message?: string;
-
   token: string;
-
   user: AuthUser;
 };
 
 export async function signup(input: {
   name: string;
-
   email: string;
-
   password: string;
 }): Promise<AuthResponse> {
-  return request<AuthResponse>(
-    "/auth/signup",
-    {
-      method: "POST",
-
-      body: {
-        name: input.name.trim(),
-
-        email: input.email
-          .trim()
-          .toLowerCase(),
-
-        password: input.password,
-      },
+  return request<AuthResponse>("/auth/signup", {
+    method: "POST",
+    body: {
+      name: input.name.trim(),
+      email: input.email.trim().toLowerCase(),
+      password: input.password,
     },
-  );
+  });
 }
 
 export async function login(input: {
   email: string;
-
   password: string;
 }): Promise<AuthResponse> {
-  return request<AuthResponse>(
-    "/auth/login",
-    {
-      method: "POST",
-
-      body: {
-        email: input.email
-          .trim()
-          .toLowerCase(),
-
-        password: input.password,
-      },
+  return request<AuthResponse>("/auth/login", {
+    method: "POST",
+    body: {
+      email: input.email.trim().toLowerCase(),
+      password: input.password,
     },
-  );
+  });
 }
 
 export async function getUserProfile(): Promise<{
   success: boolean;
-
   user: AuthUser;
 }> {
   return request<{
     success: boolean;
-
     user: AuthUser;
   }>("/user/profile", {
     method: "GET",
-
     auth: true,
   });
 }
@@ -274,126 +233,88 @@ export async function getUserProfile(): Promise<{
 
 export type UploadUrlResponse = {
   success: boolean;
-
   uploadUrl: string;
-
   key: string;
-
   photoId: string;
-
   fileName?: string;
-
   expiresIn?: number;
 };
 
-export async function requestUploadUrl(
-  input: {
-    fileName: string;
-
-    contentType: string;
-  },
-): Promise<UploadUrlResponse> {
-  return request<UploadUrlResponse>(
-    "/photos/upload-url",
-    {
-      method: "POST",
-
-      body: {
-        fileName:
-          input.fileName,
-
-        contentType:
-          input.contentType,
-      },
-
-      auth: true,
+export async function requestUploadUrl(input: {
+  fileName: string;
+  contentType: string;
+}): Promise<UploadUrlResponse> {
+  return request<UploadUrlResponse>("/photos/upload-url", {
+    method: "POST",
+    body: {
+      fileName: input.fileName,
+      contentType: input.contentType,
     },
-  );
+    auth: true,
+  });
 }
 
 export async function uploadToPresignedUrl(
   uploadUrl: string,
   file: File,
-  onProgress?: (
-    percent: number,
-  ) => void,
+  onProgress?: (percent: number) => void,
 ): Promise<void> {
-  await new Promise<void>(
-    (
-      resolve,
-      reject,
-    ) => {
-      const xhr =
-        new XMLHttpRequest();
+  await new Promise<void>((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
 
-      xhr.open(
-        "PUT",
-        uploadUrl,
+    xhr.open("PUT", uploadUrl);
+
+    xhr.setRequestHeader(
+      "Content-Type",
+      file.type,
+    );
+
+    xhr.upload.onprogress = (event) => {
+      if (event.lengthComputable) {
+        const percent = Math.round(
+          (event.loaded / event.total) * 100,
+        );
+
+        onProgress?.(percent);
+      }
+    };
+
+    xhr.onload = () => {
+      if (
+        xhr.status >= 200 &&
+        xhr.status < 300
+      ) {
+        onProgress?.(100);
+        resolve();
+        return;
+      }
+
+      reject(
+        new ApiError(
+          "Upload failed. Please try again.",
+          xhr.status,
+        ),
       );
+    };
 
-      xhr.setRequestHeader(
-        "Content-Type",
-        file.type,
+    xhr.onerror = () => {
+      reject(
+        new ApiError(
+          "Upload failed. Please try again.",
+        ),
       );
+    };
 
-      xhr.upload.onprogress = (
-        event,
-      ) => {
-        if (
-          event.lengthComputable
-        ) {
-          const percent =
-            Math.round(
-              (event.loaded /
-                event.total) *
-                100,
-            );
+    xhr.onabort = () => {
+      reject(
+        new ApiError(
+          "Upload was cancelled.",
+        ),
+      );
+    };
 
-          onProgress?.(
-            percent,
-          );
-        }
-      };
-
-      xhr.onload = () => {
-        if (
-          xhr.status >= 200 &&
-          xhr.status < 300
-        ) {
-          onProgress?.(100);
-
-          resolve();
-
-          return;
-        }
-
-        reject(
-          new ApiError(
-            "Upload failed. Please try again.",
-            xhr.status,
-          ),
-        );
-      };
-
-      xhr.onerror = () => {
-        reject(
-          new ApiError(
-            "Upload failed. Please try again.",
-          ),
-        );
-      };
-
-      xhr.onabort = () => {
-        reject(
-          new ApiError(
-            "Upload was cancelled.",
-          ),
-        );
-      };
-
-      xhr.send(file);
-    },
-  );
+    xhr.send(file);
+  });
 }
 
 // ==================================================
@@ -402,31 +323,20 @@ export async function uploadToPresignedUrl(
 
 export type ConfirmUploadResponse = {
   success: boolean;
-
   message: string;
-
   photo: Photo;
 };
 
-export async function confirmUpload(
-  input: {
-    photoId: string;
-
-    key: string;
-
-    name: string;
-
-    fileName: string;
-
-    contentType: string;
-
-    fileSize: number;
-
-    folderId?: string | null;
-  },
-): Promise<ConfirmUploadResponse> {
-  const trimmedName =
-    input.name.trim();
+export async function confirmUpload(input: {
+  photoId: string;
+  key: string;
+  name: string;
+  fileName: string;
+  contentType: string;
+  fileSize: number;
+  folderId?: string | null;
+}): Promise<ConfirmUploadResponse> {
+  const trimmedName = input.name.trim();
 
   if (!trimmedName) {
     throw new ApiError(
@@ -435,9 +345,7 @@ export async function confirmUpload(
     );
   }
 
-  if (
-    trimmedName.length > 120
-  ) {
+  if (trimmedName.length > 120) {
     throw new ApiError(
       "Photo name must be 120 characters or less.",
       400,
@@ -448,30 +356,15 @@ export async function confirmUpload(
     "/photos/confirm",
     {
       method: "POST",
-
       body: {
-        photoId:
-          input.photoId,
-
-        key:
-          input.key,
-
-        name:
-          trimmedName,
-
-        fileName:
-          input.fileName,
-
-        contentType:
-          input.contentType,
-
-        fileSize:
-          input.fileSize,
-
-        folderId:
-          input.folderId ?? null,
+        photoId: input.photoId,
+        key: input.key,
+        name: trimmedName,
+        fileName: input.fileName,
+        contentType: input.contentType,
+        fileSize: input.fileSize,
+        folderId: input.folderId ?? null,
       },
-
       auth: true,
     },
   );
@@ -494,97 +387,62 @@ export type PhotoType =
 
 export type GetPhotosOptions = {
   search?: string;
-
   sort?: PhotoSort;
-
   type?: PhotoType;
-
   folderId?: string | null;
 };
 
 export type PhotoApiItem = {
   photoId: string;
-
   userId: string;
-
   s3Key: string;
-
   name: string;
-
   originalFileName?: string;
-
   fileName: string;
-
   contentType: string;
-
   fileSize: number;
-
   createdAt: string;
-
   updatedAt?: string;
-
   downloadUrl: string;
-
   url?: string;
-
   folderId?: string | null;
-
   isTrashed?: boolean;
-
   trashedAt?: string | null;
 };
 
 export type GetPhotosResponse = {
   success: boolean;
-
   count: number;
-
   photos: PhotoApiItem[];
 };
 
 export async function getPhotos(
   options: GetPhotosOptions = {},
 ): Promise<GetPhotosResponse> {
-  const params =
-    new URLSearchParams();
+  const params = new URLSearchParams();
 
-  const search =
-    options.search?.trim();
+  const search = options.search?.trim();
 
   if (search) {
-    params.set(
-      "search",
-      search,
-    );
+    params.set("search", search);
   }
 
   if (options.sort) {
-    params.set(
-      "sort",
-      options.sort,
-    );
+    params.set("sort", options.sort);
   }
 
   if (options.type) {
-    params.set(
-      "type",
-      options.type,
-    );
+    params.set("type", options.type);
   }
 
-  if (
-    options.folderId !==
-    undefined
-  ) {
+  if (options.folderId !== undefined) {
     params.set(
       "folderId",
-      options.folderId ||
-        "root",
+      options.folderId || "root",
     );
   }
 
-  const queryString =
-    params.toString();
+  const queryString = params.toString();
 
   const path = queryString
     ? `/photos?${queryString}`
@@ -594,7 +452,6 @@ export async function getPhotos(
     path,
     {
       method: "GET",
-
       auth: true,
     },
   );
@@ -606,9 +463,7 @@ export async function getPhotos(
 
 export type RenamePhotoResponse = {
   success: boolean;
-
   message: string;
-
   photo: Photo;
 };
 
@@ -616,8 +471,7 @@ export async function renamePhoto(
   photoId: string,
   name: string,
 ): Promise<RenamePhotoResponse> {
-  const trimmedName =
-    name.trim();
+  const trimmedName = name.trim();
 
   if (!trimmedName) {
     throw new ApiError(
@@ -626,9 +480,7 @@ export async function renamePhoto(
     );
   }
 
-  if (
-    trimmedName.length > 120
-  ) {
+  if (trimmedName.length > 120) {
     throw new ApiError(
       "Photo name must be 120 characters or less.",
       400,
@@ -636,16 +488,12 @@ export async function renamePhoto(
   }
 
   return request<RenamePhotoResponse>(
-    `/photos/${encodeURIComponent(
-      photoId,
-    )}`,
+    `/photos/${encodeURIComponent(photoId)}`,
     {
       method: "PATCH",
-
       body: {
         name: trimmedName,
       },
-
       auth: true,
     },
   );
@@ -657,9 +505,7 @@ export async function renamePhoto(
 
 export type MovePhotoResponse = {
   success: boolean;
-
   message: string;
-
   photo: Photo;
 };
 
@@ -668,16 +514,12 @@ export async function movePhotoToFolder(
   folderId: string | null,
 ): Promise<MovePhotoResponse> {
   return request<MovePhotoResponse>(
-    `/photos/${encodeURIComponent(
-      photoId,
-    )}/folder`,
+    `/photos/${encodeURIComponent(photoId)}/folder`,
     {
       method: "PATCH",
-
       body: {
         folderId,
       },
-
       auth: true,
     },
   );
@@ -689,7 +531,6 @@ export async function movePhotoToFolder(
 
 export type DownloadUrlResponse = {
   success: boolean;
-
   downloadUrl: string;
 };
 
@@ -702,7 +543,6 @@ export async function requestDownloadUrl(
     )}`,
     {
       method: "GET",
-
       auth: true,
     },
   );
@@ -713,21 +553,17 @@ export async function requestDownloadUrl(
 // ==================================================
 
 /**
- * Move a photo from the main gallery to Trash.
+ * Move photo from gallery to Trash.
  *
- * Backend:
  * DELETE /photos/:photoId
  */
 export async function trashPhoto(
   photoId: string,
 ): Promise<TrashPhotoResponse> {
   return request<TrashPhotoResponse>(
-    `/photos/${encodeURIComponent(
-      photoId,
-    )}`,
+    `/photos/${encodeURIComponent(photoId)}`,
     {
       method: "DELETE",
-
       auth: true,
     },
   );
@@ -736,7 +572,6 @@ export async function trashPhoto(
 /**
  * Get all photos currently in Trash.
  *
- * Backend:
  * GET /trash
  */
 export async function getTrashPhotos(): Promise<TrashPhotosResponse> {
@@ -744,7 +579,6 @@ export async function getTrashPhotos(): Promise<TrashPhotosResponse> {
     "/trash",
     {
       method: "GET",
-
       auth: true,
     },
   );
@@ -753,19 +587,15 @@ export async function getTrashPhotos(): Promise<TrashPhotosResponse> {
 /**
  * Restore a photo from Trash.
  *
- * Backend:
  * POST /trash/:photoId/restore
  */
 export async function restorePhoto(
   photoId: string,
 ): Promise<TrashPhotoResponse> {
   return request<TrashPhotoResponse>(
-    `/trash/${encodeURIComponent(
-      photoId,
-    )}/restore`,
+    `/trash/${encodeURIComponent(photoId)}/restore`,
     {
       method: "POST",
-
       auth: true,
     },
   );
@@ -774,19 +604,15 @@ export async function restorePhoto(
 /**
  * Permanently delete one photo.
  *
- * Backend:
  * DELETE /trash/:photoId
  */
 export async function deletePhotoForever(
   photoId: string,
 ): Promise<TrashPhotoResponse> {
   return request<TrashPhotoResponse>(
-    `/trash/${encodeURIComponent(
-      photoId,
-    )}`,
+    `/trash/${encodeURIComponent(photoId)}`,
     {
       method: "DELETE",
-
       auth: true,
     },
   );
@@ -795,7 +621,6 @@ export async function deletePhotoForever(
 /**
  * Permanently delete every photo in Trash.
  *
- * Backend:
  * DELETE /trash
  */
 export async function emptyTrash(): Promise<EmptyTrashResponse> {
@@ -803,7 +628,6 @@ export async function emptyTrash(): Promise<EmptyTrashResponse> {
     "/trash",
     {
       method: "DELETE",
-
       auth: true,
     },
   );
@@ -818,7 +642,6 @@ export async function getFolders(): Promise<GetFoldersResponse> {
     "/folders",
     {
       method: "GET",
-
       auth: true,
     },
   );
@@ -827,8 +650,7 @@ export async function getFolders(): Promise<GetFoldersResponse> {
 export async function createFolder(
   name: string,
 ): Promise<CreateFolderResponse> {
-  const trimmedName =
-    name.trim();
+  const trimmedName = name.trim();
 
   if (!trimmedName) {
     throw new ApiError(
@@ -837,9 +659,7 @@ export async function createFolder(
     );
   }
 
-  if (
-    trimmedName.length > 100
-  ) {
+  if (trimmedName.length > 100) {
     throw new ApiError(
       "Folder name cannot exceed 100 characters.",
       400,
@@ -850,11 +670,9 @@ export async function createFolder(
     "/folders",
     {
       method: "POST",
-
       body: {
         name: trimmedName,
       },
-
       auth: true,
     },
   );
@@ -864,8 +682,7 @@ export async function renameFolder(
   folderId: string,
   name: string,
 ): Promise<RenameFolderResponse> {
-  const trimmedName =
-    name.trim();
+  const trimmedName = name.trim();
 
   if (!trimmedName) {
     throw new ApiError(
@@ -875,16 +692,12 @@ export async function renameFolder(
   }
 
   return request<RenameFolderResponse>(
-    `/folders/${encodeURIComponent(
-      folderId,
-    )}`,
+    `/folders/${encodeURIComponent(folderId)}`,
     {
       method: "PATCH",
-
       body: {
         name: trimmedName,
       },
-
       auth: true,
     },
   );
@@ -894,12 +707,9 @@ export async function deleteFolder(
   folderId: string,
 ): Promise<DeleteFolderResponse> {
   return request<DeleteFolderResponse>(
-    `/folders/${encodeURIComponent(
-      folderId,
-    )}`,
+    `/folders/${encodeURIComponent(folderId)}`,
     {
       method: "DELETE",
-
       auth: true,
     },
   );

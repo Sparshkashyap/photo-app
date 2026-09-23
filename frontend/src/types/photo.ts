@@ -5,8 +5,6 @@ export interface Photo {
 
   userId: string;
 
-  key?: string;
-
   name: string;
 
   fileName: string;
@@ -17,13 +15,13 @@ export interface Photo {
 
   s3Key: string;
 
+  key?: string;
+
   url?: string;
 
   downloadUrl?: string;
 
   fileSize?: number;
-
-  uploadedAt?: string;
 
   folderId?: string | null;
 
@@ -37,47 +35,49 @@ export interface Photo {
 
   updatedAt?: string;
 
+  uploadedAt?: string;
+
   isTrashed?: boolean;
 
   trashedAt?: string | null;
 }
+
+// ==================================================
+// UPLOAD
+// ==================================================
 
 export interface UploadUrlResponse {
   success: boolean;
 
   uploadUrl: string;
 
-  photoId: string;
-
   key: string;
+
+  photoId: string;
 
   fileName?: string;
 
   expiresIn?: number;
 }
 
+// ==================================================
+// DOWNLOAD
+// ==================================================
+
 export interface DownloadUrlResponse {
   success: boolean;
 
   downloadUrl: string;
-
-  url?: string;
-
-  expiresIn?: number;
-
-  photo?: {
-    photoId: string;
-
-    fileName: string;
-
-    contentType: string;
-
-    s3Key: string;
-  };
 }
+
+// ==================================================
+// PHOTOS
+// ==================================================
 
 export interface PhotosResponse {
   success: boolean;
+
+  count: number;
 
   photos: Photo[];
 }
@@ -85,21 +85,27 @@ export interface PhotosResponse {
 export interface PhotoResponse {
   success: boolean;
 
-  photo?: Photo;
-
   message?: string;
+
+  photo: Photo;
 }
 
-/* ==================================================
-   TRASH
-================================================== */
+// ==================================================
+// TRASH
+// ==================================================
+
+export interface TrashPhoto extends Photo {
+  isTrashed?: boolean;
+
+  trashedAt?: string | null;
+}
 
 export interface TrashPhotosResponse {
   success: boolean;
 
   count?: number;
 
-  photos: Photo[];
+  photos: TrashPhoto[];
 }
 
 export interface TrashPhotoResponse {
@@ -107,21 +113,7 @@ export interface TrashPhotoResponse {
 
   message?: string;
 
-  photo?: Photo;
-}
-
-export interface RestorePhotoResponse {
-  success: boolean;
-
-  message?: string;
-
-  photo?: Photo;
-}
-
-export interface DeleteForeverResponse {
-  success: boolean;
-
-  message?: string;
+  photo?: TrashPhoto;
 }
 
 export interface EmptyTrashResponse {
@@ -130,4 +122,6 @@ export interface EmptyTrashResponse {
   message?: string;
 
   deletedCount?: number;
+
+  count?: number;
 }

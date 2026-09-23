@@ -1,4 +1,3 @@
-
 // ==================================================
 // FILE: app.js
 // ==================================================
@@ -32,6 +31,9 @@ const folderRoutes =
 
 const trashRoutes =
   require("./src/routes/trashRoutes");
+
+const shareRoutes =
+  require("./src/routes/shareRoutes");
 
 const app =
   express();
@@ -120,6 +122,23 @@ app.use(
 app.use(
   "/trash",
   trashRoutes
+);
+
+// ==================================================
+// SHARE
+// ==================================================
+//
+// Authenticated:
+// POST   /share
+// DELETE /share/:token
+//
+// Public:
+// GET    /share/:token
+// ==================================================
+
+app.use(
+  "/share",
+  shareRoutes
 );
 
 // --------------------------------------------------
