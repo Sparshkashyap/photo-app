@@ -5,21 +5,17 @@ export interface Photo {
 
   userId: string;
 
-  name: string;
-
-  fileName: string;
-
-  originalFileName?: string;
-
-  contentType: string;
+  key?: string;
 
   s3Key: string;
 
-  key?: string;
+  name: string;
 
-  url?: string;
+  originalFileName?: string;
 
-  downloadUrl?: string;
+  fileName: string;
+
+  contentType: string;
 
   fileSize?: number;
 
@@ -31,63 +27,21 @@ export interface Photo {
     | "FAILED"
     | string;
 
+  url?: string;
+
+  downloadUrl?: string;
+
+  uploadedAt?: string;
+
   createdAt?: string;
 
   updatedAt?: string;
 
-  uploadedAt?: string;
-
   isTrashed?: boolean;
 
   trashedAt?: string | null;
-}
 
-// ==================================================
-// UPLOAD
-// ==================================================
-
-export interface UploadUrlResponse {
-  success: boolean;
-
-  uploadUrl: string;
-
-  key: string;
-
-  photoId: string;
-
-  fileName?: string;
-
-  expiresIn?: number;
-}
-
-// ==================================================
-// DOWNLOAD
-// ==================================================
-
-export interface DownloadUrlResponse {
-  success: boolean;
-
-  downloadUrl: string;
-}
-
-// ==================================================
-// PHOTOS
-// ==================================================
-
-export interface PhotosResponse {
-  success: boolean;
-
-  count: number;
-
-  photos: Photo[];
-}
-
-export interface PhotoResponse {
-  success: boolean;
-
-  message?: string;
-
-  photo: Photo;
+  isFavorite?: boolean;
 }
 
 // ==================================================
@@ -95,7 +49,7 @@ export interface PhotoResponse {
 // ==================================================
 
 export interface TrashPhoto extends Photo {
-  isTrashed?: boolean;
+  isTrashed: true;
 
   trashedAt?: string | null;
 }
@@ -103,25 +57,89 @@ export interface TrashPhoto extends Photo {
 export interface TrashPhotosResponse {
   success: boolean;
 
-  count?: number;
+  count: number;
 
   photos: TrashPhoto[];
 }
 
-export interface TrashPhotoResponse {
+export interface TrashActionResponse {
   success: boolean;
 
-  message?: string;
+  message: string;
 
-  photo?: TrashPhoto;
+  photo?: Photo;
 }
 
 export interface EmptyTrashResponse {
   success: boolean;
 
-  message?: string;
-
-  deletedCount?: number;
+  message: string;
 
   count?: number;
+}
+
+// ==================================================
+// SHARE
+// ==================================================
+
+export interface SharedPhoto {
+  photoId: string;
+
+  name: string;
+
+  originalFileName?: string;
+
+  fileName: string;
+
+  contentType: string;
+
+  fileSize?: number;
+
+  createdAt?: string;
+
+  updatedAt?: string;
+
+  folderId?: string | null;
+
+  downloadUrl: string;
+
+  url?: string;
+}
+
+export interface ShareInfo {
+  shareId: string;
+
+  photoId: string;
+
+  token: string;
+
+  expiresAt?: string | null;
+
+  createdAt?: string;
+
+  revoked?: boolean;
+
+  shareUrl?: string;
+}
+
+export interface CreateShareResponse {
+  success: boolean;
+
+  message?: string;
+
+  share: ShareInfo;
+}
+
+export interface RevokeShareResponse {
+  success: boolean;
+
+  message: string;
+}
+
+export interface GetSharedPhotoResponse {
+  success: boolean;
+
+  photo: SharedPhoto;
+
+  share?: ShareInfo;
 }

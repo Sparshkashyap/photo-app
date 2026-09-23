@@ -1,6 +1,7 @@
 import {
   Download,
   FolderInput,
+  Heart,
   Loader2,
   MoreVertical,
   Pencil,
@@ -32,8 +33,10 @@ import {
 } from "@/components/ui/dialog";
 
 import {
+  createShare,
   movePhotoToFolder,
   renamePhoto,
+  setFavorite,
   trashPhoto,
 } from "@/services/api";
 
@@ -64,6 +67,10 @@ type PhotoMenuProps = {
   onTrashed?: (
     photo: Photo,
   ) => void;
+
+  onFavorite?: (
+    photo: Photo,
+  ) => void;
 };
 
 export function PhotoMenu({
@@ -73,6 +80,7 @@ export function PhotoMenu({
   onMoved,
   onDownload,
   onTrashed,
+  onFavorite,
 }: PhotoMenuProps) {
   const [
     menuOpen,
@@ -93,6 +101,16 @@ export function PhotoMenu({
     deleteOpen,
     setDeleteOpen,
   ] = useState(false);
+
+  const [
+    shareOpen,
+    setShareOpen,
+  ] = useState(false);
+
+  const [
+    shareUrl,
+    setShareUrl,
+  ] = useState("");
 
   const [
     newName,
@@ -125,6 +143,35 @@ export function PhotoMenu({
     sharing,
     setSharing,
   ] = useState(false);
+
+  const [
+    favoriting,
+    setFavoriting,
+  ] = useState(false);
+
+  const [
+    copied,
+    setCopied,
+  ] = useState(false);
+
+  const [
+    isFavorite,
+    setIsFavorite,
+  ] = useState(
+    photo.isFavorite === true,
+  );
+
+  // --------------------------------------------------
+  // Keep favorite state synchronized with photo
+  // --------------------------------------------------
+
+  useEffect(() => {
+    setIsFavorite(
+      photo.isFavorite === true,
+    );
+  }, [
+    photo.isFavorite,
+  ]);
 
   // --------------------------------------------------
   // Menu Reference
@@ -190,7 +237,83 @@ export function PhotoMenu({
         handleEscape,
       );
     };
-  }, [menuOpen]);
+  }, [
+    menuOpen,
+  ]);
+
+  // --------------------------------------------------
+  // Favorite
+  // --------------------------------------------------
+
+  async function handleFavorite() {
+    if (
+      favoriting ||
+      !photo.photoId
+    ) {
+      return;
+    }
+
+    const nextValue =
+      !isFavorite;
+
+    setFavoriting(true);
+
+    try {
+      const response =
+        await setFavorite(
+          photo.photoId,
+          nextValue,
+        );
+
+      const updatedAt =
+        response.photo?.updatedAt ??
+        photo.updatedAt ??
+        new Date().toISOString();
+
+      const updatedPhoto: Photo = {
+        ...photo,
+        isFavorite:
+          response.photo
+            ?.isFavorite ??
+          nextValue,
+        updatedAt,
+      };
+
+      setIsFavorite(
+        updatedPhoto.isFavorite ===
+          true,
+      );
+
+      onFavorite?.(
+        updatedPhoto,
+      );
+
+      setMenuOpen(false);
+
+      toast.success(
+        nextValue
+          ? "Added to Favorites"
+          : "Removed from Favorites",
+      );
+    } catch (error) {
+      console.error(
+        "Favorite update failed:",
+        error,
+      );
+
+      toast.error(
+        "Couldn't update Favorite",
+        {
+          description:
+            error instanceof Error
+              ? error.message
+              : "Please try again.",
+        },
+      );
+    } finally {
+      setFavoriting(false);
+    }
+  }
 
   // --------------------------------------------------
   // Share
@@ -201,125 +324,65 @@ export function PhotoMenu({
       return;
     }
 
-    const shareUrl =
-      photo.url ||
-      photo.downloadUrl ||
-      "";
-
-    if (!shareUrl) {
-      toast.error(
-        "Unable to share this photo",
-        {
-          description:
-            "No shareable URL is available for this photo.",
-        },
-      );
-
-      setMenuOpen(false);
-
-      return;
-    }
-
     setSharing(true);
     setMenuOpen(false);
 
     try {
-      const shareTitle =
-        photo.name ||
-        photo.fileName ||
-        "Photo";
-
-      // Native Web Share API
-      if (
-        typeof navigator !==
-          "undefined" &&
-        typeof navigator.share ===
-          "function"
-      ) {
-        await navigator.share({
-          title: shareTitle,
-          text: `Check out ${shareTitle}`,
-          url: shareUrl,
-        });
-
-        toast.success(
-          "Share dialog opened",
+      const response =
+        await createShare(
+          photo.photoId,
         );
 
-        return;
+      /*
+       * Backend Phase 6 share response is expected
+       * to contain the generated share token.
+       *
+       * Prefer an explicit shareUrl if backend
+       * already provides one.
+       */
+
+      const responseData =
+        response as typeof response & {
+          shareUrl?: string;
+          url?: string;
+          share?: {
+            token?: string;
+            shareUrl?: string;
+          };
+        };
+
+      let generatedShareUrl =
+        responseData.shareUrl ||
+        responseData.url ||
+        responseData.share?.shareUrl ||
+        "";
+
+      if (
+        !generatedShareUrl &&
+        responseData.share?.token
+      ) {
+        generatedShareUrl =
+          `${window.location.origin}/shared/${encodeURIComponent(
+            responseData.share.token,
+          )}`;
       }
 
-      // Fallback: Copy URL
-      if (
-        typeof navigator !==
-          "undefined" &&
-        navigator.clipboard
-      ) {
-        await navigator.clipboard.writeText(
-          shareUrl,
+      if (!generatedShareUrl) {
+        throw new Error(
+          "The server did not return a shareable link.",
         );
-
-        toast.success(
-          "Photo link copied",
-          {
-            description:
-              "The shareable photo link has been copied to your clipboard.",
-          },
-        );
-
-        return;
       }
 
-      // Last fallback
-      const textArea =
-        document.createElement(
-          "textarea",
-        );
-
-      textArea.value = shareUrl;
-      textArea.style.position =
-        "fixed";
-      textArea.style.opacity = "0";
-      textArea.style.pointerEvents =
-        "none";
-
-      document.body.appendChild(
-        textArea,
+      setShareUrl(
+        generatedShareUrl,
       );
 
-      textArea.focus();
-      textArea.select();
+      setShareOpen(true);
 
-      const copied =
-        document.execCommand(
-          "copy",
-        );
-
-      textArea.remove();
-
-      if (copied) {
-        toast.success(
-          "Photo link copied",
-        );
-      } else {
-        toast.error(
-          "Unable to share photo",
-          {
-            description:
-              "Please copy the photo URL manually.",
-          },
-        );
-      }
+      toast.success(
+        "Share link created",
+      );
     } catch (error) {
-      // User closing/cancelling the native
-      // share dialog is not an application error.
-      if (
-        error instanceof DOMException &&
-        error.name === "AbortError"
-      ) {
-        return;
-      }
-
       console.error(
         "Share failed:",
         error,
@@ -337,6 +400,133 @@ export function PhotoMenu({
     } finally {
       setSharing(false);
     }
+  }
+
+  // --------------------------------------------------
+  // Copy Share URL
+  // --------------------------------------------------
+
+  async function handleCopyShareUrl() {
+    if (!shareUrl) {
+      return;
+    }
+
+    try {
+      if (
+        navigator.clipboard
+      ) {
+        await navigator.clipboard.writeText(
+          shareUrl,
+        );
+      } else {
+        const textArea =
+          document.createElement(
+            "textarea",
+          );
+
+        textArea.value =
+          shareUrl;
+
+        textArea.style.position =
+          "fixed";
+
+        textArea.style.opacity =
+          "0";
+
+        document.body.appendChild(
+          textArea,
+        );
+
+        textArea.focus();
+        textArea.select();
+
+        const copiedSuccessfully =
+          document.execCommand(
+            "copy",
+          );
+
+        textArea.remove();
+
+        if (!copiedSuccessfully) {
+          throw new Error(
+            "Clipboard access was unavailable.",
+          );
+        }
+      }
+
+      setCopied(true);
+
+      toast.success(
+        "Share link copied",
+      );
+
+      window.setTimeout(() => {
+        setCopied(false);
+      }, 1800);
+    } catch (error) {
+      console.error(
+        "Copy share link failed:",
+        error,
+      );
+
+      toast.error(
+        "Couldn't copy link",
+      );
+    }
+  }
+
+  // --------------------------------------------------
+  // Native Share
+  // --------------------------------------------------
+
+  async function handleNativeShare() {
+    if (!shareUrl) {
+      return;
+    }
+
+    if (
+      typeof navigator !==
+        "undefined" &&
+      typeof navigator.share ===
+        "function"
+    ) {
+      try {
+        if (
+          typeof navigator.share ===
+          "function"
+        ) {
+          await navigator.share({
+            title:
+              photo.name ||
+              photo.fileName ||
+              "Photo",
+            text: `Check out ${
+              photo.name ||
+              photo.fileName ||
+              "this photo"
+            }`,
+            url: shareUrl,
+          });
+
+          return;
+        }
+      } catch (error) {
+        if (
+          error instanceof DOMException &&
+          error.name ===
+            "AbortError"
+        ) {
+          return;
+        }
+
+        console.error(
+          "Native share failed:",
+          error,
+        );
+      }
+    }
+
+    await handleCopyShareUrl();
   }
 
   // --------------------------------------------------
@@ -369,6 +559,7 @@ export function PhotoMenu({
       cleanName === photo.name
     ) {
       setRenameOpen(false);
+
       return;
     }
 
@@ -395,8 +586,13 @@ export function PhotoMenu({
         name:
           updated.name,
 
-        ...(updated.originalFileName || photo.originalFileName
-          ? { originalFileName: updated.originalFileName ?? photo.originalFileName }
+        ...(updated.originalFileName ||
+        photo.originalFileName
+          ? {
+              originalFileName:
+                updated.originalFileName ??
+                photo.originalFileName,
+            }
           : {}),
 
         fileName:
@@ -523,7 +719,9 @@ export function PhotoMenu({
 
       setMenuOpen(false);
 
-      onTrashed?.(photo);
+      onTrashed?.(
+        photo,
+      );
 
       toast.success(
         "Moved to Trash",
@@ -578,9 +776,7 @@ export function PhotoMenu({
           title="Photo options"
           className="border-border bg-background/95 shadow-sm sm:opacity-0 sm:transition-opacity sm:group-hover:opacity-100"
         >
-          <MoreVertical
-            className="size-4"
-          />
+          <MoreVertical className="size-4" />
         </Button>
 
         {menuOpen ? (
@@ -588,23 +784,15 @@ export function PhotoMenu({
             role="menu"
             className="absolute right-0 top-11 z-30 w-52 overflow-hidden rounded-lg border border-border bg-popover p-1 text-popover-foreground shadow-xl"
           >
-            {/* ------------------------------------------------
-                Rename
-            ------------------------------------------------ */}
+            {/* Rename */}
 
             <button
               type="button"
               role="menuitem"
               onClick={() => {
                 setMenuOpen(false);
-
-                setNewName(
-                  photo.name,
-                );
-
-                setRenameOpen(
-                  true,
-                );
+                setNewName(photo.name);
+                setRenameOpen(true);
               }}
               className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-sm transition-colors hover:bg-accent"
             >
@@ -615,9 +803,7 @@ export function PhotoMenu({
               </span>
             </button>
 
-            {/* ------------------------------------------------
-                Move
-            ------------------------------------------------ */}
+            {/* Move */}
 
             <button
               type="button"
@@ -630,9 +816,7 @@ export function PhotoMenu({
                     "",
                 );
 
-                setMoveOpen(
-                  true,
-                );
+                setMoveOpen(true);
               }}
               className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-sm transition-colors hover:bg-accent"
             >
@@ -643,16 +827,13 @@ export function PhotoMenu({
               </span>
             </button>
 
-            {/* ------------------------------------------------
-                Download
-            ------------------------------------------------ */}
+            {/* Download */}
 
             <button
               type="button"
               role="menuitem"
               onClick={() => {
                 setMenuOpen(false);
-
                 onDownload?.();
               }}
               className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-sm transition-colors hover:bg-accent"
@@ -664,9 +845,37 @@ export function PhotoMenu({
               </span>
             </button>
 
-            {/* ------------------------------------------------
-                Share
-            ------------------------------------------------ */}
+            {/* Favorite */}
+
+            <button
+              type="button"
+              role="menuitem"
+              onClick={() => {
+                void handleFavorite();
+              }}
+              disabled={favoriting}
+              className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-sm transition-colors hover:bg-accent disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              {favoriting ? (
+                <Loader2 className="size-4 animate-spin" />
+              ) : (
+                <Heart
+                  className={`size-4 ${
+                    isFavorite
+                      ? "fill-current text-rose-500"
+                      : ""
+                  }`}
+                />
+              )}
+
+              <span>
+                {isFavorite
+                  ? "Remove from Favorites"
+                  : "Add to Favorites"}
+              </span>
+            </button>
+
+            {/* Share */}
 
             <button
               type="button"
@@ -690,25 +899,16 @@ export function PhotoMenu({
               </span>
             </button>
 
-            {/* ------------------------------------------------
-                Separator
-            ------------------------------------------------ */}
-
             <div className="my-1 h-px bg-border" />
 
-            {/* ------------------------------------------------
-                Move to Trash
-            ------------------------------------------------ */}
+            {/* Trash */}
 
             <button
               type="button"
               role="menuitem"
               onClick={() => {
                 setMenuOpen(false);
-
-                setDeleteOpen(
-                  true,
-                );
+                setDeleteOpen(true);
               }}
               className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-sm text-destructive transition-colors hover:bg-destructive/10"
             >
@@ -730,9 +930,7 @@ export function PhotoMenu({
         open={renameOpen}
         onOpenChange={(open) => {
           if (!renaming) {
-            setRenameOpen(
-              open,
-            );
+            setRenameOpen(open);
           }
         }}
       >
@@ -765,8 +963,7 @@ export function PhotoMenu({
               autoFocus
               onChange={(event) =>
                 setNewName(
-                  event.target
-                    .value,
+                  event.target.value,
                 )
               }
               onKeyDown={(event) => {
@@ -789,9 +986,7 @@ export function PhotoMenu({
             <Button
               variant="outline"
               onClick={() =>
-                setRenameOpen(
-                  false,
-                )
+                setRenameOpen(false)
               }
               disabled={renaming}
             >
@@ -827,9 +1022,7 @@ export function PhotoMenu({
         open={moveOpen}
         onOpenChange={(open) => {
           if (!moving) {
-            setMoveOpen(
-              open,
-            );
+            setMoveOpen(open);
           }
         }}
       >
@@ -855,14 +1048,11 @@ export function PhotoMenu({
 
             <select
               id={`move-${photo.photoId}`}
-              value={
-                selectedFolderId
-              }
+              value={selectedFolderId}
               disabled={moving}
               onChange={(event) =>
                 setSelectedFolderId(
-                  event.target
-                    .value,
+                  event.target.value,
                 )
               }
               className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm outline-none focus:border-ring focus:ring-2 focus:ring-ring/20"
@@ -892,9 +1082,7 @@ export function PhotoMenu({
             <Button
               variant="outline"
               onClick={() =>
-                setMoveOpen(
-                  false,
-                )
+                setMoveOpen(false)
               }
               disabled={moving}
             >
@@ -920,6 +1108,69 @@ export function PhotoMenu({
       </Dialog>
 
       {/* ==================================================
+          Share Dialog
+      ================================================== */}
+
+      <Dialog
+        open={shareOpen}
+        onOpenChange={setShareOpen}
+      >
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>
+              Share photo
+            </DialogTitle>
+
+            <DialogDescription>
+              Anyone with this link can
+              view the shared photo.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-3">
+            <div className="rounded-lg border border-border bg-muted/40 p-3">
+              <p className="mb-2 text-xs font-medium text-muted-foreground">
+                Share link
+              </p>
+
+              <p className="break-all text-sm">
+                {shareUrl}
+              </p>
+            </div>
+
+            <p className="text-xs text-muted-foreground">
+              The original photo remains private.
+              This link only provides access to
+              the shared photo.
+            </p>
+          </div>
+
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() =>
+                void handleNativeShare()
+              }
+            >
+              <Share2 className="size-4" />
+
+              Share
+            </Button>
+
+            <Button
+              onClick={() =>
+                void handleCopyShareUrl()
+              }
+            >
+              {copied
+                ? "Copied"
+                : "Copy link"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* ==================================================
           Trash Confirmation
       ================================================== */}
 
@@ -927,9 +1178,7 @@ export function PhotoMenu({
         open={deleteOpen}
         onOpenChange={(open) => {
           if (!deleting) {
-            setDeleteOpen(
-              open,
-            );
+            setDeleteOpen(open);
           }
         }}
       >
@@ -954,9 +1203,7 @@ export function PhotoMenu({
             <Button
               variant="outline"
               onClick={() =>
-                setDeleteOpen(
-                  false,
-                )
+                setDeleteOpen(false)
               }
               disabled={deleting}
             >
@@ -984,3 +1231,5 @@ export function PhotoMenu({
     </>
   );
 }
+
+export default PhotoMenu;

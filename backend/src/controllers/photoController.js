@@ -362,6 +362,10 @@ const confirmUpload = async (
       isTrashed:
         false,
 
+      // Favorite state
+      isFavorite:
+        false,
+
       createdAt:
         now,
 
@@ -600,8 +604,7 @@ const getPhotos = async (
 
             const fileName =
               String(
-                photo.fileName ||
-                ""
+                photo.fileName || ""
               ).toLowerCase();
 
             return (
@@ -773,6 +776,10 @@ const getPhotos = async (
                 photo.folderId ||
                 null,
 
+              // Favorite state
+              isFavorite:
+                photo.isFavorite === true,
+
               createdAt:
                 photo.createdAt ||
                 "",
@@ -820,15 +827,8 @@ const getPhotos = async (
 // DELETE /photos/:photoId
 //
 // IMPORTANT:
-// This is now a SOFT DELETE.
-//
-// S3 object remains safe.
-// DynamoDB metadata remains.
-// Only isTrashed becomes true.
-//
-// User can later:
-// 1. Restore
-// 2. Delete Forever
+// This is a SOFT DELETE.
+// The S3 object is NOT deleted.
 // --------------------------------------------------
 
 const deletePhoto = async (
@@ -939,7 +939,7 @@ const deletePhoto = async (
     });
   } catch (error) {
     console.error(
-      "Move photo to trash error:",
+      "Delete photo error:",
       error
     );
 
@@ -1350,8 +1350,6 @@ const downloadUrl = async (
       });
     }
 
-    // Trashed photos cannot be downloaded
-    // from the normal gallery.
     if (
       photo.isTrashed === true
     ) {

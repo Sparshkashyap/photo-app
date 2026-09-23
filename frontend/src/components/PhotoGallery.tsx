@@ -51,6 +51,10 @@ type PhotoGalleryProps = {
     photo: Photo,
   ) => void;
 
+  onFavorite?: (
+    photo: Photo,
+  ) => void;
+
   onRetry?: () => void;
 
   error?: string;
@@ -98,6 +102,7 @@ export function PhotoGallery({
   onRenamed,
   onMoved,
   onTrashed,
+  onFavorite,
   onRetry,
   error,
   deletingPhotoId,
@@ -129,6 +134,31 @@ export function PhotoGallery({
       window.removeEventListener(
         "storage",
         handleStorageChange,
+      );
+    };
+  }, []);
+
+  // ==================================================
+  // Same-tab settings refresh
+  // ==================================================
+
+  useEffect(() => {
+    const interval =
+      window.setInterval(() => {
+        const next =
+          getCompactGridSetting();
+
+        setCompactGrid(
+          (previous) =>
+            previous === next
+              ? previous
+              : next,
+        );
+      }, 500);
+
+    return () => {
+      window.clearInterval(
+        interval,
       );
     };
   }, []);
@@ -260,6 +290,11 @@ export function PhotoGallery({
                 {...(onTrashed
                   ? {
                       onTrashed,
+                    }
+                  : {})}
+                {...(onFavorite
+                  ? {
+                      onFavorite,
                     }
                   : {})}
               />

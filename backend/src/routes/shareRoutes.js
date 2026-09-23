@@ -1,61 +1,49 @@
-const express =
-  require("express");
+const express = require("express");
 
 const authMiddleware =
   require("../middleware/authMiddleware");
 
 const {
-  createShareLink,
-  getPublicShare,
-  revokeShareLink,
+  createShare,
+  getSharedPhoto,
+  revokeShare,
 } = require("../controllers/shareController");
 
-const router =
-  express.Router();
+const router = express.Router();
 
 // ==================================================
 // CREATE SHARE LINK
-// POST /share
-//
-// Authentication required.
+// POST /share/:photoId
+// Protected
 // ==================================================
 
 router.post(
-  "/",
+  "/:photoId",
   authMiddleware,
-  createShareLink
+  createShare,
 );
 
 // ==================================================
 // PUBLIC SHARED PHOTO
 // GET /share/:token
-//
-// Authentication NOT required.
-//
-// Anyone who has the valid share link can
-// access the shared photo.
+// Public
 // ==================================================
 
 router.get(
   "/:token",
-  getPublicShare
+  getSharedPhoto,
 );
 
 // ==================================================
 // REVOKE SHARE LINK
-// DELETE /share/:token
-//
-// Authentication required.
-//
-// Only the owner who created the link can
-// revoke it.
+// DELETE /share/:photoId/:shareId
+// Protected
 // ==================================================
 
 router.delete(
-  "/:token",
+  "/:photoId/:shareId",
   authMiddleware,
-  revokeShareLink
+  revokeShare,
 );
 
-module.exports =
-  router;
+module.exports = router;

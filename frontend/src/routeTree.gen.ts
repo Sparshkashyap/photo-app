@@ -11,8 +11,10 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as DashboardRouteImport } from './routes/dashboard'
+import { Route as FavoritesRouteImport } from './routes/favorites'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as SettingsRouteImport } from './routes/settings'
+import { Route as SharedRouteImport } from './routes/shared'
 import { Route as SignupRouteImport } from './routes/signup'
 import { Route as TrashRouteImport } from './routes/trash'
 import { Route as ShareTokenRouteImport } from './routes/share.$token'
@@ -27,6 +29,11 @@ const DashboardRoute = DashboardRouteImport.update({
   path: '/dashboard',
   getParentRoute: () => rootRouteImport,
 } as any)
+const FavoritesRoute = FavoritesRouteImport.update({
+  id: '/favorites',
+  path: '/favorites',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const LoginRoute = LoginRouteImport.update({
   id: '/login',
   path: '/login',
@@ -35,6 +42,11 @@ const LoginRoute = LoginRouteImport.update({
 const SettingsRoute = SettingsRouteImport.update({
   id: '/settings',
   path: '/settings',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SharedRoute = SharedRouteImport.update({
+  id: '/shared',
+  path: '/shared',
   getParentRoute: () => rootRouteImport,
 } as any)
 const SignupRoute = SignupRouteImport.update({
@@ -56,8 +68,10 @@ const ShareTokenRoute = ShareTokenRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/dashboard': typeof DashboardRoute
+  '/favorites': typeof FavoritesRoute
   '/login': typeof LoginRoute
   '/settings': typeof SettingsRoute
+  '/shared': typeof SharedRoute
   '/signup': typeof SignupRoute
   '/trash': typeof TrashRoute
   '/share/$token': typeof ShareTokenRoute
@@ -65,8 +79,10 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/dashboard': typeof DashboardRoute
+  '/favorites': typeof FavoritesRoute
   '/login': typeof LoginRoute
   '/settings': typeof SettingsRoute
+  '/shared': typeof SharedRoute
   '/signup': typeof SignupRoute
   '/trash': typeof TrashRoute
   '/share/$token': typeof ShareTokenRoute
@@ -75,8 +91,10 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/dashboard': typeof DashboardRoute
+  '/favorites': typeof FavoritesRoute
   '/login': typeof LoginRoute
   '/settings': typeof SettingsRoute
+  '/shared': typeof SharedRoute
   '/signup': typeof SignupRoute
   '/trash': typeof TrashRoute
   '/share/$token': typeof ShareTokenRoute
@@ -86,8 +104,10 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/dashboard'
+    | '/favorites'
     | '/login'
     | '/settings'
+    | '/shared'
     | '/signup'
     | '/trash'
     | '/share/$token'
@@ -95,8 +115,10 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/dashboard'
+    | '/favorites'
     | '/login'
     | '/settings'
+    | '/shared'
     | '/signup'
     | '/trash'
     | '/share/$token'
@@ -104,8 +126,10 @@ export interface FileRouteTypes {
     | '__root__'
     | '/'
     | '/dashboard'
+    | '/favorites'
     | '/login'
     | '/settings'
+    | '/shared'
     | '/signup'
     | '/trash'
     | '/share/$token'
@@ -114,8 +138,10 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   DashboardRoute: typeof DashboardRoute
+  FavoritesRoute: typeof FavoritesRoute
   LoginRoute: typeof LoginRoute
   SettingsRoute: typeof SettingsRoute
+  SharedRoute: typeof SharedRoute
   SignupRoute: typeof SignupRoute
   TrashRoute: typeof TrashRoute
   ShareTokenRoute: typeof ShareTokenRoute
@@ -137,6 +163,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DashboardRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/favorites': {
+      id: '/favorites'
+      path: '/favorites'
+      fullPath: '/favorites'
+      preLoaderRoute: typeof FavoritesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/login': {
       id: '/login'
       path: '/login'
@@ -149,6 +182,13 @@ declare module '@tanstack/react-router' {
       path: '/settings'
       fullPath: '/settings'
       preLoaderRoute: typeof SettingsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/shared': {
+      id: '/shared'
+      path: '/shared'
+      fullPath: '/shared'
+      preLoaderRoute: typeof SharedRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/signup': {
@@ -178,8 +218,10 @@ declare module '@tanstack/react-router' {
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   DashboardRoute: DashboardRoute,
+  FavoritesRoute: FavoritesRoute,
   LoginRoute: LoginRoute,
   SettingsRoute: SettingsRoute,
+  SharedRoute: SharedRoute,
   SignupRoute: SignupRoute,
   TrashRoute: TrashRoute,
   ShareTokenRoute: ShareTokenRoute,

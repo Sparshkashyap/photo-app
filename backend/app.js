@@ -35,6 +35,20 @@ const trashRoutes =
 const shareRoutes =
   require("./src/routes/shareRoutes");
 
+// Phase 6 - Favorites
+// Keep this import only if favoriteRoutes.js
+// has already been created.
+let favoriteRoutes = null;
+
+try {
+  favoriteRoutes =
+    require("./src/routes/favoriteRoutes");
+} catch (error) {
+  console.warn(
+    "favoriteRoutes.js not found. Favorites route will be skipped until the file is added."
+  );
+}
+
 const app =
   express();
 
@@ -140,6 +154,24 @@ app.use(
   "/share",
   shareRoutes
 );
+
+// ==================================================
+// FAVORITES
+// ==================================================
+//
+// Authenticated:
+// PATCH /favorites/:photoId
+//
+// This route is optional until
+// favoriteRoutes.js exists.
+// ==================================================
+
+if (favoriteRoutes) {
+  app.use(
+    "/favorites",
+    favoriteRoutes
+  );
+}
 
 // --------------------------------------------------
 // 404 Handler

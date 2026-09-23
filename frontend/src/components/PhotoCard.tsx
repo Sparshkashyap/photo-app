@@ -1,4 +1,5 @@
 import {
+  Heart,
   ImageOff,
   Loader2,
   Video,
@@ -8,7 +9,8 @@ import {
 import {
   useEffect,
   useState,
-  type MouseEvent,
+  type KeyboardEvent as ReactKeyboardEvent,
+  type MouseEvent as ReactMouseEvent,
 } from "react";
 
 import { toast } from "sonner";
@@ -37,6 +39,10 @@ type PhotoCardProps = {
   ) => void;
 
   onTrashed?: (
+    photo: Photo,
+  ) => void;
+
+  onFavorite?: (
     photo: Photo,
   ) => void;
 };
@@ -83,6 +89,7 @@ export function PhotoCard({
   onRenamed,
   onMoved,
   onTrashed,
+  onFavorite,
 }: PhotoCardProps) {
   const [
     downloading,
@@ -105,6 +112,13 @@ export function PhotoCard({
     mediaError,
     setMediaError,
   ] = useState(false);
+
+  const [
+    isFavorite,
+    setIsFavorite,
+  ] = useState(
+    photo.isFavorite === true,
+  );
 
   // ==================================================
   // Listen for settings changes
@@ -130,6 +144,18 @@ export function PhotoCard({
       );
     };
   }, []);
+
+  // ==================================================
+  // Synchronize favorite state
+  // ==================================================
+
+  useEffect(() => {
+    setIsFavorite(
+      photo.isFavorite === true,
+    );
+  }, [
+    photo.isFavorite,
+  ]);
 
   // ==================================================
   // Download
@@ -252,7 +278,7 @@ export function PhotoCard({
     }
 
     function handleKeyDown(
-      event: KeyboardEvent,
+      event: globalThis.KeyboardEvent,
     ) {
       if (
         event.key ===
@@ -291,14 +317,8 @@ export function PhotoCard({
   // ==================================================
 
   function handlePreviewOpen(
-    event: MouseEvent<HTMLElement>,
+    event: ReactMouseEvent<HTMLElement>,
   ) {
-    /*
-     * Do not open the preview when
-     * the user is interacting with
-     * video controls or buttons.
-     */
-
     if (
       event.target instanceof
       HTMLVideoElement
@@ -328,7 +348,7 @@ export function PhotoCard({
   // ==================================================
 
   function handlePreviewKeyDown(
-    event: React.KeyboardEvent<HTMLElement>,
+    event: ReactKeyboardEvent<HTMLElement>,
   ) {
     if (
       event.key ===
@@ -349,6 +369,26 @@ export function PhotoCard({
 
   function handleMediaError() {
     setMediaError(true);
+  }
+
+  // ==================================================
+  // Favorite
+  // ==================================================
+
+  function handleFavorite(
+    updatedPhoto: Photo,
+  ) {
+    const nextFavorite =
+      updatedPhoto.isFavorite ===
+      true;
+
+    setIsFavorite(
+      nextFavorite,
+    );
+
+    onFavorite?.(
+      updatedPhoto,
+    );
   }
 
   return (
@@ -378,9 +418,7 @@ export function PhotoCard({
               : "cursor-default"
           }`}
         >
-          {/* ==================================================
-              Media unavailable
-          ================================================== */}
+          {/* Media unavailable */}
 
           {!mediaUrl ||
           mediaError ? (
@@ -437,6 +475,20 @@ export function PhotoCard({
         ) : null}
 
         {/* ==================================================
+            Favorite indicator
+        ================================================== */}
+
+        {isFavorite ? (
+          <div
+            className="pointer-events-none absolute left-2 top-2 z-10 flex size-8 items-center justify-center rounded-full bg-black/45 text-white backdrop-blur-sm"
+            aria-label="Favorite photo"
+            title="Favorite"
+          >
+            <Heart className="size-4 fill-current text-rose-400" />
+          </div>
+        ) : null}
+
+        {/* ==================================================
             Name
         ================================================== */}
 
@@ -462,16 +514,22 @@ export function PhotoCard({
             photo={photo}
             folders={folders}
             onRenamed={
-              onRenamed ?? ((_: Photo) => {})
+              onRenamed ??
+              ((_: Photo) => {})
             }
             onMoved={
-              onMoved ?? ((_: Photo, __: string | null) => {})
+              onMoved ??
+              ((_: Photo, __: string | null) => {})
             }
             onDownload={() => {
               void handleDownload();
             }}
             onTrashed={
-              onTrashed ?? ((_: Photo) => {})
+              onTrashed ??
+              ((_: Photo) => {})
+            }
+            onFavorite={
+              handleFavorite
             }
           />
         </div>
@@ -503,9 +561,7 @@ export function PhotoCard({
             setPreviewOpen(false);
           }}
         >
-          {/* ==================================================
-              Close button
-          ================================================== */}
+          {/* Close button */}
 
           <button
             type="button"
@@ -519,9 +575,7 @@ export function PhotoCard({
             <X className="size-5" />
           </button>
 
-          {/* ==================================================
-              Preview content
-          ================================================== */}
+          {/* Preview content */}
 
           <div
             className="relative flex max-h-[92vh] max-w-[95vw] items-center justify-center"
@@ -548,9 +602,7 @@ export function PhotoCard({
             )}
           </div>
 
-          {/* ==================================================
-              Photo information
-          ================================================== */}
+          {/* Photo information */}
 
           {showFileNames ? (
             <div className="absolute bottom-4 left-1/2 max-w-[80vw] -translate-x-1/2 truncate rounded-full border border-white/10 bg-black/60 px-4 py-2 text-sm font-medium text-white backdrop-blur sm:bottom-6">

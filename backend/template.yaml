@@ -28,7 +28,12 @@ Globals:
         JWT_EXPIRES_IN: "1d"
 
         # Share links
-        SHARE_TABLE_NAME: ShareTable
+        #
+        # IMPORTANT:
+        # Do not hardcode ShareTable here.
+        # CloudFormation creates/manages this table.
+        #
+        SHARE_TABLE_NAME: !Ref ShareTable
 
         # Frontend URL used for generated share links.
         #
@@ -86,6 +91,8 @@ Resources:
         #
         # PhotoTable, FolderTable and UsersTable are
         # existing manually-created tables.
+        #
+        # ShareTable is managed by this SAM stack.
         # ------------------------------------------------
 
         - Statement:
@@ -127,9 +134,14 @@ Resources:
 
               # ------------------------------------------
               # ShareTable
+              #
+              # Dynamically references the table created
+              # by this CloudFormation stack.
               # ------------------------------------------
 
-              - !Sub "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/ShareTable"
+              - !GetAtt ShareTable.Arn
+
+              - !Sub "${ShareTable.Arn}/index/*"
 
         # ------------------------------------------------
         # S3
@@ -187,17 +199,41 @@ Resources:
     Type: AWS::DynamoDB::Table
 
     Properties:
-      TableName: ShareTable
+
+      # IMPORTANT:
+      # Do NOT specify TableName.
+      #
+      # CloudFormation will generate the physical table
+      # name automatically. This avoids the custom-name
+      # replacement problem during future deployments.
+      #
 
       BillingMode: PAY_PER_REQUEST
 
       AttributeDefinitions:
+
+        # Main key
+        - AttributeName: shareId
+          AttributeType: S
+
+        # GSI key
         - AttributeName: token
           AttributeType: S
 
       KeySchema:
-        - AttributeName: token
+        - AttributeName: shareId
           KeyType: HASH
+
+      GlobalSecondaryIndexes:
+
+        - IndexName: token-index
+
+          KeySchema:
+            - AttributeName: token
+              KeyType: HASH
+
+          Projection:
+            ProjectionType: ALL
 
       TimeToLiveSpecification:
         AttributeName: ttl
