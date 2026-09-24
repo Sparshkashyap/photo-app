@@ -952,14 +952,14 @@ export type FavoriteResponse = {
 /**
  * Add/remove a photo from Favorites.
  *
- * PATCH /photos/:photoId/favorite
+ * PATCH /favorites/:photoId/favorite
  */
 export async function setFavorite(
   photoId: string,
   isFavorite: boolean,
 ): Promise<FavoriteResponse> {
   return request<FavoriteResponse>(
-    `/photos/${encodeURIComponent(
+    `/favorites/${encodeURIComponent(
       photoId,
     )}/favorite`,
     {
@@ -981,15 +981,22 @@ export async function setFavorite(
 /**
  * Create a public share link for a photo.
  *
- * POST /photos/:photoId/share
+ * POST /share/:photoId
  */
 export async function createShare(
   photoId: string,
 ): Promise<CreateShareResponse> {
+  if (!photoId.trim()) {
+    throw new ApiError(
+      "Photo ID is required.",
+      400,
+    );
+  }
+
   return request<CreateShareResponse>(
-    `/photos/${encodeURIComponent(
+    `/share/${encodeURIComponent(
       photoId,
-    )}/share`,
+    )}`,
     {
       method: "POST",
 
@@ -1001,16 +1008,30 @@ export async function createShare(
 /**
  * Revoke an existing share link.
  *
- * DELETE /photos/:photoId/share/:shareId
+ * DELETE /share/:photoId/:shareId
  */
 export async function revokeShare(
   photoId: string,
   shareId: string,
 ): Promise<RevokeShareResponse> {
+  if (!photoId.trim()) {
+    throw new ApiError(
+      "Photo ID is required.",
+      400,
+    );
+  }
+
+  if (!shareId.trim()) {
+    throw new ApiError(
+      "Share ID is required.",
+      400,
+    );
+  }
+
   return request<RevokeShareResponse>(
-    `/photos/${encodeURIComponent(
+    `/share/${encodeURIComponent(
       photoId,
-    )}/share/${encodeURIComponent(
+    )}/${encodeURIComponent(
       shareId,
     )}`,
     {
@@ -1024,14 +1045,26 @@ export async function revokeShare(
 /**
  * Publicly fetch a shared photo.
  *
- * GET /shared/:token
+ * GET /share/:token
+ *
+ * No authentication required.
  */
 export async function getSharedPhoto(
   token: string,
 ): Promise<GetSharedPhotoResponse> {
+  const trimmedToken =
+    token.trim();
+
+  if (!trimmedToken) {
+    throw new ApiError(
+      "Share token is required.",
+      400,
+    );
+  }
+
   return request<GetSharedPhotoResponse>(
-    `/shared/${encodeURIComponent(
-      token,
+    `/share/${encodeURIComponent(
+      trimmedToken,
     )}`,
     {
       method: "GET",

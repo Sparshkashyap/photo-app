@@ -1,4 +1,5 @@
 import {
+  Heart,
   Images,
   Settings,
   Trash2,
@@ -9,7 +10,9 @@ import {
   useLocation,
 } from "@tanstack/react-router";
 
-import { APP_TAGLINE } from "@/lib/constants";
+import {
+  APP_TAGLINE,
+} from "@/lib/constants";
 
 // ==================================================
 // SIDEBAR
@@ -22,6 +25,10 @@ export function Sidebar() {
   const isPhotos =
     location.pathname ===
     "/dashboard";
+
+  const isFavorites =
+    location.pathname ===
+    "/favorites";
 
   const isTrash =
     location.pathname ===
@@ -37,7 +44,9 @@ export function Sidebar() {
         aria-label="Main navigation"
         className="space-y-1"
       >
-        {/* Photos */}
+        {/* ==================================================
+            Photos
+        ================================================== */}
 
         <Link
           to="/dashboard"
@@ -55,7 +64,29 @@ export function Sidebar() {
           Photos
         </Link>
 
-        {/* Trash */}
+        {/* ==================================================
+            Favorites
+        ================================================== */}
+
+        <Link
+          to="/favorites"
+          className={
+            isFavorites
+              ? "flex items-center gap-3 rounded-full bg-sidebar-accent px-4 py-2.5 text-sm font-semibold text-sidebar-accent-foreground transition"
+              : "flex items-center gap-3 rounded-full px-4 py-2.5 text-sm text-muted-foreground transition hover:bg-sidebar-accent/60 hover:text-foreground"
+          }
+        >
+          <Heart
+            className="size-[18px]"
+            aria-hidden="true"
+          />
+
+          Favorites
+        </Link>
+
+        {/* ==================================================
+            Trash
+        ================================================== */}
 
         <Link
           to="/trash"
@@ -73,7 +104,9 @@ export function Sidebar() {
           Trash
         </Link>
 
-        {/* Settings */}
+        {/* ==================================================
+            Settings
+        ================================================== */}
 
         <Link
           to="/settings"
@@ -111,6 +144,10 @@ export function MobileNav() {
     location.pathname ===
     "/dashboard";
 
+  const isFavorites =
+    location.pathname ===
+    "/favorites";
+
   const isTrash =
     location.pathname ===
     "/trash";
@@ -124,6 +161,8 @@ export function MobileNav() {
       aria-label="Main navigation"
       className="flex items-center gap-1 overflow-x-auto border-b border-border bg-surface px-4 py-2.5 md:hidden"
     >
+      {/* Photos */}
+
       <Link
         to="/dashboard"
         className={
@@ -137,6 +176,23 @@ export function MobileNav() {
         Photos
       </Link>
 
+      {/* Favorites */}
+
+      <Link
+        to="/favorites"
+        className={
+          isFavorites
+            ? "inline-flex shrink-0 items-center gap-2 rounded-full bg-accent px-3.5 py-1.5 text-sm font-semibold text-accent-foreground"
+            : "inline-flex shrink-0 items-center gap-2 rounded-full px-3.5 py-1.5 text-sm text-muted-foreground hover:bg-muted"
+        }
+      >
+        <Heart className="size-4" />
+
+        Favorites
+      </Link>
+
+      {/* Trash */}
+
       <Link
         to="/trash"
         className={
@@ -149,6 +205,8 @@ export function MobileNav() {
 
         Trash
       </Link>
+
+      {/* Settings */}
 
       <Link
         to="/settings"

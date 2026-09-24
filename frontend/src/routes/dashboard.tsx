@@ -522,6 +522,28 @@ function DashboardPage() {
   }
 
   // ==================================================
+  // PHOTO FAVORITE
+  // ==================================================
+
+  function handlePhotoFavorite(
+    updatedPhoto: Photo,
+  ) {
+    setPhotos(
+      (previous) =>
+        previous.map(
+          (item) =>
+            item.photoId ===
+            updatedPhoto.photoId
+              ? {
+                  ...item,
+                  ...updatedPhoto,
+                }
+              : item,
+        ),
+    );
+  }
+
+  // ==================================================
   // PHOTO TRASHED
   // ==================================================
 
@@ -796,6 +818,9 @@ function DashboardPage() {
             }
             onTrashed={
               handlePhotoTrashed
+            }
+            onFavorite={
+              handlePhotoFavorite
             }
             onRetry={() => {
               void loadPhotos();

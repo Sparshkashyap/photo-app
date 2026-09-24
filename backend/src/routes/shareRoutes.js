@@ -9,11 +9,14 @@ const {
   revokeShare,
 } = require("../controllers/shareController");
 
-const router = express.Router();
+const router =
+  express.Router();
 
 // ==================================================
 // CREATE SHARE LINK
+//
 // POST /share/:photoId
+//
 // Protected
 // ==================================================
 
@@ -24,9 +27,13 @@ router.post(
 );
 
 // ==================================================
-// PUBLIC SHARED PHOTO
+// PUBLIC SHARE TOKEN
+//
 // GET /share/:token
+//
 // Public
+//
+// This returns a fresh AWS S3 URL.
 // ==================================================
 
 router.get(
@@ -35,8 +42,10 @@ router.get(
 );
 
 // ==================================================
-// REVOKE SHARE LINK
+// REVOKE SHARE
+//
 // DELETE /share/:photoId/:shareId
+//
 // Protected
 // ==================================================
 

@@ -37,7 +37,7 @@ import type {
   Photo,
 } from "@/types/photo";
 
-type ShareDialogProps = {
+type SharePhotoDialogProps = {
   open: boolean;
 
   onOpenChange: (
@@ -47,11 +47,11 @@ type ShareDialogProps = {
   photo: Photo;
 };
 
-export function ShareDialog({
+export function SharePhotoDialog({
   open,
   onOpenChange,
   photo,
-}: ShareDialogProps) {
+}: SharePhotoDialogProps) {
   const [
     loading,
     setLoading,
@@ -94,7 +94,10 @@ export function ShareDialog({
   }, [open]);
 
   async function handleCreateShare() {
-    if (loading) {
+    if (
+      loading ||
+      revoking
+    ) {
       return;
     }
 
@@ -109,13 +112,11 @@ export function ShareDialog({
       const share =
         response.share;
 
-      let generatedUrl =
-        share.shareUrl;
-
-      if (!generatedUrl) {
-        generatedUrl =
-          `${window.location.origin}/shared/${share.token}`;
-      }
+      const generatedUrl =
+        share.shareUrl ||
+        `${window.location.origin}/shared/${encodeURIComponent(
+          share.token,
+        )}`;
 
       setShareUrl(
         generatedUrl,
@@ -129,6 +130,8 @@ export function ShareDialog({
         share.expiresAt ??
           null,
       );
+
+      setCopied(false);
 
       toast.success(
         "Share link created",
@@ -169,27 +172,41 @@ export function ShareDialog({
         "Share link copied",
       );
 
-      window.setTimeout(
-        () => {
-          setCopied(false);
-        },
-        2000,
-      );
+      window.setTimeout(() => {
+        setCopied(false);
+      }, 2000);
     } catch (error) {
       console.error(
-        "Copy failed:",
+        "Copy share link failed:",
         error,
       );
 
       toast.error(
         "Couldn't copy link",
+        {
+          description:
+            "Please copy the link manually.",
+        },
       );
     }
+  }
+
+  function handleOpenLink() {
+    if (!shareUrl) {
+      return;
+    }
+
+    window.open(
+      shareUrl,
+      "_blank",
+      "noopener,noreferrer",
+    );
   }
 
   async function handleRevoke() {
     if (
       revoking ||
+      loading ||
       !shareId
     ) {
       return;
@@ -206,6 +223,7 @@ export function ShareDialog({
       setShareUrl("");
       setShareId("");
       setExpiresAt(null);
+      setCopied(false);
 
       toast.success(
         "Share link revoked",
@@ -251,21 +269,27 @@ export function ShareDialog({
     return `Expires ${date.toLocaleString()}`;
   }
 
+  function handleDialogChange(
+    nextOpen: boolean,
+  ) {
+    if (
+      loading ||
+      revoking
+    ) {
+      return;
+    }
+
+    onOpenChange(
+      nextOpen,
+    );
+  }
+
   return (
     <Dialog
       open={open}
-      onOpenChange={(
-        nextOpen,
-      ) => {
-        if (
-          !loading &&
-          !revoking
-        ) {
-          onOpenChange(
-            nextOpen,
-          );
-        }
-      }}
+      onOpenChange={
+        handleDialogChange
+      }
     >
       <DialogContent className="sm:max-w-lg">
         <DialogHeader>
@@ -276,13 +300,14 @@ export function ShareDialog({
           </DialogTitle>
 
           <DialogDescription>
-            Create a private link that
+            Create a secure link that
             allows anyone with the link
             to view this photo.
           </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-4">
+          {/* PHOTO INFO */}
           <div className="rounded-xl border border-border bg-muted/40 p-4">
             <p className="truncate text-sm font-medium">
               {photo.name ||
@@ -293,10 +318,12 @@ export function ShareDialog({
             <p className="mt-1 text-xs text-muted-foreground">
               Anyone with the generated
               link can access this shared
-              photo.
+              photo until the link is
+              revoked or expires.
             </p>
           </div>
 
+          {/* CREATE SHARE LINK */}
           {!shareUrl ? (
             <div className="rounded-xl border border-dashed border-border p-6 text-center">
               <div className="mx-auto flex size-12 items-center justify-center rounded-full bg-primary/10 text-primary">
@@ -313,11 +340,15 @@ export function ShareDialog({
               </p>
 
               <Button
+                type="button"
                 className="mt-5"
                 onClick={() =>
                   void handleCreateShare()
                 }
-                disabled={loading}
+                disabled={
+                  loading ||
+                  revoking
+                }
               >
                 {loading ? (
                   <Loader2 className="mr-2 size-4 animate-spin" />
@@ -325,18 +356,27 @@ export function ShareDialog({
                   <Link2 className="mr-2 size-4" />
                 )}
 
-                Create link
+                {loading
+                  ? "Creating..."
+                  : "Create link"}
               </Button>
             </div>
           ) : (
             <div className="space-y-4">
+              {/* SHARE URL */}
               <div className="rounded-xl border border-border bg-muted/40 p-3">
                 <div className="flex items-center gap-2">
                   <input
+                    type="text"
                     value={shareUrl}
                     readOnly
-                    className="h-10 min-w-0 flex-1 rounded-md border border-border bg-background px-3 text-sm outline-none"
+                    className="h-10 min-w-0 flex-1 rounded-md border border-border bg-background px-3 text-sm outline-none focus:ring-2 focus:ring-primary/20"
                     aria-label="Share link"
+                    onFocus={(
+                      event,
+                    ) => {
+                      event.currentTarget.select();
+                    }}
                   />
 
                   <Button
@@ -345,6 +385,9 @@ export function ShareDialog({
                     size="icon"
                     onClick={() =>
                       void handleCopy()
+                    }
+                    disabled={
+                      revoking
                     }
                     aria-label="Copy share link"
                     title="Copy link"
@@ -364,16 +407,16 @@ export function ShareDialog({
                 </p>
               </div>
 
-              <div className="flex flex-col gap-2 sm:flex-row">
+              {/* ACTIONS */}
+              <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
                 <Button
+                  type="button"
                   variant="outline"
-                  className="flex-1"
-                  onClick={() =>
-                    window.open(
-                      shareUrl,
-                      "_blank",
-                      "noopener,noreferrer",
-                    )
+                  onClick={
+                    handleOpenLink
+                  }
+                  disabled={
+                    revoking
                   }
                 >
                   <ExternalLink className="mr-2 size-4" />
@@ -382,10 +425,13 @@ export function ShareDialog({
                 </Button>
 
                 <Button
+                  type="button"
                   variant="outline"
-                  className="flex-1"
                   onClick={() =>
                     void handleCopy()
+                  }
+                  disabled={
+                    revoking
                   }
                 >
                   {copied ? (
@@ -400,25 +446,31 @@ export function ShareDialog({
                 </Button>
               </div>
 
+              {/* REVOKE */}
               <div className="rounded-xl border border-destructive/20 bg-destructive/5 p-4">
                 <p className="text-sm font-medium">
                   Stop sharing
                 </p>
 
                 <p className="mt-1 text-xs text-muted-foreground">
-                  Revoking the link will
-                  immediately disable access
-                  through this share.
+                  Revoking this link will
+                  immediately prevent anyone
+                  from accessing this shared
+                  photo.
                 </p>
 
                 <Button
+                  type="button"
                   variant="destructive"
                   size="sm"
                   className="mt-3"
                   onClick={() =>
                     void handleRevoke()
                   }
-                  disabled={revoking}
+                  disabled={
+                    revoking ||
+                    loading
+                  }
                 >
                   {revoking ? (
                     <Loader2 className="mr-2 size-4 animate-spin" />
@@ -426,7 +478,9 @@ export function ShareDialog({
                     <X className="mr-2 size-4" />
                   )}
 
-                  Revoke link
+                  {revoking
+                    ? "Revoking..."
+                    : "Revoke link"}
                 </Button>
               </div>
             </div>
@@ -435,6 +489,7 @@ export function ShareDialog({
 
         <DialogFooter>
           <Button
+            type="button"
             variant="outline"
             onClick={() =>
               onOpenChange(false)
@@ -452,4 +507,4 @@ export function ShareDialog({
   );
 }
 
-export default ShareDialog;
+export default SharePhotoDialog;

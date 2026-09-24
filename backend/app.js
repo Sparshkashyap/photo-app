@@ -1,9 +1,5 @@
-// ==================================================
-// FILE: app.js
-// ==================================================
-
 require("dns").setDefaultResultOrder(
-  "ipv4first"
+  "ipv4first",
 );
 
 require("dotenv").config();
@@ -35,26 +31,18 @@ const trashRoutes =
 const shareRoutes =
   require("./src/routes/shareRoutes");
 
-// Phase 6 - Favorites
-// Keep this import only if favoriteRoutes.js
-// has already been created.
-let favoriteRoutes = null;
+const photoShareRoutes =
+  require("./src/routes/photoShareRoutes");
 
-try {
-  favoriteRoutes =
-    require("./src/routes/favoriteRoutes");
-} catch (error) {
-  console.warn(
-    "favoriteRoutes.js not found. Favorites route will be skipped until the file is added."
-  );
-}
+const favoriteRoutes =
+  require("./src/routes/favoriteRoutes");
 
 const app =
   express();
 
-// --------------------------------------------------
+// ==================================================
 // CORS
-// --------------------------------------------------
+// ==================================================
 
 app.use(
   cors({
@@ -74,29 +62,29 @@ app.use(
       "Content-Type",
       "Authorization",
     ],
-  })
+  }),
 );
 
-// --------------------------------------------------
-// Body Parser
-// --------------------------------------------------
+// ==================================================
+// BODY PARSER
+// ==================================================
 
 app.use(
   express.json({
     limit: "10mb",
-  })
+  }),
 );
 
 app.use(
   express.urlencoded({
     extended: true,
     limit: "10mb",
-  })
+  }),
 );
 
-// --------------------------------------------------
-// Health Check
-// --------------------------------------------------
+// ==================================================
+// HEALTH
+// ==================================================
 
 app.get(
   "/health",
@@ -106,96 +94,127 @@ app.get(
       message:
         "Photo App API is running",
     });
-  }
+  },
 );
 
-// --------------------------------------------------
-// Routes
-// --------------------------------------------------
+// ==================================================
+// AUTH
+// ==================================================
 
 app.use(
   "/auth",
-  authRoutes
+  authRoutes,
 );
+
+// ==================================================
+// USER
+// ==================================================
 
 app.use(
   "/user",
-  userRoutes
+  userRoutes,
 );
+
+// ==================================================
+// FOLDERS
+// ==================================================
 
 app.use(
   "/folders",
-  folderRoutes
+  folderRoutes,
 );
+
+// ==================================================
+// PHOTOS
+// ==================================================
 
 app.use(
   "/photos",
-  photoRoutes
+  photoRoutes,
 );
+
+// ==================================================
+// BACKWARD COMPATIBLE PHOTO SHARE
+// ==================================================
+
+app.use(
+  "/photos",
+  photoShareRoutes,
+);
+
+// ==================================================
+// TRASH
+// ==================================================
 
 app.use(
   "/trash",
-  trashRoutes
+  trashRoutes,
 );
 
 // ==================================================
 // SHARE
 // ==================================================
 //
-// Authenticated:
-// POST   /share
-// DELETE /share/:token
-//
-// Public:
+// POST   /share/:photoId
 // GET    /share/:token
+// DELETE /share/:photoId/:shareId
 // ==================================================
 
 app.use(
   "/share",
-  shareRoutes
+  shareRoutes,
 );
 
 // ==================================================
 // FAVORITES
 // ==================================================
 //
-// Authenticated:
-// PATCH /favorites/:photoId
-//
-// This route is optional until
-// favoriteRoutes.js exists.
+// PATCH /favorites/:photoId/favorite
 // ==================================================
 
-if (favoriteRoutes) {
-  app.use(
-    "/favorites",
-    favoriteRoutes
-  );
-}
+app.use(
+  "/favorites",
+  favoriteRoutes,
+);
 
-// --------------------------------------------------
-// 404 Handler
-// --------------------------------------------------
+// Backward-compatible favorite endpoint:
+//
+// PATCH /photos/:photoId/favorite
+
+app.use(
+  "/photos",
+  favoriteRoutes,
+);
+
+// ==================================================
+// 404
+// ==================================================
 
 app.use(
   (req, res) => {
     return res.status(404).json({
       success: false,
+
       message:
         `Route not found: ${req.method} ${req.originalUrl}`,
     });
-  }
+  },
 );
 
-// --------------------------------------------------
-// Global Error Handler
-// --------------------------------------------------
+// ==================================================
+// ERROR HANDLER
+// ==================================================
 
 app.use(
-  (err, req, res, next) => {
+  (
+    err,
+    req,
+    res,
+    next,
+  ) => {
     console.error(
       "Global error:",
-      err
+      err,
     );
 
     const statusCode =
@@ -203,31 +222,28 @@ app.use(
       err.status ||
       500;
 
-    return res.status(
-      statusCode
-    ).json({
-      success: false,
+    return res
+      .status(statusCode)
+      .json({
+        success: false,
 
-      message:
-        err.message ||
-        "Internal server error",
-    });
-  }
+        message:
+          err.message ||
+          "Internal server error",
+      });
+  },
 );
 
-// --------------------------------------------------
-// Local Development
-//
-// IMPORTANT:
-// Lambda does NOT call connectDB().
-// This is only for local Express development.
-// --------------------------------------------------
+// ==================================================
+// LOCAL DEVELOPMENT
+// ==================================================
 
 if (
   require.main === module
 ) {
   const PORT =
-    process.env.PORT || 5000;
+    process.env.PORT ||
+    5000;
 
   connectDB()
     .then(() => {
@@ -235,25 +251,21 @@ if (
         PORT,
         () => {
           console.log(
-            `Server running on port ${PORT}`
+            `Server running on port ${PORT}`,
           );
-        }
+        },
       );
     })
     .catch(
       (error) => {
         console.error(
           "Failed to start server:",
-          error
+          error,
         );
 
         process.exit(1);
-      }
+      },
     );
 }
-
-// --------------------------------------------------
-// Export
-// --------------------------------------------------
 
 module.exports = app;

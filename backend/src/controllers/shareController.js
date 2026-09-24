@@ -25,30 +25,27 @@ const crypto = require("crypto");
 // AWS
 // ==================================================
 
-const AWS_REGION =
+const REGION =
   process.env.AWS_REGION ||
   "ap-south-1";
 
 const s3 =
   new S3Client({
-    region: AWS_REGION,
-  });
-
-const dynamoClient =
-  new DynamoDBClient({
-    region: AWS_REGION,
+    region: REGION,
   });
 
 const dynamoDb =
   DynamoDBDocumentClient.from(
-    dynamoClient,
+    new DynamoDBClient({
+      region: REGION,
+    }),
   );
 
 // ==================================================
-// Helpers
+// HELPERS
 // ==================================================
 
-const getPhotoTableName = () => {
+function getPhotoTableName() {
   const tableName =
     process.env.DYNAMODB_TABLE;
 
@@ -59,23 +56,16 @@ const getPhotoTableName = () => {
   }
 
   return tableName;
-};
+}
 
-const getShareTableName = () => {
-  const tableName =
+function getShareTableName() {
+  return (
     process.env.SHARE_TABLE_NAME ||
-    "ShareTable";
+    "ShareTable"
+  );
+}
 
-  if (!tableName) {
-    throw new Error(
-      "SHARE_TABLE_NAME is not configured",
-    );
-  }
-
-  return tableName;
-};
-
-const getBucketName = () => {
+function getBucketName() {
   const bucketName =
     process.env.S3_BUCKET_NAME;
 
@@ -86,14 +76,11 @@ const getBucketName = () => {
   }
 
   return bucketName;
-};
+}
 
-const sanitizeFileName = (
-  fileName,
-) => {
+function sanitizeFileName(fileName) {
   return String(
-    fileName ||
-      "photo",
+    fileName || "photo",
   )
     .replace(
       /[^a-zA-Z0-9._-]/g,
@@ -103,37 +90,120 @@ const sanitizeFileName = (
       /-+/g,
       "-",
     );
-};
-
-const getShareBaseUrl = () => {
-  const configuredUrl =
-    process.env.PUBLIC_APP_URL;
-
-  if (
-    configuredUrl &&
-    typeof configuredUrl ===
-      "string"
-  ) {
-    return configuredUrl.replace(
-      /\/+$/,
-      "",
-    );
-  }
-
-  return "";
-};
+}
 
 // ==================================================
-// Create Share Link
-// POST /photos/:photoId/share
+// GET PHOTO
+// ==================================================
+
+async function getPhoto(
+  photoId,
+) {
+  const result =
+    await dynamoDb.send(
+      new GetCommand({
+        TableName:
+          getPhotoTableName(),
+
+        Key: {
+          photoId,
+        },
+      }),
+    );
+
+  return result.Item;
+}
+
+// ==================================================
+// FIND SHARE BY TOKEN
+// ==================================================
+
+async function findShareByToken(
+  token,
+) {
+  const result =
+    await dynamoDb.send(
+      new QueryCommand({
+        TableName:
+          getShareTableName(),
+
+        IndexName:
+          "token-index",
+
+        KeyConditionExpression:
+          "#token = :token",
+
+        ExpressionAttributeNames: {
+          "#token":
+            "token",
+        },
+
+        ExpressionAttributeValues: {
+          ":token":
+            token,
+        },
+
+        Limit: 1,
+      }),
+    );
+
+  return result.Items?.[0];
+}
+
+// ==================================================
+// CREATE AWS S3 PRESIGNED URL
+// ==================================================
+
+async function createSignedPhotoUrl(
+  photo,
+  disposition = "inline",
+) {
+  const fileName =
+    sanitizeFileName(
+      photo.originalFileName ||
+        photo.fileName ||
+        photo.name ||
+        "photo",
+    );
+
+  const command =
+    new GetObjectCommand({
+      Bucket:
+        getBucketName(),
+
+      Key:
+        photo.s3Key,
+
+      ResponseContentType:
+        photo.contentType ||
+        "application/octet-stream",
+
+      ResponseContentDisposition:
+        `${disposition}; filename="${fileName}"`,
+    });
+
+  return getSignedUrl(
+    s3,
+    command,
+    {
+      // Same as your old working URL
+      expiresIn: 300,
+    },
+  );
+}
+
+// ==================================================
+// CREATE SHARE
+//
+// POST /share/:photoId
 // Protected
 // ==================================================
 
-const createShare = async (
+async function createShare(
   req,
   res,
   next,
-) => {
+) {
   try {
     const {
       photoId,
@@ -162,20 +232,10 @@ const createShare = async (
     // Get photo
     // ------------------------------------------------
 
-    const photoResult =
-      await dynamoDb.send(
-        new GetCommand({
-          TableName:
-            getPhotoTableName(),
-
-          Key: {
-            photoId,
-          },
-        }),
-      );
-
     const photo =
-      photoResult.Item;
+      await getPhoto(
+        photoId,
+      );
 
     if (!photo) {
       return res.status(404).json({
@@ -201,7 +261,7 @@ const createShare = async (
     }
 
     // ------------------------------------------------
-    // Trash check
+    // Trash
     // ------------------------------------------------
 
     if (
@@ -215,7 +275,23 @@ const createShare = async (
     }
 
     // ------------------------------------------------
-    // Generate secure token
+    // S3 key
+    // ------------------------------------------------
+
+    if (
+      !photo.s3Key ||
+      typeof photo.s3Key !==
+        "string"
+    ) {
+      return res.status(404).json({
+        success: false,
+        message:
+          "Photo file is not available",
+      });
+    }
+
+    // ------------------------------------------------
+    // Generate share token
     // ------------------------------------------------
 
     const token =
@@ -226,13 +302,13 @@ const createShare = async (
     const shareId =
       crypto.randomUUID();
 
-    const now =
+    const createdAt =
       new Date().toISOString();
 
     // ------------------------------------------------
-    // Optional expiry
+    // Share expiry
     //
-    // Default: 7 days
+    // Default = 7 days
     // ------------------------------------------------
 
     const configuredExpiryDays =
@@ -259,24 +335,8 @@ const createShare = async (
             1000,
       ).toISOString();
 
-    const item = {
-      shareId,
-
-      photoId,
-
-      userId,
-
-      token,
-
-      createdAt: now,
-
-      expiresAt,
-
-      revoked: false,
-    };
-
     // ------------------------------------------------
-    // Save Share
+    // Save share record
     // ------------------------------------------------
 
     await dynamoDb.send(
@@ -284,20 +344,45 @@ const createShare = async (
         TableName:
           getShareTableName(),
 
-        Item: item,
+        Item: {
+          shareId,
+
+          photoId,
+
+          userId,
+
+          token,
+
+          createdAt,
+
+          expiresAt,
+
+          ttl: Math.floor(
+            new Date(
+              expiresAt,
+            ).getTime() /
+              1000,
+          ),
+
+          revoked: false,
+        },
       }),
     );
 
     // ------------------------------------------------
-    // Build public URL
+    // IMPORTANT
+    //
+    // Generate DIRECT AWS S3 URL.
+    //
+    // This is what frontend will receive as
+    // shareUrl.
     // ------------------------------------------------
 
-    const baseUrl =
-      getShareBaseUrl();
-
-    const shareUrl = baseUrl
-      ? `${baseUrl}/shared/${token}`
-      : `/shared/${token}`;
+    const signedUrl =
+      await createSignedPhotoUrl(
+        photo,
+        "inline",
+      );
 
     return res.status(201).json({
       success: true,
@@ -312,13 +397,24 @@ const createShare = async (
 
         token,
 
-        shareUrl,
+        // DIRECT AWS S3 URL
+        shareUrl:
+          signedUrl,
 
-        createdAt: now,
+        // Explicit field also available
+        awsUrl:
+          signedUrl,
+
+        createdAt,
 
         expiresAt,
 
         revoked: false,
+
+        // Tell frontend that this URL
+        // is temporary.
+        urlExpiresIn:
+          300,
       },
     });
   } catch (error) {
@@ -329,19 +425,23 @@ const createShare = async (
 
     next(error);
   }
-};
+}
 
 // ==================================================
-// Get Shared Photo
-// GET /shared/:token
-// Public
+// GET SHARED PHOTO
+//
+// GET /share/:token
+//
+// This remains available for future use.
+// It returns a fresh AWS S3 URL.
+//
 // ==================================================
 
-const getSharedPhoto = async (
+async function getSharedPhoto(
   req,
   res,
   next,
-) => {
+) {
   try {
     const {
       token,
@@ -356,39 +456,13 @@ const getSharedPhoto = async (
     }
 
     // ------------------------------------------------
-    // Find share by token
-    //
-    // Requires token-index on ShareTable.
+    // Find share
     // ------------------------------------------------
 
-    const result =
-      await dynamoDb.send(
-        new QueryCommand({
-          TableName:
-            getShareTableName(),
-
-          IndexName:
-            "token-index",
-
-          KeyConditionExpression:
-            "#token = :token",
-
-          ExpressionAttributeNames: {
-            "#token":
-              "token",
-          },
-
-          ExpressionAttributeValues: {
-            ":token":
-              token,
-          },
-
-          Limit: 1,
-        }),
-      );
-
     const share =
-      result.Items?.[0];
+      await findShareByToken(
+        token,
+      );
 
     if (!share) {
       return res.status(404).json({
@@ -413,7 +487,7 @@ const getSharedPhoto = async (
     }
 
     // ------------------------------------------------
-    // Expiry
+    // Expired
     // ------------------------------------------------
 
     if (
@@ -434,21 +508,10 @@ const getSharedPhoto = async (
     // Get photo
     // ------------------------------------------------
 
-    const photoResult =
-      await dynamoDb.send(
-        new GetCommand({
-          TableName:
-            getPhotoTableName(),
-
-          Key: {
-            photoId:
-              share.photoId,
-          },
-        }),
-      );
-
     const photo =
-      photoResult.Item;
+      await getPhoto(
+        share.photoId,
+      );
 
     if (!photo) {
       return res.status(404).json({
@@ -459,7 +522,7 @@ const getSharedPhoto = async (
     }
 
     // ------------------------------------------------
-    // If photo is in Trash
+    // Trash
     // ------------------------------------------------
 
     if (
@@ -473,7 +536,7 @@ const getSharedPhoto = async (
     }
 
     // ------------------------------------------------
-    // Validate S3 key
+    // S3 key
     // ------------------------------------------------
 
     if (
@@ -489,42 +552,13 @@ const getSharedPhoto = async (
     }
 
     // ------------------------------------------------
-    // Generate temporary S3 URL
-    //
-    // This keeps the S3 bucket private.
-    //
-    // IMPORTANT:
-    // Use the actual S3 client here.
+    // Fresh AWS URL
     // ------------------------------------------------
 
-    const command =
-      new GetObjectCommand({
-        Bucket:
-          getBucketName(),
-
-        Key:
-          photo.s3Key,
-
-        ResponseContentType:
-          photo.contentType ||
-          "application/octet-stream",
-
-        ResponseContentDisposition:
-          `inline; filename="${sanitizeFileName(
-            photo.originalFileName ||
-              photo.fileName ||
-              photo.name ||
-              "photo",
-          )}"`,
-      });
-
     const signedUrl =
-      await getSignedUrl(
-        s3,
-        command,
-        {
-          expiresIn: 300,
-        },
+      await createSignedPhotoUrl(
+        photo,
+        "inline",
       );
 
     return res.status(200).json({
@@ -567,6 +601,7 @@ const getSharedPhoto = async (
           photo.createdAt ||
           "",
 
+        // DIRECT AWS URL
         url:
           signedUrl,
 
@@ -581,6 +616,9 @@ const getSharedPhoto = async (
         photoId:
           share.photoId,
 
+        token:
+          share.token,
+
         createdAt:
           share.createdAt,
 
@@ -588,7 +626,8 @@ const getSharedPhoto = async (
           share.expiresAt,
 
         revoked:
-          share.revoked === true,
+          share.revoked ===
+          true,
       },
     });
   } catch (error) {
@@ -599,19 +638,20 @@ const getSharedPhoto = async (
 
     next(error);
   }
-};
+}
 
 // ==================================================
-// Revoke Share
-// DELETE /photos/:photoId/share/:shareId
-// Protected
+// REVOKE SHARE
+//
+// DELETE /share/:photoId/:shareId
+//
 // ==================================================
 
-const revokeShare = async (
+async function revokeShare(
   req,
   res,
   next,
-) => {
+) {
   try {
     const {
       photoId,
@@ -644,7 +684,7 @@ const revokeShare = async (
     // Find share
     // ------------------------------------------------
 
-    const shareResult =
+    const result =
       await dynamoDb.send(
         new GetCommand({
           TableName:
@@ -657,7 +697,7 @@ const revokeShare = async (
       );
 
     const share =
-      shareResult.Item;
+      result.Item;
 
     if (!share) {
       return res.status(404).json({
@@ -668,7 +708,7 @@ const revokeShare = async (
     }
 
     // ------------------------------------------------
-    // Ownership checks
+    // Ownership
     // ------------------------------------------------
 
     if (
@@ -681,6 +721,10 @@ const revokeShare = async (
           "You are not allowed to revoke this share",
       });
     }
+
+    // ------------------------------------------------
+    // Photo check
+    // ------------------------------------------------
 
     if (
       share.photoId !==
@@ -724,8 +768,7 @@ const revokeShare = async (
           "SET revoked = :revoked",
 
         ExpressionAttributeValues: {
-          ":revoked":
-            true,
+          ":revoked": true,
         },
       }),
     );
@@ -744,10 +787,10 @@ const revokeShare = async (
 
     next(error);
   }
-};
+}
 
 // ==================================================
-// Exports
+// EXPORTS
 // ==================================================
 
 module.exports = {

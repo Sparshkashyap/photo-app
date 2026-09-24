@@ -402,6 +402,9 @@
                     }
                     onRenamed={() => {}}
                     onMoved={() => {}}
+                    onFavorite={
+                    handleFavoriteChanged
+                    }
                 />
                 )}
             </div>
