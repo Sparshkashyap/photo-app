@@ -7,8 +7,6 @@ import {
 import {
   Eye,
   EyeOff,
-  Facebook,
-  Instagram,
   Loader2,
 } from "lucide-react";
 
@@ -89,21 +87,15 @@ function passwordStrength(
   }
 
   if (
-    /[A-Z]/.test(
-      password,
-    ) &&
-    /[a-z]/.test(
-      password,
-    )
+    /[A-Z]/.test(password) &&
+    /[a-z]/.test(password)
   ) {
     score += 1;
   }
 
   if (
     /\d/.test(password) ||
-    /[^A-Za-z0-9]/.test(
-      password,
-    )
+    /[^A-Za-z0-9]/.test(password)
   ) {
     score += 1;
   }
@@ -118,8 +110,7 @@ function passwordStrength(
 
   return {
     score,
-    label:
-      labels[score]!,
+    label: labels[score]!,
   };
 }
 
@@ -177,14 +168,9 @@ function SignupPage() {
   ] = useState(false);
 
   const [
-    oauthProvider,
-    setOauthProvider,
-  ] = useState<
-    "google" |
-      "facebook" |
-      "instagram" |
-      null
-  >(null);
+    googleLoading,
+    setGoogleLoading,
+  ] = useState(false);
 
   const strength =
     useMemo(
@@ -230,9 +216,7 @@ function SignupPage() {
       }),
     );
 
-    setFormError(
-      null,
-    );
+    setFormError(null);
   }
 
   async function handleSubmit(
@@ -348,36 +332,29 @@ function SignupPage() {
     }
   }
 
-  async function handleOAuth(
-    provider:
-      | "google"
-      | "facebook"
-      | "instagram",
-  ) {
-    if (oauthProvider) {
+  async function handleGoogleSignup() {
+    if (
+      googleLoading ||
+      submitting
+    ) {
       return;
     }
 
-    setOauthProvider(
-      provider,
-    );
-
     setFormError(null);
+    setGoogleLoading(true);
 
     try {
       await loginWithProvider(
-        provider,
+        "google",
       );
     } catch (error) {
       setFormError(
         error instanceof Error
           ? error.message
-          : `Unable to continue with ${provider}.`,
+          : "Unable to continue with Google.",
       );
 
-      setOauthProvider(
-        null,
-      );
+      setGoogleLoading(false);
     }
   }
 
@@ -397,301 +374,286 @@ function SignupPage() {
         </>
       }
     >
-      <div className="space-y-3">
+      <div className="space-y-5">
+        {/* GOOGLE OAUTH */}
+
         <Button
           type="button"
           variant="outline"
-          className="w-full"
+          className="h-11 w-full gap-3 rounded-lg border-border bg-background text-sm font-medium shadow-sm transition hover:bg-secondary"
           disabled={
             submitting ||
-            Boolean(
-              oauthProvider,
-            )
+            googleLoading
           }
           onClick={() =>
-            void handleOAuth(
-              "google",
-            )
+            void handleGoogleSignup()
           }
         >
-          {oauthProvider ===
-          "google" ? (
+          {googleLoading ? (
             <Loader2 className="size-4 animate-spin" />
           ) : (
-            <span className="font-bold">
-              G
-            </span>
+            <svg
+              className="size-4"
+              viewBox="0 0 24 24"
+              aria-hidden="true"
+            >
+              <path
+                fill="#4285F4"
+                d="M21.35 12.23c0-.79-.07-1.55-.22-2.27H12v4.3h5.24a4.48 4.48 0 0 1-1.94 2.94v2.45h3.14c1.84-1.7 2.91-4.2 2.91-7.42Z"
+              />
+
+              <path
+                fill="#34A853"
+                d="M12 21.99c2.63 0 4.84-.87 6.45-2.34l-3.14-2.45c-.87.58-1.98.92-3.31.92-2.54 0-4.7-1.72-5.47-4.03H3.28v2.53A9.74 9.74 0 0 0 12 21.99Z"
+              />
+
+              <path
+                fill="#FBBC05"
+                d="M6.53 14.09A5.85 5.85 0 0 1 6.22 12c0-.73.13-1.43.31-2.09V7.38H3.28A9.96 9.96 0 0 0 2 12c0 1.49.36 2.9 1.28 4.62l3.25-2.53Z"
+              />
+
+              <path
+                fill="#EA4335"
+                d="M12 5.88c1.43 0 2.71.49 3.72 1.45l2.79-2.79C16.83 2.99 14.62 2 12 2a9.74 9.74 0 0 0-8.72 5.38l3.25 2.53C7.3 7.6 9.46 5.88 12 5.88Z"
+              />
+            </svg>
           )}
 
-          Continue with Google
+          {googleLoading
+            ? "Connecting to Google..."
+            : "Continue with Google"}
         </Button>
 
-        <div className="grid grid-cols-2 gap-3">
-          <Button
-            type="button"
-            variant="outline"
-            disabled={
-              submitting ||
-              Boolean(
-                oauthProvider,
-              )
-            }
-            onClick={() =>
-              void handleOAuth(
-                "facebook",
-              )
-            }
-          >
-            {oauthProvider ===
-            "facebook" ? (
-              <Loader2 className="size-4 animate-spin" />
-            ) : (
-              <Facebook className="size-4" />
-            )}
+        {/* DIVIDER */}
 
-            Facebook
-          </Button>
+        <div className="flex items-center gap-3">
+          <div className="h-px flex-1 bg-border" />
 
-          <Button
-            type="button"
-            variant="outline"
-            disabled={
-              submitting ||
-              Boolean(
-                oauthProvider,
-              )
-            }
-            onClick={() =>
-              void handleOAuth(
-                "instagram",
-              )
-            }
-          >
-            {oauthProvider ===
-            "instagram" ? (
-              <Loader2 className="size-4 animate-spin" />
-            ) : (
-              <Instagram className="size-4" />
-            )}
+          <span className="text-xs font-medium text-muted-foreground">
+            OR
+          </span>
 
-            Instagram
-          </Button>
-        </div>
-      </div>
-
-      <div className="my-5 flex items-center gap-3">
-        <div className="h-px flex-1 bg-border" />
-        <span className="text-xs text-muted-foreground">
-          OR
-        </span>
-        <div className="h-px flex-1 bg-border" />
-      </div>
-
-      <form
-        onSubmit={
-          handleSubmit
-        }
-        noValidate
-        className="space-y-4"
-      >
-        <div className="space-y-2">
-          <Label htmlFor="name">
-            Full name
-          </Label>
-
-          <Input
-            id="name"
-            autoComplete="name"
-            value={values.name}
-            onChange={(event) =>
-              update(
-                "name",
-                event.target.value,
-              )
-            }
-            aria-invalid={Boolean(
-              errors.name,
-            )}
-            placeholder="Sparsh Kashyap"
-          />
-
-          {errors.name ? (
-            <p className="text-xs font-medium text-destructive">
-              {errors.name}
-            </p>
-          ) : null}
+          <div className="h-px flex-1 bg-border" />
         </div>
 
-        <div className="space-y-2">
-          <Label htmlFor="email">
-            Email
-          </Label>
+        {/* SIGNUP FORM */}
 
-          <Input
-            id="email"
-            type="email"
-            autoComplete="email"
-            value={values.email}
-            onChange={(event) =>
-              update(
-                "email",
-                event.target.value,
-              )
-            }
-            aria-invalid={Boolean(
-              errors.email,
-            )}
-            placeholder="you@example.com"
-          />
+        <form
+          onSubmit={
+            handleSubmit
+          }
+          noValidate
+          className="space-y-4"
+        >
+          {/* NAME */}
 
-          {errors.email ? (
-            <p className="text-xs font-medium text-destructive">
-              {errors.email}
-            </p>
-          ) : null}
-        </div>
+          <div className="space-y-2">
+            <Label htmlFor="name">
+              Full name
+            </Label>
 
-        <div className="space-y-2">
-          <Label htmlFor="password">
-            Password
-          </Label>
-
-          <div className="relative">
             <Input
-              id="password"
+              id="name"
+              autoComplete="name"
+              value={values.name}
+              onChange={(event) =>
+                update(
+                  "name",
+                  event.target.value,
+                )
+              }
+              aria-invalid={Boolean(
+                errors.name,
+              )}
+              placeholder="Sparsh Kashyap"
+            />
+
+            {errors.name ? (
+              <p className="text-xs font-medium text-destructive">
+                {errors.name}
+              </p>
+            ) : null}
+          </div>
+
+          {/* EMAIL */}
+
+          <div className="space-y-2">
+            <Label htmlFor="email">
+              Email
+            </Label>
+
+            <Input
+              id="email"
+              type="email"
+              autoComplete="email"
+              value={values.email}
+              onChange={(event) =>
+                update(
+                  "email",
+                  event.target.value,
+                )
+              }
+              aria-invalid={Boolean(
+                errors.email,
+              )}
+              placeholder="you@example.com"
+            />
+
+            {errors.email ? (
+              <p className="text-xs font-medium text-destructive">
+                {errors.email}
+              </p>
+            ) : null}
+          </div>
+
+          {/* PASSWORD */}
+
+          <div className="space-y-2">
+            <Label htmlFor="password">
+              Password
+            </Label>
+
+            <div className="relative">
+              <Input
+                id="password"
+                type={
+                  showPassword
+                    ? "text"
+                    : "password"
+                }
+                autoComplete="new-password"
+                value={values.password}
+                onChange={(event) =>
+                  update(
+                    "password",
+                    event.target.value,
+                  )
+                }
+                className="pr-11"
+                placeholder="At least 8 characters"
+              />
+
+              <button
+                type="button"
+                onClick={() =>
+                  setShowPassword(
+                    (value) =>
+                      !value,
+                  )
+                }
+                aria-label={
+                  showPassword
+                    ? "Hide password"
+                    : "Show password"
+                }
+                className="absolute right-1 top-1 inline-flex size-8 items-center justify-center rounded-md text-muted-foreground transition hover:bg-secondary hover:text-foreground"
+              >
+                {showPassword ? (
+                  <EyeOff className="size-4" />
+                ) : (
+                  <Eye className="size-4" />
+                )}
+              </button>
+            </div>
+
+            {values.password ? (
+              <div className="flex items-center gap-2">
+                <span className="flex flex-1 gap-1">
+                  {[0, 1, 2, 3].map(
+                    (index) => (
+                      <span
+                        key={index}
+                        className={`h-1.5 flex-1 rounded-full ${
+                          index <
+                          strength.score
+                            ? "bg-primary"
+                            : "bg-border"
+                        }`}
+                      />
+                    ),
+                  )}
+                </span>
+
+                <span className="w-16 text-right text-xs text-muted-foreground">
+                  {strength.label}
+                </span>
+              </div>
+            ) : null}
+
+            {errors.password ? (
+              <p className="text-xs font-medium text-destructive">
+                {errors.password}
+              </p>
+            ) : null}
+          </div>
+
+          {/* CONFIRM PASSWORD */}
+
+          <div className="space-y-2">
+            <Label htmlFor="confirmPassword">
+              Confirm password
+            </Label>
+
+            <Input
+              id="confirmPassword"
               type={
                 showPassword
                   ? "text"
                   : "password"
               }
               autoComplete="new-password"
-              value={values.password}
+              value={
+                values.confirmPassword
+              }
               onChange={(event) =>
                 update(
-                  "password",
+                  "confirmPassword",
                   event.target.value,
                 )
               }
-              className="pr-11"
-              placeholder="At least 8 characters"
+              aria-invalid={Boolean(
+                errors.confirmPassword,
+              )}
+              placeholder="Re-enter your password"
             />
 
-            <button
-              type="button"
-              onClick={() =>
-                setShowPassword(
-                  (value) =>
-                    !value,
-                )
-              }
-              aria-label={
-                showPassword
-                  ? "Hide password"
-                  : "Show password"
-              }
-              className="absolute right-1 top-1 inline-flex size-8 items-center justify-center rounded-md text-muted-foreground hover:bg-secondary hover:text-foreground"
-            >
-              {showPassword ? (
-                <EyeOff className="size-4" />
-              ) : (
-                <Eye className="size-4" />
-              )}
-            </button>
+            {errors.confirmPassword ? (
+              <p className="text-xs font-medium text-destructive">
+                {
+                  errors.confirmPassword
+                }
+              </p>
+            ) : null}
           </div>
 
-          {values.password ? (
-            <div className="flex items-center gap-2">
-              <span className="flex flex-1 gap-1">
-                {[0, 1, 2, 3].map(
-                  (index) => (
-                    <span
-                      key={index}
-                      className={`h-1.5 flex-1 rounded-full ${
-                        index <
-                        strength.score
-                          ? "bg-primary"
-                          : "bg-border"
-                      }`}
-                    />
-                  ),
-                )}
-              </span>
+          {/* ERROR */}
 
-              <span className="w-16 text-right text-xs text-muted-foreground">
-                {strength.label}
-              </span>
-            </div>
-          ) : null}
-
-          {errors.password ? (
-            <p className="text-xs font-medium text-destructive">
-              {errors.password}
+          {formError ? (
+            <p className="rounded-lg border border-destructive/25 bg-destructive/8 px-3 py-2 text-sm font-medium text-destructive">
+              {formError}
             </p>
           ) : null}
-        </div>
 
-        <div className="space-y-2">
-          <Label htmlFor="confirmPassword">
-            Confirm password
-          </Label>
+          {/* SUBMIT */}
 
-          <Input
-            id="confirmPassword"
-            type={
-              showPassword
-                ? "text"
-                : "password"
+          <Button
+            type="submit"
+            className="h-11 w-full"
+            disabled={
+              submitting ||
+              googleLoading
             }
-            autoComplete="new-password"
-            value={
-              values.confirmPassword
-            }
-            onChange={(event) =>
-              update(
-                "confirmPassword",
-                event.target.value,
-              )
-            }
-            aria-invalid={Boolean(
-              errors.confirmPassword,
-            )}
-            placeholder="Re-enter your password"
-          />
+          >
+            {submitting ? (
+              <Loader2 className="size-4 animate-spin" />
+            ) : null}
 
-          {errors.confirmPassword ? (
-            <p className="text-xs font-medium text-destructive">
-              {
-                errors.confirmPassword
-              }
-            </p>
-          ) : null}
-        </div>
-
-        {formError ? (
-          <p className="rounded-lg border border-destructive/25 bg-destructive/8 px-3 py-2 text-sm font-medium text-destructive">
-            {formError}
-          </p>
-        ) : null}
-
-        <Button
-          type="submit"
-          className="w-full"
-          disabled={
-            submitting ||
-            Boolean(
-              oauthProvider,
-            )
-          }
-        >
-          {submitting ? (
-            <Loader2 className="size-4 animate-spin" />
-          ) : null}
-
-          {submitting
-            ? "Creating account..."
-            : "Create account"}
-        </Button>
-      </form>
+            {submitting
+              ? "Creating account..."
+              : "Create account"}
+          </Button>
+        </form>
+      </div>
     </AuthLayout>
   );
 }

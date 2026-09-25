@@ -70,7 +70,7 @@ const AuthContext =
   >(undefined);
 
 /* ==================================================
- * OAUTH CALLBACK HELPERS
+ * OAUTH URL HELPERS
  * ================================================== */
 
 function getOAuthTokenFromUrl(): string | null {
@@ -89,6 +89,32 @@ function getOAuthTokenFromUrl(): string | null {
     params.get("token") ||
     params.get("auth_token")
   );
+}
+
+function getOAuthErrorFromUrl(): {
+  error: string | null;
+  message: string | null;
+} {
+  if (
+    typeof window === "undefined"
+  ) {
+    return {
+      error: null,
+      message: null,
+    };
+  }
+
+  const params =
+    new URLSearchParams(
+      window.location.search,
+    );
+
+  return {
+    error:
+      params.get("error"),
+    message:
+      params.get("message"),
+  };
 }
 
 function clearOAuthQueryParams() {
@@ -145,9 +171,11 @@ export function AuthProvider({
   const [loading, setLoading] =
     useState(true);
 
-  /* ==================================================
+  /*
+   * ==================================================
    * REFRESH CURRENT USER
-   * ================================================== */
+   * ==================================================
+   */
 
   const refreshMe =
     useCallback(
@@ -169,44 +197,44 @@ export function AuthProvider({
             response?.user ??
             null;
 
-          if (nextUser) {
-            saveAuth(
-              token,
-              nextUser,
-            );
+          if (!nextUser) {
+            clearAuth();
 
-            setUser(
-              nextUser,
-            );
+            setUser(null);
 
-            return nextUser;
+            return null;
           }
 
-          clearAuth();
+          saveAuth(
+            token,
+            nextUser,
+          );
 
-          setUser(null);
+          setUser(
+            nextUser,
+          );
 
-          return null;
+          return nextUser;
         } catch (error) {
           /*
-           * Only clear authentication when
-           * backend explicitly says the token
-           * is invalid/expired.
+           * Only remove the session when the
+           * backend explicitly says the JWT
+           * is invalid or the session changed.
            */
           if (
             error instanceof ApiError &&
             error.status === 401
           ) {
             clearAuth();
+
             setUser(null);
 
             return null;
           }
 
           /*
-           * Network/server errors should not
-           * immediately destroy a valid local
-           * authentication state.
+           * For temporary backend/network
+           * problems, preserve the cached user.
            */
           const cachedUser =
             getUser();
@@ -227,9 +255,11 @@ export function AuthProvider({
       [],
     );
 
-  /* ==================================================
+  /*
+   * ==================================================
    * INITIAL AUTH BOOTSTRAP
-   * ================================================== */
+   * ==================================================
+   */
 
   useEffect(() => {
     let mounted = true;
@@ -239,9 +269,46 @@ export function AuthProvider({
         const oauthToken =
           getOAuthTokenFromUrl();
 
+        const oauthError =
+          getOAuthErrorFromUrl();
+
         /*
          * ==============================================
-         * GOOGLE OAUTH CALLBACK
+         * OAUTH ERROR
+         * ==============================================
+         */
+
+        if (
+          oauthError.error &&
+          !oauthToken
+        ) {
+          console.error(
+            "OAuth login failed:",
+            oauthError.error,
+            oauthError.message,
+          );
+
+          /*
+           * Keep the error available for the
+           * login page.
+           */
+          if (
+            typeof window !==
+            "undefined"
+          ) {
+            sessionStorage.setItem(
+              "photos.oauth.error",
+              oauthError.message ||
+                oauthError.error,
+            );
+          }
+
+          clearOAuthQueryParams();
+        }
+
+        /*
+         * ==============================================
+         * OAUTH SUCCESS
          * ==============================================
          */
 
@@ -251,7 +318,9 @@ export function AuthProvider({
               (
                 import.meta.env[
                   "VITE_API_BASE_URL"
-                ] as string | undefined
+                ] as
+                  | string
+                  | undefined
               )?.replace(
                 /\/+$/,
                 "",
@@ -264,14 +333,9 @@ export function AuthProvider({
             }
 
             /*
-             * IMPORTANT:
-             *
-             * Do NOT rely on the old cached user.
-             *
-             * The OAuth token itself is used to
-             * retrieve the authenticated user.
+             * Use the OAuth JWT directly to
+             * fetch the authenticated user.
              */
-
             const profile =
               await fetch(
                 `${apiBaseUrl}/user/profile`,
@@ -285,47 +349,41 @@ export function AuthProvider({
                 },
               );
 
-            if (!profile.ok) {
-              let errorMessage =
-                "Unable to complete Google login.";
-
-              try {
-                const errorData =
-                  (await profile.json()) as {
-                    message?: string;
-                  };
-
-                if (
-                  errorData?.message
-                ) {
-                  errorMessage =
-                    errorData.message;
+            let data:
+              | {
+                  success?: boolean;
+                  user?: AuthUser;
+                  message?: string;
                 }
-              } catch {
-                // Ignore invalid error body.
-              }
+              | null = null;
 
+            try {
+              data =
+                (await profile.json()) as {
+                  success?: boolean;
+                  user?: AuthUser;
+                  message?: string;
+                };
+            } catch {
+              data = null;
+            }
+
+            if (!profile.ok) {
               throw new Error(
-                `${errorMessage} (${profile.status})`,
+                data?.message ||
+                  `OAuth profile request failed with status ${profile.status}.`,
               );
             }
 
-            const data =
-              (await profile.json()) as {
-                success?: boolean;
-                user?: AuthUser;
-              };
-
-            if (!data.user) {
+            if (!data?.user) {
               throw new Error(
-                "Google login succeeded but user information was not returned.",
+                "Google login succeeded, but the user profile was not returned.",
               );
             }
 
             /*
-             * Save both token and user.
+             * Save JWT + user.
              */
-
             saveAuth(
               oauthToken,
               data.user,
@@ -335,10 +393,7 @@ export function AuthProvider({
              * IMPORTANT:
              *
              * Update React state immediately.
-             * This is what allows login.tsx to
-             * detect authentication.
              */
-
             if (mounted) {
               setUser(
                 data.user,
@@ -346,16 +401,18 @@ export function AuthProvider({
             }
 
             /*
-             * Remove token from browser URL.
+             * Remove JWT from URL.
              */
-
             clearOAuthQueryParams();
-          } catch (error) {
+
             /*
-             * OAuth callback failed.
-             *
-             * Do not leave a bad token in storage.
+             * OAuth login is complete.
              */
+          } catch (error) {
+            console.error(
+              "OAuth callback failed:",
+              error,
+            );
 
             clearAuth();
 
@@ -363,12 +420,19 @@ export function AuthProvider({
               setUser(null);
             }
 
-            clearOAuthQueryParams();
+            if (
+              typeof window !==
+              "undefined"
+            ) {
+              sessionStorage.setItem(
+                "photos.oauth.error",
+                error instanceof Error
+                  ? error.message
+                  : "Unable to complete Google login.",
+              );
+            }
 
-            console.error(
-              "OAuth callback failed:",
-              error,
-            );
+            clearOAuthQueryParams();
           }
         }
 
@@ -376,6 +440,9 @@ export function AuthProvider({
          * ==============================================
          * NORMAL SESSION RESTORE
          * ==============================================
+         *
+         * Do not call refreshMe immediately after
+         * a failed OAuth callback.
          */
 
         if (mounted) {
@@ -402,9 +469,11 @@ export function AuthProvider({
     };
   }, [refreshMe]);
 
-  /* ==================================================
-   * CROSS-TAB AUTH SYNC
-   * ================================================== */
+  /*
+   * ==================================================
+   * CROSS TAB AUTH SYNC
+   * ==================================================
+   */
 
   useEffect(() => {
     function handleStorage(
@@ -443,9 +512,11 @@ export function AuthProvider({
     };
   }, []);
 
-  /* ==================================================
+  /*
+   * ==================================================
    * NORMAL LOGIN
-   * ================================================== */
+   * ==================================================
+   */
 
   const login =
     useCallback(
@@ -480,9 +551,11 @@ export function AuthProvider({
       [],
     );
 
-  /* ==================================================
+  /*
+   * ==================================================
    * SIGNUP
-   * ================================================== */
+   * ==================================================
+   */
 
   const signup =
     useCallback(
@@ -517,9 +590,11 @@ export function AuthProvider({
       [],
     );
 
-  /* ==================================================
+  /*
+   * ==================================================
    * LOGOUT
-   * ================================================== */
+   * ==================================================
+   */
 
   const logout =
     useCallback(
@@ -535,9 +610,11 @@ export function AuthProvider({
       [],
     );
 
-  /* ==================================================
-   * OAUTH LOGIN
-   * ================================================== */
+  /*
+   * ==================================================
+   * OAUTH
+   * ==================================================
+   */
 
   const handleOAuthLogin =
     useCallback(
@@ -551,19 +628,17 @@ export function AuthProvider({
       [],
     );
 
-  /* ==================================================
+  /*
+   * ==================================================
    * CONTEXT VALUE
-   * ================================================== */
+   * ==================================================
+   */
 
   const value =
     useMemo<AuthContextValue>(
       () => ({
         user,
 
-        /*
-         * Authentication is based on both
-         * a token and a loaded user.
-         */
         isAuthenticated:
           Boolean(
             user &&
