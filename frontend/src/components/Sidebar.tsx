@@ -1,225 +1,196 @@
 import {
   Heart,
-  Images,
+  Image,
+  Menu,
   Settings,
   Trash2,
+  X,
 } from "lucide-react";
 
 import {
   Link,
-  useLocation,
+  useRouterState,
 } from "@tanstack/react-router";
 
 import {
-  APP_TAGLINE,
-} from "@/lib/constants";
+  useState,
+} from "react";
 
-// ==================================================
-// SIDEBAR
-// ==================================================
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetTrigger,
+} from "@/components/ui/sheet";
 
-export function Sidebar() {
-  const location =
-    useLocation();
+import { Button } from "@/components/ui/button";
 
-  const isPhotos =
-    location.pathname ===
-    "/dashboard";
+const navigation = [
+  {
+    label: "Photos",
+    href: "/dashboard",
+    icon: Image,
+  },
+  {
+    label: "Favorites",
+    href: "/favorites",
+    icon: Heart,
+  },
+  {
+    label: "Trash",
+    href: "/trash",
+    icon: Trash2,
+  },
+  {
+    label: "Settings",
+    href: "/settings",
+    icon: Settings,
+  },
+] as const;
 
-  const isFavorites =
-    location.pathname ===
-    "/favorites";
+function NavigationItems({
+  onNavigate,
+}: {
+  onNavigate?: () => void;
+}) {
+  const routerState =
+    useRouterState();
 
-  const isTrash =
-    location.pathname ===
-    "/trash";
-
-  const isSettings =
-    location.pathname ===
-    "/settings";
+  const pathname =
+    routerState.location.pathname;
 
   return (
-    <aside className="hidden w-56 shrink-0 border-r border-border bg-sidebar px-3 py-6 md:block lg:w-64">
-      <nav
-        aria-label="Main navigation"
-        className="space-y-1"
-      >
-        {/* ==================================================
-            Photos
-        ================================================== */}
+    <nav className="space-y-1">
+      {navigation.map(
+        (item) => {
+          const Icon =
+            item.icon;
 
-        <Link
-          to="/dashboard"
-          className={
-            isPhotos
-              ? "flex items-center gap-3 rounded-full bg-sidebar-accent px-4 py-2.5 text-sm font-semibold text-sidebar-accent-foreground transition"
-              : "flex items-center gap-3 rounded-full px-4 py-2.5 text-sm text-muted-foreground transition hover:bg-sidebar-accent/60 hover:text-foreground"
-          }
-        >
-          <Images
-            className="size-[18px]"
-            aria-hidden="true"
-          />
+          const active =
+            pathname ===
+              item.href ||
+            (
+              item.href ===
+                "/dashboard" &&
+              pathname === "/"
+            );
 
-          Photos
-        </Link>
+          return (
+            <Link
+              key={item.href}
+              to={item.href}
+              onClick={
+                onNavigate
+              }
+              className={`flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-colors ${
+                active
+                  ? "bg-primary/10 text-primary"
+                  : "text-muted-foreground hover:bg-muted hover:text-foreground"
+              }`}
+            >
+              <Icon className="size-4 shrink-0" />
 
-        {/* ==================================================
-            Favorites
-        ================================================== */}
+              <span>
+                {item.label}
+              </span>
+            </Link>
+          );
+        },
+      )}
+    </nav>
+  );
+}
 
-        <Link
-          to="/favorites"
-          className={
-            isFavorites
-              ? "flex items-center gap-3 rounded-full bg-sidebar-accent px-4 py-2.5 text-sm font-semibold text-sidebar-accent-foreground transition"
-              : "flex items-center gap-3 rounded-full px-4 py-2.5 text-sm text-muted-foreground transition hover:bg-sidebar-accent/60 hover:text-foreground"
-          }
-        >
-          <Heart
-            className="size-[18px]"
-            aria-hidden="true"
-          />
+export function Sidebar() {
+  return (
+    <aside className="hidden w-60 shrink-0 border-r border-border px-4 py-6 md:block">
+      <div className="sticky top-24">
+        <p className="mb-3 px-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+          Library
+        </p>
 
-          Favorites
-        </Link>
-
-        {/* ==================================================
-            Trash
-        ================================================== */}
-
-        <Link
-          to="/trash"
-          className={
-            isTrash
-              ? "flex items-center gap-3 rounded-full bg-sidebar-accent px-4 py-2.5 text-sm font-semibold text-sidebar-accent-foreground transition"
-              : "flex items-center gap-3 rounded-full px-4 py-2.5 text-sm text-muted-foreground transition hover:bg-sidebar-accent/60 hover:text-foreground"
-          }
-        >
-          <Trash2
-            className="size-[18px]"
-            aria-hidden="true"
-          />
-
-          Trash
-        </Link>
-
-        {/* ==================================================
-            Settings
-        ================================================== */}
-
-        <Link
-          to="/settings"
-          className={
-            isSettings
-              ? "flex items-center gap-3 rounded-full bg-sidebar-accent px-4 py-2.5 text-sm font-semibold text-sidebar-accent-foreground transition"
-              : "flex items-center gap-3 rounded-full px-4 py-2.5 text-sm text-muted-foreground transition hover:bg-sidebar-accent/60 hover:text-foreground"
-          }
-        >
-          <Settings
-            className="size-[18px]"
-            aria-hidden="true"
-          />
-
-          Settings
-        </Link>
-      </nav>
-
-      <p className="mt-8 px-4 text-xs leading-relaxed text-muted-foreground">
-        {APP_TAGLINE}
-      </p>
+        <NavigationItems />
+      </div>
     </aside>
   );
 }
 
-// ==================================================
-// MOBILE NAV
-// ==================================================
-
 export function MobileNav() {
-  const location =
-    useLocation();
-
-  const isPhotos =
-    location.pathname ===
-    "/dashboard";
-
-  const isFavorites =
-    location.pathname ===
-    "/favorites";
-
-  const isTrash =
-    location.pathname ===
-    "/trash";
-
-  const isSettings =
-    location.pathname ===
-    "/settings";
+  const [
+    open,
+    setOpen,
+  ] = useState(false);
 
   return (
-    <nav
-      aria-label="Main navigation"
-      className="flex items-center gap-1 overflow-x-auto border-b border-border bg-surface px-4 py-2.5 md:hidden"
-    >
-      {/* Photos */}
+    <div className="sticky top-0 z-40 border-b border-border bg-background/95 backdrop-blur md:hidden">
+      <div className="flex h-14 items-center px-3">
+        <Sheet
+          open={open}
+          onOpenChange={
+            setOpen
+          }
+        >
+          <SheetTrigger
+            asChild
+          >
+            <Button
+              variant="ghost"
+              size="icon"
+              aria-label="Open navigation"
+            >
+              <Menu className="size-5" />
+            </Button>
+          </SheetTrigger>
 
-      <Link
-        to="/dashboard"
-        className={
-          isPhotos
-            ? "inline-flex shrink-0 items-center gap-2 rounded-full bg-accent px-3.5 py-1.5 text-sm font-semibold text-accent-foreground"
-            : "inline-flex shrink-0 items-center gap-2 rounded-full px-3.5 py-1.5 text-sm text-muted-foreground hover:bg-muted"
-        }
-      >
-        <Images className="size-4" />
+          <SheetContent
+            side="left"
+            className="w-[280px] p-0"
+          >
+            <SheetHeader className="border-b border-border px-5 py-4">
+              <div className="flex items-center justify-between">
+                <SheetTitle className="text-left">
+                  Photos
+                </SheetTitle>
 
-        Photos
-      </Link>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() =>
+                    setOpen(
+                      false,
+                    )
+                  }
+                  aria-label="Close navigation"
+                >
+                  <X className="size-4" />
+                </Button>
+              </div>
+            </SheetHeader>
 
-      {/* Favorites */}
+            <div className="p-4">
+              <p className="mb-3 px-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                Library
+              </p>
 
-      <Link
-        to="/favorites"
-        className={
-          isFavorites
-            ? "inline-flex shrink-0 items-center gap-2 rounded-full bg-accent px-3.5 py-1.5 text-sm font-semibold text-accent-foreground"
-            : "inline-flex shrink-0 items-center gap-2 rounded-full px-3.5 py-1.5 text-sm text-muted-foreground hover:bg-muted"
-        }
-      >
-        <Heart className="size-4" />
+              <NavigationItems
+                onNavigate={() =>
+                  setOpen(
+                    false,
+                  )
+                }
+              />
+            </div>
+          </SheetContent>
+        </Sheet>
 
-        Favorites
-      </Link>
-
-      {/* Trash */}
-
-      <Link
-        to="/trash"
-        className={
-          isTrash
-            ? "inline-flex shrink-0 items-center gap-2 rounded-full bg-accent px-3.5 py-1.5 text-sm font-semibold text-accent-foreground"
-            : "inline-flex shrink-0 items-center gap-2 rounded-full px-3.5 py-1.5 text-sm text-muted-foreground hover:bg-muted"
-        }
-      >
-        <Trash2 className="size-4" />
-
-        Trash
-      </Link>
-
-      {/* Settings */}
-
-      <Link
-        to="/settings"
-        className={
-          isSettings
-            ? "inline-flex shrink-0 items-center gap-2 rounded-full bg-accent px-3.5 py-1.5 text-sm font-semibold text-accent-foreground"
-            : "inline-flex shrink-0 items-center gap-2 rounded-full px-3.5 py-1.5 text-sm text-muted-foreground hover:bg-muted"
-        }
-      >
-        <Settings className="size-4" />
-
-        Settings
-      </Link>
-    </nav>
+        <Link
+          to="/dashboard"
+          className="ml-2 text-sm font-semibold"
+        >
+          Photos
+        </Link>
+      </div>
+    </div>
   );
 }

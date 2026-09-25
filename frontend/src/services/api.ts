@@ -14,25 +14,28 @@
  */
 
 import type { AuthUser } from "@/utils/auth";
-import { getToken } from "@/utils/auth";
+import {
+  clearAuth,
+  getDeviceId,
+  getToken,
+  saveAuth,
+} from "@/utils/auth";
 
 import type {
   CreateFolderResponse,
   DeleteFolderResponse,
-  Folder,
   GetFoldersResponse,
   RenameFolderResponse,
 } from "@/types/folder";
 
 import type {
+  CreateShareResponse,
   EmptyTrashResponse,
+  GetSharedPhotoResponse,
   Photo,
+  RevokeShareResponse,
   TrashActionResponse,
   TrashPhotosResponse,
-  TrashPhoto,
-  CreateShareResponse,
-  RevokeShareResponse,
-  GetSharedPhotoResponse,
 } from "@/types/photo";
 
 // ==================================================
@@ -51,18 +54,21 @@ const API_BASE_URL = (
 
 export class ApiError extends Error {
   status: number;
+  code?: string | undefined;
+  details?: unknown | undefined;
 
   constructor(
     message: string,
     status = 0,
+    code?: string,
+    details?: unknown,
   ) {
     super(message);
 
-    this.name =
-      "ApiError";
-
-    this.status =
-      status;
+    this.name = "ApiError";
+    this.status = status;
+    this.code = code;
+    this.details = details;
   }
 }
 
@@ -87,8 +93,10 @@ type RequestOptions = {
 
 type BackendErrorResponse = {
   success?: boolean;
-
   message?: string;
+  code?: string;
+  error?: string;
+  details?: unknown;
 };
 
 async function request<T>(
@@ -113,67 +121,51 @@ async function request<T>(
     string
   > = {};
 
-  if (
-    body !== undefined
-  ) {
-    headers[
-      "Content-Type"
-    ] = "application/json";
+  if (body !== undefined) {
+    headers["Content-Type"] =
+      "application/json";
   }
 
   if (auth) {
-    const token =
-      getToken();
+    const token = getToken();
 
     if (!token) {
       throw new ApiError(
         "Your session has expired. Please log in again.",
         401,
+        "AUTH_REQUIRED",
       );
     }
 
-    headers[
-      "Authorization"
-    ] =
+    headers["Authorization"] =
       `Bearer ${token}`;
   }
 
-  const requestInit: RequestInit =
-    {
-      method,
-      headers,
-    };
+  const requestInit: RequestInit = {
+    method,
+    headers,
+  };
 
-  if (
-    signal !== undefined
-  ) {
-    requestInit.signal =
-      signal;
+  if (signal !== undefined) {
+    requestInit.signal = signal;
   }
 
-  if (
-    body !== undefined
-  ) {
+  if (body !== undefined) {
     requestInit.body =
-      JSON.stringify(
-        body,
-      );
+      JSON.stringify(body);
   }
 
   let response: Response;
 
   try {
-    response =
-      await fetch(
-        `${API_BASE_URL}${path}`,
-        requestInit,
-      );
+    response = await fetch(
+      `${API_BASE_URL}${path}`,
+      requestInit,
+    );
   } catch (error) {
     if (
-      error instanceof
-        DOMException &&
-      error.name ===
-        "AbortError"
+      error instanceof DOMException &&
+      error.name === "AbortError"
     ) {
       throw error;
     }
@@ -183,36 +175,39 @@ async function request<T>(
     );
   }
 
-  let data: unknown =
-    null;
+  let data: unknown = null;
 
   try {
-    data =
-      await response.json();
+    data = await response.json();
   } catch {
     data = null;
   }
 
-  if (
-    response.status ===
-    401
-  ) {
+  const errorData =
+    data as
+      | BackendErrorResponse
+      | null;
+
+  if (response.status === 401) {
+    clearAuth();
+
     throw new ApiError(
-      (
-        data as BackendErrorResponse | null
-      )?.message ||
+      errorData?.message ||
         "Your session has expired. Please log in again.",
       401,
+      errorData?.code ||
+        "AUTH_REQUIRED",
+      errorData?.details,
     );
   }
 
   if (!response.ok) {
     throw new ApiError(
-      (
-        data as BackendErrorResponse | null
-      )?.message ||
+      errorData?.message ||
         "Something went wrong. Please try again.",
       response.status,
+      errorData?.code,
+      errorData?.details,
     );
   }
 
@@ -231,6 +226,28 @@ export type AuthResponse = {
   token: string;
 
   user: AuthUser;
+
+  session?: {
+    sessionId?: string;
+    deviceId?: string;
+  };
+};
+
+export type OAuthProvider =
+  | "google"
+  | "facebook"
+  | "instagram";
+
+export type ActiveSessionResponse = {
+  success: boolean;
+
+  hasActiveSession: boolean;
+
+  session?: {
+    deviceName?: string;
+    createdAt?: string;
+    lastActiveAt?: string;
+  };
 };
 
 export async function signup(
@@ -246,16 +263,15 @@ export async function signup(
       method: "POST",
 
       body: {
-        name:
-          input.name.trim(),
+        name: input.name.trim(),
 
-        email:
-          input.email
-            .trim()
-            .toLowerCase(),
+        email: input.email
+          .trim()
+          .toLowerCase(),
 
-        password:
-          input.password,
+        password: input.password,
+
+        deviceId: getDeviceId(),
       },
     },
   );
@@ -273,14 +289,81 @@ export async function login(
       method: "POST",
 
       body: {
-        email:
-          input.email
-            .trim()
-            .toLowerCase(),
+        email: input.email
+          .trim()
+          .toLowerCase(),
 
-        password:
-          input.password,
+        password: input.password,
+
+        deviceId: getDeviceId(),
       },
+    },
+  );
+}
+
+export async function loginWithOAuth(
+  provider: OAuthProvider,
+): Promise<void> {
+  if (!API_BASE_URL) {
+    throw new ApiError(
+      "API URL is not configured.",
+    );
+  }
+
+  const deviceId =
+    encodeURIComponent(
+      getDeviceId(),
+    );
+
+  const callbackUrl =
+    `${window.location.origin}/login`;
+
+  const encodedCallback =
+    encodeURIComponent(
+      callbackUrl,
+    );
+
+  window.location.assign(
+    `${API_BASE_URL}/auth/${provider}?deviceId=${deviceId}&redirectUri=${encodedCallback}`,
+  );
+}
+
+export async function logout(): Promise<{
+  success: boolean;
+  message?: string;
+}> {
+  const token = getToken();
+
+  if (!token) {
+    clearAuth();
+
+    return {
+      success: true,
+    };
+  }
+
+  try {
+    return await request<{
+      success: boolean;
+      message?: string;
+    }>("/auth/logout", {
+      method: "POST",
+      auth: true,
+      body: {
+        deviceId: getDeviceId(),
+      },
+    });
+  } finally {
+    clearAuth();
+  }
+}
+
+export async function getActiveSession(): Promise<ActiveSessionResponse> {
+  return request<ActiveSessionResponse>(
+    "/auth/active-session",
+    {
+      method: "GET",
+      body: undefined,
     },
   );
 }
@@ -292,13 +375,10 @@ export async function getUserProfile(): Promise<{
   return request<{
     success: boolean;
     user: AuthUser;
-  }>(
-    "/user/profile",
-    {
-      method: "GET",
-      auth: true,
-    },
-  );
+  }>("/user/profile", {
+    method: "GET",
+    auth: true,
+  });
 }
 
 // ==================================================
@@ -307,15 +387,10 @@ export async function getUserProfile(): Promise<{
 
 export type UploadUrlResponse = {
   success: boolean;
-
   uploadUrl: string;
-
   key: string;
-
   photoId: string;
-
   fileName?: string;
-
   expiresIn?: number;
 };
 
@@ -388,16 +463,11 @@ export async function uploadToPresignedUrl(
 
       xhr.onload = () => {
         if (
-          xhr.status >=
-            200 &&
+          xhr.status >= 200 &&
           xhr.status < 300
         ) {
-          onProgress?.(
-            100,
-          );
-
+          onProgress?.(100);
           resolve();
-
           return;
         }
 
@@ -436,9 +506,7 @@ export async function uploadToPresignedUrl(
 
 export type ConfirmUploadResponse = {
   success: boolean;
-
   message: string;
-
   photo: Photo;
 };
 
@@ -464,8 +532,7 @@ export async function confirmUpload(
   }
 
   if (
-    trimmedName.length >
-    120
+    trimmedName.length > 120
   ) {
     throw new ApiError(
       "Photo name must be 120 characters or less.",
@@ -498,8 +565,7 @@ export async function confirmUpload(
           input.fileSize,
 
         folderId:
-          input.folderId ??
-          null,
+          input.folderId ?? null,
       },
 
       auth: true,
@@ -524,53 +590,33 @@ export type PhotoType =
 
 export type GetPhotosOptions = {
   search?: string;
-
   sort?: PhotoSort;
-
   type?: PhotoType;
-
   folderId?: string | null;
 };
 
 export type PhotoApiItem = {
   photoId: string;
-
   userId: string;
-
   s3Key: string;
-
   name: string;
-
   originalFileName?: string;
-
   fileName: string;
-
   contentType: string;
-
   fileSize: number;
-
   createdAt: string;
-
   updatedAt?: string;
-
   downloadUrl: string;
-
   url?: string;
-
   folderId?: string | null;
-
   isTrashed?: boolean;
-
   trashedAt?: string | null;
-
   isFavorite?: boolean;
 };
 
 export type GetPhotosResponse = {
   success: boolean;
-
   count: number;
-
   photos: PhotoApiItem[];
 };
 
@@ -618,10 +664,9 @@ export async function getPhotos(
   const queryString =
     params.toString();
 
-  const path =
-    queryString
-      ? `/photos?${queryString}`
-      : "/photos";
+  const path = queryString
+    ? `/photos?${queryString}`
+    : "/photos";
 
   return request<GetPhotosResponse>(
     path,
@@ -638,9 +683,7 @@ export async function getPhotos(
 
 export type RenamePhotoResponse = {
   success: boolean;
-
   message: string;
-
   photo: Photo;
 };
 
@@ -659,8 +702,7 @@ export async function renamePhoto(
   }
 
   if (
-    trimmedName.length >
-    120
+    trimmedName.length > 120
   ) {
     throw new ApiError(
       "Photo name must be 120 characters or less.",
@@ -676,8 +718,7 @@ export async function renamePhoto(
       method: "PATCH",
 
       body: {
-        name:
-          trimmedName,
+        name: trimmedName,
       },
 
       auth: true,
@@ -686,14 +727,12 @@ export async function renamePhoto(
 }
 
 // ==================================================
-// MOVE PHOTO TO FOLDER
+// MOVE PHOTO
 // ==================================================
 
 export type MovePhotoResponse = {
   success: boolean;
-
   message: string;
-
   photo: Photo;
 };
 
@@ -723,7 +762,6 @@ export async function movePhotoToFolder(
 
 export type DownloadUrlResponse = {
   success: boolean;
-
   downloadUrl: string;
 };
 
@@ -736,7 +774,6 @@ export async function requestDownloadUrl(
     )}`,
     {
       method: "GET",
-
       auth: true,
     },
   );
@@ -746,11 +783,6 @@ export async function requestDownloadUrl(
 // TRASH
 // ==================================================
 
-/**
- * Move photo from gallery to Trash.
- *
- * DELETE /photos/:photoId
- */
 export async function trashPhoto(
   photoId: string,
 ): Promise<TrashActionResponse> {
@@ -760,33 +792,21 @@ export async function trashPhoto(
     )}`,
     {
       method: "DELETE",
-
       auth: true,
     },
   );
 }
 
-/**
- * Get all photos currently in Trash.
- *
- * GET /trash
- */
 export async function getTrashPhotos(): Promise<TrashPhotosResponse> {
   return request<TrashPhotosResponse>(
     "/trash",
     {
       method: "GET",
-
       auth: true,
     },
   );
 }
 
-/**
- * Restore a photo from Trash.
- *
- * POST /trash/:photoId/restore
- */
 export async function restorePhoto(
   photoId: string,
 ): Promise<TrashActionResponse> {
@@ -796,17 +816,11 @@ export async function restorePhoto(
     )}/restore`,
     {
       method: "POST",
-
       auth: true,
     },
   );
 }
 
-/**
- * Permanently delete one photo.
- *
- * DELETE /trash/:photoId
- */
 export async function deletePhotoForever(
   photoId: string,
 ): Promise<TrashActionResponse> {
@@ -816,23 +830,16 @@ export async function deletePhotoForever(
     )}`,
     {
       method: "DELETE",
-
       auth: true,
     },
   );
 }
 
-/**
- * Permanently delete every photo in Trash.
- *
- * DELETE /trash
- */
 export async function emptyTrash(): Promise<EmptyTrashResponse> {
   return request<EmptyTrashResponse>(
     "/trash",
     {
       method: "DELETE",
-
       auth: true,
     },
   );
@@ -847,7 +854,6 @@ export async function getFolders(): Promise<GetFoldersResponse> {
     "/folders",
     {
       method: "GET",
-
       auth: true,
     },
   );
@@ -867,8 +873,7 @@ export async function createFolder(
   }
 
   if (
-    trimmedName.length >
-    100
+    trimmedName.length > 100
   ) {
     throw new ApiError(
       "Folder name cannot exceed 100 characters.",
@@ -882,8 +887,7 @@ export async function createFolder(
       method: "POST",
 
       body: {
-        name:
-          trimmedName,
+        name: trimmedName,
       },
 
       auth: true,
@@ -913,8 +917,7 @@ export async function renameFolder(
       method: "PATCH",
 
       body: {
-        name:
-          trimmedName,
+        name: trimmedName,
       },
 
       auth: true,
@@ -931,7 +934,6 @@ export async function deleteFolder(
     )}`,
     {
       method: "DELETE",
-
       auth: true,
     },
   );
@@ -943,23 +945,16 @@ export async function deleteFolder(
 
 export type FavoriteResponse = {
   success: boolean;
-
   message?: string;
-
   photo: Photo;
 };
 
-/**
- * Add/remove a photo from Favorites.
- *
- * PATCH /favorites/:photoId/favorite
- */
 export async function setFavorite(
   photoId: string,
   isFavorite: boolean,
 ): Promise<FavoriteResponse> {
   return request<FavoriteResponse>(
-    `/favorites/${encodeURIComponent(
+    `/photos/${encodeURIComponent(
       photoId,
     )}/favorite`,
     {
@@ -978,97 +973,46 @@ export async function setFavorite(
 // SHARING
 // ==================================================
 
-/**
- * Create a public share link for a photo.
- *
- * POST /share/:photoId
- */
 export async function createShare(
   photoId: string,
 ): Promise<CreateShareResponse> {
-  if (!photoId.trim()) {
-    throw new ApiError(
-      "Photo ID is required.",
-      400,
-    );
-  }
-
   return request<CreateShareResponse>(
-    `/share/${encodeURIComponent(
+    `/photos/${encodeURIComponent(
       photoId,
-    )}`,
+    )}/share`,
     {
       method: "POST",
-
       auth: true,
     },
   );
 }
 
-/**
- * Revoke an existing share link.
- *
- * DELETE /share/:photoId/:shareId
- */
 export async function revokeShare(
   photoId: string,
   shareId: string,
 ): Promise<RevokeShareResponse> {
-  if (!photoId.trim()) {
-    throw new ApiError(
-      "Photo ID is required.",
-      400,
-    );
-  }
-
-  if (!shareId.trim()) {
-    throw new ApiError(
-      "Share ID is required.",
-      400,
-    );
-  }
-
   return request<RevokeShareResponse>(
-    `/share/${encodeURIComponent(
+    `/photos/${encodeURIComponent(
       photoId,
-    )}/${encodeURIComponent(
+    )}/share/${encodeURIComponent(
       shareId,
     )}`,
     {
       method: "DELETE",
-
       auth: true,
     },
   );
 }
 
-/**
- * Publicly fetch a shared photo.
- *
- * GET /share/:token
- *
- * No authentication required.
- */
 export async function getSharedPhoto(
   token: string,
 ): Promise<GetSharedPhotoResponse> {
-  const trimmedToken =
-    token.trim();
-
-  if (!trimmedToken) {
-    throw new ApiError(
-      "Share token is required.",
-      400,
-    );
-  }
-
   return request<GetSharedPhotoResponse>(
-    `/share/${encodeURIComponent(
-      trimmedToken,
+    `/shared/${encodeURIComponent(
+      token,
     )}`,
     {
       method: "GET",
-
       auth: false,
     },
   );

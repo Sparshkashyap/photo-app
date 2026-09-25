@@ -25,11 +25,20 @@ const getSecret = async (name) => {
 };
 
 const loadSecrets = async () => {
-  const jwtSecret = await getSecret(
-    "/photo-app/JWT_SECRET"
-  );
+  const [
+    jwtSecret,
+    googleClientId,
+    googleClientSecret,
+  ] = await Promise.all([
+    getSecret("/photo-app/JWT_SECRET"),
+    getSecret("/photo-app/GOOGLE_CLIENT_ID"),
+    getSecret("/photo-app/GOOGLE_CLIENT_SECRET"),
+  ]);
 
   process.env.JWT_SECRET = jwtSecret;
+  process.env.GOOGLE_CLIENT_ID = googleClientId;
+  process.env.GOOGLE_CLIENT_SECRET =
+    googleClientSecret;
 };
 
 module.exports = {
