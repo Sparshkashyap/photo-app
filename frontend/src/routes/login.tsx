@@ -8,10 +8,13 @@ import {
   Eye,
   EyeOff,
   Loader2,
+  Lock,
+  Mail,
 } from "lucide-react";
 
 import {
   useEffect,
+  useRef,
   useState,
 } from "react";
 
@@ -79,6 +82,9 @@ function LoginPage() {
   const navigate =
     useNavigate();
 
+  const emailInputRef =
+    useRef<HTMLInputElement>(null);
+
   const [
     email,
     setEmail,
@@ -127,6 +133,16 @@ function LoginPage() {
     googleLoading,
     setGoogleLoading,
   ] = useState(false);
+
+  /*
+   * ==================================================
+   * AUTOFOCUS EMAIL FIELD ON MOUNT
+   * ==================================================
+   */
+
+  useEffect(() => {
+    emailInputRef.current?.focus();
+  }, []);
 
   /*
    * ==================================================
@@ -234,6 +250,11 @@ function LoginPage() {
         nextErrors,
       ).length > 0
     ) {
+      // Move focus to the first invalid field so keyboard/screen-reader
+      // users land exactly where they need to fix things.
+      if (nextErrors.email) {
+        emailInputRef.current?.focus();
+      }
       return;
     }
 
@@ -336,20 +357,20 @@ function LoginPage() {
           Don&apos;t have an account?{" "}
           <Link
             to="/signup"
-            className="font-semibold text-primary hover:underline"
+            className="font-semibold text-primary underline-offset-4 transition hover:underline"
           >
             Create one
           </Link>
         </>
       }
     >
-      <div className="space-y-5">
+      <div className="space-y-6">
         {/* GOOGLE */}
 
         <Button
           type="button"
           variant="outline"
-          className="h-12 w-full rounded-xl border-border bg-background text-sm font-semibold shadow-sm transition hover:bg-muted"
+          className="h-12 w-full rounded-xl border-border bg-background text-sm font-semibold shadow-sm transition-all hover:border-foreground/20 hover:bg-muted active:scale-[0.99]"
           disabled={
             googleLoading ||
             submitting
@@ -361,9 +382,28 @@ function LoginPage() {
           {googleLoading ? (
             <Loader2 className="mr-2 size-4 animate-spin" />
           ) : (
-            <span className="mr-2 text-base font-bold">
-              G
-            </span>
+            <svg
+              className="mr-2 size-4"
+              viewBox="0 0 24 24"
+              aria-hidden="true"
+            >
+              <path
+                fill="#4285F4"
+                d="M23.52 12.27c0-.85-.08-1.67-.22-2.45H12v4.64h6.46c-.28 1.5-1.13 2.78-2.4 3.63v3.02h3.89c2.28-2.1 3.57-5.2 3.57-8.84z"
+              />
+              <path
+                fill="#34A853"
+                d="M12 24c3.24 0 5.96-1.07 7.95-2.9l-3.89-3.02c-1.08.72-2.46 1.15-4.06 1.15-3.12 0-5.77-2.11-6.72-4.94H1.27v3.11C3.25 21.3 7.31 24 12 24z"
+              />
+              <path
+                fill="#FBBC05"
+                d="M5.28 14.29a7.2 7.2 0 0 1 0-4.58V6.6H1.27a12 12 0 0 0 0 10.8z"
+              />
+              <path
+                fill="#EA4335"
+                d="M12 4.75c1.77 0 3.35.61 4.6 1.8l3.45-3.45C17.95 1.19 15.24 0 12 0 7.31 0 3.25 2.7 1.27 6.6l4.01 3.11C6.23 6.87 8.88 4.75 12 4.75z"
+              />
+            </svg>
           )}
 
           {googleLoading
@@ -373,7 +413,10 @@ function LoginPage() {
 
         {/* DIVIDER */}
 
-        <div className="flex items-center gap-3">
+        <div
+          className="flex items-center gap-3"
+          role="separator"
+        >
           <div className="h-px flex-1 bg-border" />
 
           <span className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
@@ -399,42 +442,58 @@ function LoginPage() {
               Email
             </Label>
 
-            <Input
-              id="email"
-              type="email"
-              autoComplete="email"
-              value={email}
-              onChange={(event) => {
-                setEmail(
-                  event.target.value,
-                );
+            <div className="relative">
+              <Mail
+                className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground"
+                aria-hidden="true"
+              />
 
-                setErrors(
-                  (previous) => {
-                    const next =
-                      {
-                        ...previous,
-                      };
+              <Input
+                ref={emailInputRef}
+                id="email"
+                type="email"
+                autoComplete="email"
+                value={email}
+                onChange={(event) => {
+                  setEmail(
+                    event.target.value,
+                  );
 
-                    delete next.email;
+                  setErrors(
+                    (previous) => {
+                      const next =
+                        {
+                          ...previous,
+                        };
 
-                    return next;
-                  },
-                );
+                      delete next.email;
 
-                setFormError(
-                  null,
-                );
-              }}
-              aria-invalid={Boolean(
-                errors.email,
-              )}
-              placeholder="you@example.com"
-              className="h-11 rounded-xl"
-            />
+                      return next;
+                    },
+                  );
+
+                  setFormError(
+                    null,
+                  );
+                }}
+                aria-invalid={Boolean(
+                  errors.email,
+                )}
+                aria-describedby={
+                  errors.email
+                    ? "email-error"
+                    : undefined
+                }
+                placeholder="you@example.com"
+                className="h-11 rounded-xl pl-10 transition-shadow focus-visible:ring-2"
+              />
+            </div>
 
             {errors.email ? (
-              <p className="text-xs font-medium text-destructive">
+              <p
+                id="email-error"
+                className="flex items-center gap-1 text-xs font-medium text-destructive"
+              >
                 {errors.email}
               </p>
             ) : null}
@@ -443,11 +502,26 @@ function LoginPage() {
           {/* PASSWORD */}
 
           <div className="space-y-2">
-            <Label htmlFor="password">
-              Password
-            </Label>
+            <div className="flex items-center justify-between">
+              <Label htmlFor="password">
+                Password
+              </Label>
+
+              <a
+                href="/forgot-password"
+                className="text-xs font-medium text-muted-foreground underline-offset-4 transition hover:text-foreground hover:underline"
+                tabIndex={-1}
+              >
+                Forgot password?
+              </a>
+            </div>
 
             <div className="relative">
+              <Lock
+                className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground"
+                aria-hidden="true"
+              />
+
               <Input
                 id="password"
                 type={
@@ -479,11 +553,16 @@ function LoginPage() {
                     null,
                   );
                 }}
-                className="h-11 rounded-xl pr-11"
+                className="h-11 rounded-xl pl-10 pr-11 transition-shadow focus-visible:ring-2"
                 placeholder="Enter your password"
                 aria-invalid={Boolean(
                   errors.password,
                 )}
+                aria-describedby={
+                  errors.password
+                    ? "password-error"
+                    : undefined
+                }
               />
 
               <button
@@ -510,7 +589,10 @@ function LoginPage() {
             </div>
 
             {errors.password ? (
-              <p className="text-xs font-medium text-destructive">
+              <p
+                id="password-error"
+                className="text-xs font-medium text-destructive"
+              >
                 {errors.password}
               </p>
             ) : null}
@@ -519,7 +601,10 @@ function LoginPage() {
           {/* ACTIVE SESSION */}
 
           {activeSession ? (
-            <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-4 text-sm">
+            <div
+              role="alert"
+              className="animate-in fade-in slide-in-from-top-1 rounded-xl border border-amber-500/30 bg-amber-500/10 p-4 text-sm duration-200"
+            >
               <p className="font-semibold text-amber-700 dark:text-amber-400">
                 Account already logged in
               </p>
@@ -534,7 +619,10 @@ function LoginPage() {
 
           {formError &&
           !activeSession ? (
-            <div className="rounded-xl border border-destructive/25 bg-destructive/5 px-4 py-3 text-sm font-medium text-destructive">
+            <div
+              role="alert"
+              className="animate-in fade-in slide-in-from-top-1 rounded-xl border border-destructive/25 bg-destructive/5 px-4 py-3 text-sm font-medium text-destructive duration-200"
+            >
               {formError}
             </div>
           ) : null}
@@ -543,7 +631,7 @@ function LoginPage() {
 
           <Button
             type="submit"
-            className="h-11 w-full rounded-xl text-sm font-semibold"
+            className="h-11 w-full rounded-xl text-sm font-semibold transition-all active:scale-[0.99]"
             disabled={
               submitting ||
               googleLoading

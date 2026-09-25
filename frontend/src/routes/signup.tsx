@@ -5,14 +5,20 @@ import {
 } from "@tanstack/react-router";
 
 import {
+  Check,
   Eye,
   EyeOff,
   Loader2,
+  Lock,
+  Mail,
+  User,
+  X,
 } from "lucide-react";
 
 import {
   useEffect,
   useMemo,
+  useRef,
   useState,
 } from "react";
 
@@ -108,9 +114,18 @@ function passwordStrength(
     "Strong",
   ];
 
+  const colors = [
+    "bg-destructive",
+    "bg-destructive",
+    "bg-amber-500",
+    "bg-lime-500",
+    "bg-emerald-500",
+  ];
+
   return {
     score,
     label: labels[score]!,
+    color: colors[score]!,
   };
 }
 
@@ -124,6 +139,9 @@ function SignupPage() {
 
   const navigate =
     useNavigate();
+
+  const nameInputRef =
+    useRef<HTMLInputElement>(null);
 
   const [
     values,
@@ -180,6 +198,22 @@ function SignupPage() {
         ),
       [values.password],
     );
+
+  const passwordsMatch =
+    values.confirmPassword.length >
+      0 &&
+    values.confirmPassword ===
+      values.password;
+
+  /*
+   * ==================================================
+   * AUTOFOCUS NAME FIELD ON MOUNT
+   * ==================================================
+   */
+
+  useEffect(() => {
+    nameInputRef.current?.focus();
+  }, []);
 
   useEffect(() => {
     if (
@@ -284,6 +318,9 @@ function SignupPage() {
         nextErrors,
       ).length > 0
     ) {
+      if (nextErrors.name) {
+        nameInputRef.current?.focus();
+      }
       return;
     }
 
@@ -367,20 +404,20 @@ function SignupPage() {
           Already have an account?{" "}
           <Link
             to="/login"
-            className="font-semibold text-primary hover:underline"
+            className="font-semibold text-primary underline-offset-4 transition hover:underline"
           >
             Log in
           </Link>
         </>
       }
     >
-      <div className="space-y-5">
+      <div className="space-y-6">
         {/* GOOGLE OAUTH */}
 
         <Button
           type="button"
           variant="outline"
-          className="h-11 w-full gap-3 rounded-lg border-border bg-background text-sm font-medium shadow-sm transition hover:bg-secondary"
+          className="h-12 w-full gap-3 rounded-xl border-border bg-background text-sm font-semibold shadow-sm transition-all hover:border-foreground/20 hover:bg-muted active:scale-[0.99]"
           disabled={
             submitting ||
             googleLoading
@@ -426,11 +463,14 @@ function SignupPage() {
 
         {/* DIVIDER */}
 
-        <div className="flex items-center gap-3">
+        <div
+          className="flex items-center gap-3"
+          role="separator"
+        >
           <div className="h-px flex-1 bg-border" />
 
-          <span className="text-xs font-medium text-muted-foreground">
-            OR
+          <span className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+            or continue with email
           </span>
 
           <div className="h-px flex-1 bg-border" />
@@ -452,24 +492,41 @@ function SignupPage() {
               Full name
             </Label>
 
-            <Input
-              id="name"
-              autoComplete="name"
-              value={values.name}
-              onChange={(event) =>
-                update(
-                  "name",
-                  event.target.value,
-                )
-              }
-              aria-invalid={Boolean(
-                errors.name,
-              )}
-              placeholder="Sparsh Kashyap"
-            />
+            <div className="relative">
+              <User
+                className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground"
+                aria-hidden="true"
+              />
+
+              <Input
+                ref={nameInputRef}
+                id="name"
+                autoComplete="name"
+                value={values.name}
+                onChange={(event) =>
+                  update(
+                    "name",
+                    event.target.value,
+                  )
+                }
+                aria-invalid={Boolean(
+                  errors.name,
+                )}
+                aria-describedby={
+                  errors.name
+                    ? "name-error"
+                    : undefined
+                }
+                placeholder="Sparsh Kashyap"
+                className="h-11 rounded-xl pl-10 transition-shadow focus-visible:ring-2"
+              />
+            </div>
 
             {errors.name ? (
-              <p className="text-xs font-medium text-destructive">
+              <p
+                id="name-error"
+                className="text-xs font-medium text-destructive"
+              >
                 {errors.name}
               </p>
             ) : null}
@@ -482,25 +539,41 @@ function SignupPage() {
               Email
             </Label>
 
-            <Input
-              id="email"
-              type="email"
-              autoComplete="email"
-              value={values.email}
-              onChange={(event) =>
-                update(
-                  "email",
-                  event.target.value,
-                )
-              }
-              aria-invalid={Boolean(
-                errors.email,
-              )}
-              placeholder="you@example.com"
-            />
+            <div className="relative">
+              <Mail
+                className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground"
+                aria-hidden="true"
+              />
+
+              <Input
+                id="email"
+                type="email"
+                autoComplete="email"
+                value={values.email}
+                onChange={(event) =>
+                  update(
+                    "email",
+                    event.target.value,
+                  )
+                }
+                aria-invalid={Boolean(
+                  errors.email,
+                )}
+                aria-describedby={
+                  errors.email
+                    ? "email-error"
+                    : undefined
+                }
+                placeholder="you@example.com"
+                className="h-11 rounded-xl pl-10 transition-shadow focus-visible:ring-2"
+              />
+            </div>
 
             {errors.email ? (
-              <p className="text-xs font-medium text-destructive">
+              <p
+                id="email-error"
+                className="text-xs font-medium text-destructive"
+              >
                 {errors.email}
               </p>
             ) : null}
@@ -514,6 +587,11 @@ function SignupPage() {
             </Label>
 
             <div className="relative">
+              <Lock
+                className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground"
+                aria-hidden="true"
+              />
+
               <Input
                 id="password"
                 type={
@@ -529,8 +607,16 @@ function SignupPage() {
                     event.target.value,
                   )
                 }
-                className="pr-11"
+                className="h-11 rounded-xl pl-10 pr-11 transition-shadow focus-visible:ring-2"
                 placeholder="At least 8 characters"
+                aria-invalid={Boolean(
+                  errors.password,
+                )}
+                aria-describedby={
+                  errors.password
+                    ? "password-error"
+                    : undefined
+                }
               />
 
               <button
@@ -546,7 +632,7 @@ function SignupPage() {
                     ? "Hide password"
                     : "Show password"
                 }
-                className="absolute right-1 top-1 inline-flex size-8 items-center justify-center rounded-md text-muted-foreground transition hover:bg-secondary hover:text-foreground"
+                className="absolute right-1 top-1 inline-flex size-9 items-center justify-center rounded-lg text-muted-foreground transition hover:bg-muted hover:text-foreground"
               >
                 {showPassword ? (
                   <EyeOff className="size-4" />
@@ -557,16 +643,16 @@ function SignupPage() {
             </div>
 
             {values.password ? (
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 pt-0.5">
                 <span className="flex flex-1 gap-1">
                   {[0, 1, 2, 3].map(
                     (index) => (
                       <span
                         key={index}
-                        className={`h-1.5 flex-1 rounded-full ${
+                        className={`h-1.5 flex-1 rounded-full transition-colors duration-300 ${
                           index <
                           strength.score
-                            ? "bg-primary"
+                            ? strength.color
                             : "bg-border"
                         }`}
                       />
@@ -581,7 +667,10 @@ function SignupPage() {
             ) : null}
 
             {errors.password ? (
-              <p className="text-xs font-medium text-destructive">
+              <p
+                id="password-error"
+                className="text-xs font-medium text-destructive"
+              >
                 {errors.password}
               </p>
             ) : null}
@@ -594,31 +683,60 @@ function SignupPage() {
               Confirm password
             </Label>
 
-            <Input
-              id="confirmPassword"
-              type={
-                showPassword
-                  ? "text"
-                  : "password"
-              }
-              autoComplete="new-password"
-              value={
-                values.confirmPassword
-              }
-              onChange={(event) =>
-                update(
-                  "confirmPassword",
-                  event.target.value,
-                )
-              }
-              aria-invalid={Boolean(
-                errors.confirmPassword,
-              )}
-              placeholder="Re-enter your password"
-            />
+            <div className="relative">
+              <Lock
+                className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground"
+                aria-hidden="true"
+              />
+
+              <Input
+                id="confirmPassword"
+                type={
+                  showPassword
+                    ? "text"
+                    : "password"
+                }
+                autoComplete="new-password"
+                value={
+                  values.confirmPassword
+                }
+                onChange={(event) =>
+                  update(
+                    "confirmPassword",
+                    event.target.value,
+                  )
+                }
+                aria-invalid={Boolean(
+                  errors.confirmPassword,
+                )}
+                aria-describedby={
+                  errors.confirmPassword
+                    ? "confirm-password-error"
+                    : undefined
+                }
+                placeholder="Re-enter your password"
+                className="h-11 rounded-xl pl-10 pr-10 transition-shadow focus-visible:ring-2"
+              />
+
+              {values.confirmPassword ? (
+                <span
+                  className="absolute right-3 top-1/2 -translate-y-1/2"
+                  aria-hidden="true"
+                >
+                  {passwordsMatch ? (
+                    <Check className="size-4 text-emerald-500" />
+                  ) : (
+                    <X className="size-4 text-destructive" />
+                  )}
+                </span>
+              ) : null}
+            </div>
 
             {errors.confirmPassword ? (
-              <p className="text-xs font-medium text-destructive">
+              <p
+                id="confirm-password-error"
+                className="text-xs font-medium text-destructive"
+              >
                 {
                   errors.confirmPassword
                 }
@@ -629,23 +747,26 @@ function SignupPage() {
           {/* ERROR */}
 
           {formError ? (
-            <p className="rounded-lg border border-destructive/25 bg-destructive/8 px-3 py-2 text-sm font-medium text-destructive">
+            <div
+              role="alert"
+              className="animate-in fade-in slide-in-from-top-1 rounded-xl border border-destructive/25 bg-destructive/5 px-4 py-3 text-sm font-medium text-destructive duration-200"
+            >
               {formError}
-            </p>
+            </div>
           ) : null}
 
           {/* SUBMIT */}
 
           <Button
             type="submit"
-            className="h-11 w-full"
+            className="h-11 w-full rounded-xl text-sm font-semibold transition-all active:scale-[0.99]"
             disabled={
               submitting ||
               googleLoading
             }
           >
             {submitting ? (
-              <Loader2 className="size-4 animate-spin" />
+              <Loader2 className="mr-2 size-4 animate-spin" />
             ) : null}
 
             {submitting

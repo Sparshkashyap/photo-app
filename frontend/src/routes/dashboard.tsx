@@ -6,6 +6,8 @@ import {
 import {
   FolderPlus,
   Plus,
+  Search,
+  X,
 } from "lucide-react";
 
 import {
@@ -585,14 +587,14 @@ function DashboardPage() {
     !isAuthenticated
   ) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-background">
+      <div className="flex min-h-screen flex-col items-center justify-center gap-3 bg-background">
         <span
-          className="size-6 animate-spin rounded-full border-2 border-border border-t-primary"
+          className="size-7 animate-spin rounded-full border-2 border-border border-t-primary"
           aria-hidden="true"
         />
 
-        <span className="sr-only">
-          Loading your library
+        <span className="text-sm text-muted-foreground">
+          Loading your library...
         </span>
       </div>
     );
@@ -641,7 +643,7 @@ function DashboardPage() {
 
           <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
             <div>
-              <h1 className="text-2xl font-semibold sm:text-3xl">
+              <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">
                 My Photos
               </h1>
 
@@ -671,6 +673,7 @@ function DashboardPage() {
             <div className="flex flex-col gap-2 sm:flex-row">
               <Button
                 variant="outline"
+                className="rounded-xl transition-all hover:border-foreground/20 active:scale-[0.98]"
                 onClick={() =>
                   setCreateFolderOpen(
                     true,
@@ -683,6 +686,7 @@ function DashboardPage() {
               </Button>
 
               <Button
+                className="rounded-xl shadow-sm transition-all hover:shadow active:scale-[0.98]"
                 onClick={() =>
                   setUploadOpen(
                     true,
@@ -699,7 +703,7 @@ function DashboardPage() {
           {/* FOLDERS */}
 
           <section
-            className="mt-6 rounded-xl border border-border bg-card p-4"
+            className="mt-6 rounded-xl border border-border bg-card p-4 shadow-sm transition-shadow hover:shadow-md"
             aria-label="Folders"
           >
             <div className="mb-3 flex items-center justify-between">
@@ -716,6 +720,7 @@ function DashboardPage() {
               <Button
                 variant="ghost"
                 size="sm"
+                className="rounded-lg"
                 onClick={() =>
                   setCreateFolderOpen(
                     true,
@@ -733,6 +738,14 @@ function DashboardPage() {
                 <span className="size-4 animate-spin rounded-full border-2 border-border border-t-primary" />
 
                 Loading folders...
+              </div>
+            ) : folders.length === 0 ? (
+              <div className="flex flex-col items-center gap-2 rounded-lg border border-dashed border-border py-6 text-center">
+                <FolderPlus className="size-5 text-muted-foreground" />
+
+                <p className="text-sm text-muted-foreground">
+                  No folders yet — create one to start organizing.
+                </p>
               </div>
             ) : (
               <FolderTree
@@ -758,7 +771,9 @@ function DashboardPage() {
           {/* ACTIVE SEARCH STATUS */}
 
           {search.trim() ? (
-            <div className="mt-6 flex flex-wrap items-center gap-2 rounded-lg border border-border bg-card px-4 py-3 text-sm">
+            <div className="animate-in fade-in slide-in-from-top-1 mt-6 flex flex-wrap items-center gap-2 rounded-xl border border-border bg-card px-4 py-3 text-sm duration-200">
+              <Search className="size-4 text-muted-foreground" />
+
               <span className="text-muted-foreground">
                 Searching for
               </span>
@@ -772,9 +787,10 @@ function DashboardPage() {
                 onClick={() =>
                   setSearch("")
                 }
-                className="ml-auto text-primary hover:underline"
+                className="ml-auto inline-flex items-center gap-1 rounded-lg px-2 py-1 text-primary transition hover:bg-primary/10"
               >
-                Clear search
+                <X className="size-3.5" />
+                Clear
               </button>
             </div>
           ) : null}
@@ -791,7 +807,7 @@ function DashboardPage() {
             </div>
 
             {!loadingPhotos ? (
-              <span className="text-xs text-muted-foreground">
+              <span className="rounded-full bg-muted px-2.5 py-1 text-xs font-medium text-muted-foreground">
                 {photos.length}{" "}
                 {photos.length ===
                 1
@@ -860,6 +876,19 @@ function DashboardPage() {
           />
         </main>
       </div>
+
+      {/* FLOATING UPLOAD BUTTON — MOBILE */}
+
+      <button
+        type="button"
+        onClick={() =>
+          setUploadOpen(true)
+        }
+        aria-label="Upload photo"
+        className="fixed bottom-20 right-4 z-40 flex size-14 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-lg transition-all hover:shadow-xl active:scale-95 lg:hidden"
+      >
+        <Plus className="size-6" />
+      </button>
     </div>
   );
 }
