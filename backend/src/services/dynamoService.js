@@ -10,27 +10,43 @@ const {
   UpdateCommand,
 } = require("@aws-sdk/lib-dynamodb");
 
-const client = new DynamoDBClient({
-  region: process.env.AWS_REGION,
-});
+const client =
+  new DynamoDBClient({
+    region:
+      process.env.AWS_REGION,
+  });
 
-const dynamoDB = DynamoDBDocumentClient.from(client);
-
-const getItem = async (tableName, key) => {
-  const result = await dynamoDB.send(
-    new GetCommand({
-      TableName: tableName,
-      Key: key,
-    })
+const dynamoDB =
+  DynamoDBDocumentClient.from(
+    client
   );
+
+const getItem = async (
+  tableName,
+  key
+) => {
+  const result =
+    await dynamoDB.send(
+      new GetCommand({
+        TableName:
+          tableName,
+
+        Key: key,
+      })
+    );
 
   return result.Item;
 };
 
-const putItem = async (tableName, item) => {
+const putItem = async (
+  tableName,
+  item
+) => {
   await dynamoDB.send(
     new PutCommand({
-      TableName: tableName,
+      TableName:
+        tableName,
+
       Item: item,
     })
   );
@@ -38,26 +54,80 @@ const putItem = async (tableName, item) => {
   return item;
 };
 
-const findUserByEmail = async (tableName, email) => {
-  const result = await dynamoDB.send(
-    new QueryCommand({
-      TableName: tableName,
-      IndexName: "email-index",
-      KeyConditionExpression: "email = :email",
-      ExpressionAttributeValues: {
-        ":email": email,
-      },
-      Limit: 1,
-    })
-  );
+const findUserByEmail = async (
+  tableName,
+  email
+) => {
+  const result =
+    await dynamoDB.send(
+      new QueryCommand({
+        TableName:
+          tableName,
 
-  return result.Items?.[0] || null;
+        IndexName:
+          "email-index",
+
+        KeyConditionExpression:
+          "email = :email",
+
+        ExpressionAttributeValues: {
+          ":email": email,
+        },
+
+        Limit: 1,
+      })
+    );
+
+  return (
+    result.Items?.[0] ||
+    null
+  );
 };
 
-const findUserById = async (tableName, userId) => {
-  return getItem(tableName, {
-    userId,
-  });
+const findUserById = async (
+  tableName,
+  userId
+) => {
+  return getItem(
+    tableName,
+    {
+      userId,
+    }
+  );
+};
+
+/*
+ * Returns true only when the existing
+ * session has been active recently.
+ */
+const isSessionActive = (
+  sessionUpdatedAt,
+  timeoutMs
+) => {
+  if (!sessionUpdatedAt) {
+    return false;
+  }
+
+  const updatedAt =
+    new Date(
+      sessionUpdatedAt
+    ).getTime();
+
+  if (
+    !Number.isFinite(
+      updatedAt
+    )
+  ) {
+    return false;
+  }
+
+  const now =
+    Date.now();
+
+  return (
+    now - updatedAt <
+    timeoutMs
+  );
 };
 
 const updateUserSession = async (
@@ -65,21 +135,79 @@ const updateUserSession = async (
   userId,
   sessionId
 ) => {
-  const result = await dynamoDB.send(
-    new UpdateCommand({
-      TableName: tableName,
-      Key: {
-        userId,
-      },
-      UpdateExpression:
-        "SET activeSessionId = :sessionId, sessionUpdatedAt = :updatedAt",
-      ExpressionAttributeValues: {
-        ":sessionId": sessionId,
-        ":updatedAt": new Date().toISOString(),
-      },
-      ReturnValues: "ALL_NEW",
-    })
-  );
+  const result =
+    await dynamoDB.send(
+      new UpdateCommand({
+        TableName:
+          tableName,
+
+        Key: {
+          userId,
+        },
+
+        UpdateExpression:
+          "SET activeSessionId = :sessionId, sessionUpdatedAt = :updatedAt",
+
+        ExpressionAttributeValues: {
+          ":sessionId":
+            sessionId,
+
+          ":updatedAt":
+            new Date().toISOString(),
+        },
+
+        ReturnValues:
+          "ALL_NEW",
+      })
+    );
+
+  return result.Attributes;
+};
+
+/*
+ * Refresh the last activity time for
+ * the current session.
+ */
+const touchUserSession = async (
+  tableName,
+  userId,
+  sessionId
+) => {
+  if (
+    !userId ||
+    !sessionId
+  ) {
+    return null;
+  }
+
+  const result =
+    await dynamoDB.send(
+      new UpdateCommand({
+        TableName:
+          tableName,
+
+        Key: {
+          userId,
+        },
+
+        UpdateExpression:
+          "SET sessionUpdatedAt = :updatedAt",
+
+        ConditionExpression:
+          "activeSessionId = :sessionId",
+
+        ExpressionAttributeValues: {
+          ":sessionId":
+            sessionId,
+
+          ":updatedAt":
+            new Date().toISOString(),
+        },
+
+        ReturnValues:
+          "ALL_NEW",
+      })
+    );
 
   return result.Attributes;
 };
@@ -89,10 +217,11 @@ const clearUserSession = async (
   userId,
   sessionId
 ) => {
-  const user = await findUserById(
-    tableName,
-    userId
-  );
+  const user =
+    await findUserById(
+      tableName,
+      userId
+    );
 
   if (!user) {
     return null;
@@ -101,31 +230,47 @@ const clearUserSession = async (
   if (
     sessionId &&
     user.activeSessionId &&
-    user.activeSessionId !== sessionId
+    user.activeSessionId !==
+      sessionId
   ) {
     return user;
   }
 
-  const result = await dynamoDB.send(
-    new UpdateCommand({
-      TableName: tableName,
-      Key: {
-        userId,
-      },
-      UpdateExpression:
-        "REMOVE activeSessionId, sessionUpdatedAt",
-      ReturnValues: "ALL_NEW",
-    })
-  );
+  const result =
+    await dynamoDB.send(
+      new UpdateCommand({
+        TableName:
+          tableName,
+
+        Key: {
+          userId,
+        },
+
+        UpdateExpression:
+          "REMOVE activeSessionId, sessionUpdatedAt",
+
+        ReturnValues:
+          "ALL_NEW",
+      })
+    );
 
   return result.Attributes;
 };
 
 module.exports = {
   getItem,
+
   putItem,
+
   findUserByEmail,
+
   findUserById,
+
+  isSessionActive,
+
   updateUserSession,
+
+  touchUserSession,
+
   clearUserSession,
 };

@@ -17,6 +17,7 @@ const {
   findUserById,
   updateUserSession,
   clearUserSession,
+  isSessionActive,
 } = require("./dynamoService");
 
 const {
@@ -25,6 +26,24 @@ const {
 
 const USERS_TABLE =
   process.env.USERS_TABLE_NAME;
+
+/*
+ * Session inactivity timeout.
+ *
+ * Default: 30 minutes.
+ *
+ * The session remains valid while the user
+ * is actively using the application.
+ *
+ * If there are no authenticated requests
+ * for this amount of time, the session is
+ * considered stale and another login is allowed.
+ */
+const SESSION_IDLE_TIMEOUT_MS =
+  Number(
+    process.env.SESSION_IDLE_TIMEOUT_MS
+  ) ||
+  30 * 60 * 1000;
 
 const createSessionToken = (
   userId,
@@ -203,7 +222,19 @@ const loginUser = async ({
     throw error;
   }
 
-  if (user.activeSessionId) {
+  /*
+   * Only block the login if the previous
+   * session is still active.
+   *
+   * A stale session is automatically replaced.
+   */
+  if (
+    user.activeSessionId &&
+    isSessionActive(
+      user.sessionUpdatedAt,
+      SESSION_IDLE_TIMEOUT_MS
+    )
+  ) {
     const error = new Error(
       "Your account is already logged in on another device. Please log out there before logging in here."
     );
@@ -211,11 +242,16 @@ const loginUser = async ({
     error.statusCode = 409;
 
     error.code =
-      "ACTIVE_SESSION";
+      "ACTIVE_SESSION_EXISTS";
 
     throw error;
   }
 
+  /*
+   * Existing session is stale.
+   *
+   * We simply create a new session.
+   */
   const sessionId =
     crypto.randomUUID();
 
@@ -234,18 +270,15 @@ const loginUser = async ({
   return {
     token,
 
-    user: publicUser(user),
+    user: publicUser({
+      ...user,
+      activeSessionId: sessionId,
+    }),
   };
 };
 
 /**
  * Google OAuth login
- *
- * Creates a new user if the Google email
- * does not already exist.
- *
- * If the user already exists, the existing
- * DynamoDB user is reused.
  */
 const loginWithGoogle = async ({
   idToken,
@@ -283,7 +316,7 @@ const loginWithGoogle = async ({
         audience:
           process.env.GOOGLE_CLIENT_ID,
       });
-  } catch (error) {
+  } catch {
     const authError =
       new Error(
         "Invalid Google authentication token"
@@ -351,11 +384,16 @@ const loginWithGoogle = async ({
    */
   if (user) {
     /*
-     * If this account already has an active
-     * session, preserve the same single-device
-     * session rule used by password login.
+     * Block only if the previous session
+     * is still active.
      */
-    if (user.activeSessionId) {
+    if (
+      user.activeSessionId &&
+      isSessionActive(
+        user.sessionUpdatedAt,
+        SESSION_IDLE_TIMEOUT_MS
+      )
+    ) {
       const error = new Error(
         "Your account is already logged in on another device. Please log out there before logging in here."
       );
@@ -363,7 +401,7 @@ const loginWithGoogle = async ({
       error.statusCode = 409;
 
       error.code =
-        "ACTIVE_SESSION";
+        "ACTIVE_SESSION_EXISTS";
 
       throw error;
     }
@@ -371,10 +409,6 @@ const loginWithGoogle = async ({
     const sessionId =
       crypto.randomUUID();
 
-    /*
-     * Preserve passwordHash if this was
-     * originally a password account.
-     */
     user = {
       ...user,
 
@@ -428,7 +462,8 @@ const loginWithGoogle = async ({
       activeSessionId:
         sessionId,
 
-      sessionUpdatedAt: now,
+      sessionUpdatedAt:
+        now,
     };
 
     await putItem(

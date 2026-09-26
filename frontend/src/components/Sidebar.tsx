@@ -83,13 +83,35 @@ function NavigationItems({
               onClick={
                 onNavigate
               }
-              className={`flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-colors ${
+              aria-current={
+                active
+                  ? "page"
+                  : undefined
+              }
+              className={`group relative flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-all duration-150 ${
                 active
                   ? "bg-primary/10 text-primary"
-                  : "text-muted-foreground hover:bg-muted hover:text-foreground"
+                  : "text-muted-foreground hover:bg-muted hover:text-foreground active:scale-[0.98]"
               }`}
             >
-              <Icon className="size-4 shrink-0" />
+              {/* ACTIVE INDICATOR */}
+
+              <span
+                className={`absolute left-0 top-1/2 h-5 w-1 -translate-y-1/2 rounded-r-full bg-primary transition-all duration-200 ${
+                  active
+                    ? "opacity-100"
+                    : "opacity-0"
+                }`}
+                aria-hidden="true"
+              />
+
+              <Icon
+                className={`size-4 shrink-0 transition-transform duration-150 ${
+                  active
+                    ? ""
+                    : "group-hover:scale-110"
+                }`}
+              />
 
               <span>
                 {item.label}
@@ -123,7 +145,7 @@ export function MobileNav() {
   ] = useState(false);
 
   return (
-    <div className="sticky top-0 z-40 border-b border-border bg-background/95 backdrop-blur md:hidden">
+    <div className="sticky top-0 z-40 border-b border-border bg-background/80 backdrop-blur-md supports-[backdrop-filter]:bg-background/60 md:hidden">
       <div className="flex h-14 items-center px-3">
         <Sheet
           open={open}
@@ -137,6 +159,7 @@ export function MobileNav() {
             <Button
               variant="ghost"
               size="icon"
+              className="rounded-lg transition-transform active:scale-90"
               aria-label="Open navigation"
             >
               <Menu className="size-5" />
@@ -156,6 +179,7 @@ export function MobileNav() {
                 <Button
                   variant="ghost"
                   size="icon"
+                  className="rounded-lg transition-transform active:scale-90"
                   onClick={() =>
                     setOpen(
                       false,
@@ -186,8 +210,11 @@ export function MobileNav() {
 
         <Link
           to="/dashboard"
-          className="ml-2 text-sm font-semibold"
+          className="ml-2 flex items-center gap-1.5 text-sm font-semibold tracking-tight transition-opacity active:opacity-70"
         >
+          <span className="flex size-6 items-center justify-center rounded-lg bg-primary/10 text-primary">
+            <Image className="size-3.5" />
+          </span>
           Photos
         </Link>
       </div>

@@ -1,22 +1,41 @@
 import { APP_NAME } from "@/lib/constants";
 import { cn } from "@/lib/utils";
 
+// Six blades rotated around the center — reads as a camera aperture/iris,
+// which ties the mark to "photos" rather than a generic sunburst.
+const APERTURE_BLADE_ANGLES = [0, 60, 120, 180, 240, 300];
+
 export function LogoMark({ className }: { className?: string }) {
   return (
     <span
       aria-hidden="true"
       className={cn(
-        "inline-flex size-9 items-center justify-center rounded-xl bg-accent",
+        "inline-flex size-9 items-center justify-center rounded-xl bg-accent transition-transform duration-200",
         className,
       )}
     >
-      <svg viewBox="0 0 24 24" className="size-5" fill="none" aria-hidden="true">
-        <circle cx="12" cy="12" r="3.4" fill="currentColor" className="text-primary" />
-        <g className="text-primary" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
-          <path d="M12 3v3.2" opacity="0.9" />
-          <path d="M12 17.8V21" opacity="0.5" />
-          <path d="M3 12h3.2" opacity="0.7" />
-          <path d="M17.8 12H21" opacity="0.35" />
+      <svg
+        viewBox="0 0 24 24"
+        className="size-5"
+        fill="none"
+        aria-hidden="true"
+      >
+        <g className="text-primary">
+          {APERTURE_BLADE_ANGLES.map((angle, index) => (
+            <rect
+              key={angle}
+              x="11"
+              y="2.75"
+              width="2"
+              height="6.5"
+              rx="1"
+              fill="currentColor"
+              opacity={1 - index * 0.12}
+              transform={`rotate(${angle} 12 12)`}
+            />
+          ))}
+
+          <circle cx="12" cy="12" r="2.6" fill="currentColor" />
         </g>
       </svg>
     </span>
@@ -26,8 +45,13 @@ export function LogoMark({ className }: { className?: string }) {
 export function Logo({ className }: { className?: string }) {
   return (
     <span className={cn("inline-flex items-center gap-2.5", className)}>
-      <LogoMark />
-      <span className="font-display text-lg font-semibold tracking-tight">{APP_NAME}</span>
+      <LogoMark className="hover:rotate-45" />
+
+      <span className="font-display text-lg font-semibold tracking-tight">
+        {APP_NAME}
+      </span>
     </span>
   );
 }
+
+export default Logo;

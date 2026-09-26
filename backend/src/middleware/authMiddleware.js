@@ -4,10 +4,18 @@ const {
 
 const {
   findUserById,
+  touchUserSession,
+  clearUserSession,
 } = require("../services/dynamoService");
 
 const USERS_TABLE =
   process.env.USERS_TABLE_NAME;
+
+const SESSION_IDLE_TIMEOUT_MS =
+  Number(
+    process.env.SESSION_IDLE_TIMEOUT_MS
+  ) ||
+  30 * 60 * 1000;
 
 const authMiddleware = async (
   req,
@@ -66,7 +74,8 @@ const authMiddleware = async (
       return res.status(401).json({
         success: false,
         code: "USER_NOT_FOUND",
-        message: "User no longer exists",
+        message:
+          "User no longer exists",
       });
     }
 
@@ -79,13 +88,62 @@ const authMiddleware = async (
         success: false,
         code: "SESSION_REPLACED",
         message:
-          "Your account is logged in on another device. Please log out there before using this device.",
+          "Your session is no longer active. Please log in again.",
+      });
+    }
+
+    const updatedAt =
+      user.sessionUpdatedAt
+        ? new Date(
+            user.sessionUpdatedAt
+          ).getTime()
+        : 0;
+
+    const sessionIsActive =
+      Number.isFinite(updatedAt) &&
+      Date.now() - updatedAt <
+        SESSION_IDLE_TIMEOUT_MS;
+
+    if (!sessionIsActive) {
+      await clearUserSession(
+        USERS_TABLE,
+        decoded.userId,
+        decoded.sessionId
+      );
+
+      return res.status(401).json({
+        success: false,
+        code: "SESSION_EXPIRED",
+        message:
+          "Your session expired due to inactivity. Please log in again.",
+      });
+    }
+
+    /*
+     * User is active.
+     * Extend the session lease.
+     */
+    try {
+      await touchUserSession(
+        USERS_TABLE,
+        decoded.userId,
+        decoded.sessionId
+      );
+    } catch {
+      return res.status(401).json({
+        success: false,
+        code: "SESSION_REPLACED",
+        message:
+          "Your session is no longer active. Please log in again.",
       });
     }
 
     req.user = {
-      userId: decoded.userId,
-      sessionId: decoded.sessionId,
+      userId:
+        decoded.userId,
+
+      sessionId:
+        decoded.sessionId,
     };
 
     next();
@@ -111,4 +169,5 @@ const authMiddleware = async (
   }
 };
 
-module.exports = authMiddleware;
+module.exports =
+  authMiddleware;
