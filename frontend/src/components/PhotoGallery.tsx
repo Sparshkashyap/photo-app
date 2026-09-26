@@ -1,4 +1,5 @@
 import {
+  AlertTriangle,
   ImagePlus,
   Loader2,
 } from "lucide-react";
@@ -24,6 +25,15 @@ const compactGridClass =
 
 const SETTINGS_KEY =
   "photo-app-settings";
+
+// Same event the Settings page dispatches after a write — lets this
+// grid react immediately in the same tab, without polling localStorage.
+const SETTINGS_CHANGED_EVENT =
+  "photo-app-settings-changed";
+
+// Cap how many cards get a staggered delay so a huge library
+// doesn't leave the last rows waiting behind a long animation queue.
+const MAX_STAGGERED_ITEMS = 24;
 
 type PhotoAppSettings = {
   compactGrid?: boolean;
@@ -115,11 +125,11 @@ export function PhotoGallery({
   );
 
   // ==================================================
-  // Listen for settings changes
+  // Listen for settings changes (other tabs + this tab)
   // ==================================================
 
   useEffect(() => {
-    function handleStorageChange() {
+    function refreshCompactGrid() {
       setCompactGrid(
         getCompactGridSetting(),
       );
@@ -127,38 +137,23 @@ export function PhotoGallery({
 
     window.addEventListener(
       "storage",
-      handleStorageChange,
+      refreshCompactGrid,
+    );
+
+    window.addEventListener(
+      SETTINGS_CHANGED_EVENT,
+      refreshCompactGrid,
     );
 
     return () => {
       window.removeEventListener(
         "storage",
-        handleStorageChange,
+        refreshCompactGrid,
       );
-    };
-  }, []);
 
-  // ==================================================
-  // Same-tab settings refresh
-  // ==================================================
-
-  useEffect(() => {
-    const interval =
-      window.setInterval(() => {
-        const next =
-          getCompactGridSetting();
-
-        setCompactGrid(
-          (previous) =>
-            previous === next
-              ? previous
-              : next,
-        );
-      }, 500);
-
-    return () => {
-      window.clearInterval(
-        interval,
+      window.removeEventListener(
+        SETTINGS_CHANGED_EVENT,
+        refreshCompactGrid,
       );
     };
   }, []);
@@ -201,7 +196,7 @@ export function PhotoGallery({
     return (
       <div className="flex min-h-[300px] flex-col items-center justify-center gap-4 rounded-xl border border-border bg-surface px-6 py-12 text-center">
         <div className="flex size-14 items-center justify-center rounded-full bg-destructive/10">
-          <Loader2 className="size-6 text-destructive" />
+          <AlertTriangle className="size-6 text-destructive" />
         </div>
 
         <div>
@@ -272,15 +267,24 @@ export function PhotoGallery({
       aria-label="Photo gallery"
     >
       {photos.map(
-        (photo) => {
+        (photo, index) => {
           const isDeleting =
             deletingPhotoId ===
             photo.photoId;
 
+          const staggerDelayMs =
+            Math.min(
+              index,
+              MAX_STAGGERED_ITEMS,
+            ) * 20;
+
           return (
             <div
               key={photo.photoId}
-              className="relative min-w-0"
+              className="relative min-w-0 motion-safe:animate-in motion-safe:fade-in motion-safe:slide-in-from-bottom-1 motion-safe:duration-300 motion-safe:fill-mode-both"
+              style={{
+                animationDelay: `${staggerDelayMs}ms`,
+              }}
             >
               <PhotoCard
                 photo={photo}

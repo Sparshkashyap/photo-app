@@ -5,8 +5,10 @@ import {
 
 import {
   FolderPlus,
+  Loader2,
   Plus,
   Search,
+  SlidersHorizontal,
   X,
 } from "lucide-react";
 
@@ -46,6 +48,19 @@ import {
 
 import type { Folder } from "@/types/folder";
 import type { Photo } from "@/types/photo";
+
+const SORT_LABELS: Record<PhotoSort, string> = {
+  newest: "Newest first",
+  oldest: "Oldest first",
+  name_asc: "Name: A → Z",
+  name_desc: "Name: Z → A",
+};
+
+const TYPE_LABELS: Record<PhotoType, string> = {
+  all: "All types",
+  image: "Images only",
+  video: "Videos only",
+};
 
 export const Route = createFileRoute("/dashboard")({
   head: () => ({
@@ -137,6 +152,15 @@ function DashboardPage() {
     type,
     setType,
   ] = useState<PhotoType>("all");
+
+  const hasNonDefaultFilters =
+    sort !== "newest" ||
+    type !== "all";
+
+  function clearFilters() {
+    setSort("newest");
+    setType("all");
+  }
 
   // ==================================================
   // AUTH REDIRECT
@@ -588,8 +612,8 @@ function DashboardPage() {
   ) {
     return (
       <div className="flex min-h-screen flex-col items-center justify-center gap-3 bg-background">
-        <span
-          className="size-7 animate-spin rounded-full border-2 border-border border-t-primary"
+        <Loader2
+          className="size-7 animate-spin text-primary"
           aria-hidden="true"
         />
 
@@ -700,6 +724,42 @@ function DashboardPage() {
             </div>
           </div>
 
+          {/* ACTIVE SORT / TYPE FILTERS */}
+
+          {hasNonDefaultFilters ? (
+            <div className="animate-in fade-in slide-in-from-top-1 mt-4 flex flex-wrap items-center gap-2 rounded-xl border border-primary/30 bg-primary/5 px-4 py-2.5 text-sm duration-200">
+              <SlidersHorizontal className="size-4 text-primary" />
+
+              <span className="text-muted-foreground">
+                Showing
+              </span>
+
+              <span className="font-medium text-foreground">
+                {TYPE_LABELS[type]}
+              </span>
+
+              <span
+                className="text-muted-foreground"
+                aria-hidden="true"
+              >
+                ·
+              </span>
+
+              <span className="font-medium text-foreground">
+                {SORT_LABELS[sort]}
+              </span>
+
+              <button
+                type="button"
+                onClick={clearFilters}
+                className="ml-auto inline-flex items-center gap-1 rounded-lg px-2 py-1 text-primary transition hover:bg-primary/10"
+              >
+                <X className="size-3.5" />
+                Clear filters
+              </button>
+            </div>
+          ) : null}
+
           {/* FOLDERS */}
 
           <section
@@ -735,7 +795,7 @@ function DashboardPage() {
 
             {loadingFolders ? (
               <div className="flex items-center gap-2 py-3 text-sm text-muted-foreground">
-                <span className="size-4 animate-spin rounded-full border-2 border-border border-t-primary" />
+                <Loader2 className="size-4 animate-spin text-primary" />
 
                 Loading folders...
               </div>
@@ -771,7 +831,7 @@ function DashboardPage() {
           {/* ACTIVE SEARCH STATUS */}
 
           {search.trim() ? (
-            <div className="animate-in fade-in slide-in-from-top-1 mt-6 flex flex-wrap items-center gap-2 rounded-xl border border-border bg-card px-4 py-3 text-sm duration-200">
+            <div className="animate-in fade-in slide-in-from-top-1 mt-4 flex flex-wrap items-center gap-2 rounded-xl border border-border bg-card px-4 py-3 text-sm duration-200">
               <Search className="size-4 text-muted-foreground" />
 
               <span className="text-muted-foreground">

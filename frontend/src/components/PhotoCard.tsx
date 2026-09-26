@@ -2,6 +2,7 @@ import {
   Heart,
   ImageOff,
   Loader2,
+  RotateCw,
   Video,
   X,
 } from "lucide-react";
@@ -57,6 +58,12 @@ type PhotoAppSettings = {
 
 const SETTINGS_KEY =
   "photo-app-settings";
+
+// Dispatched by the Settings page after every write, so preferences
+// (autoplay, file names, ...) take effect immediately in this tab too —
+// the native "storage" event only fires in *other* tabs.
+const SETTINGS_CHANGED_EVENT =
+  "photo-app-settings-changed";
 
 function getSettings(): PhotoAppSettings {
   if (
@@ -114,6 +121,11 @@ export function PhotoCard({
   ] = useState(false);
 
   const [
+    mediaLoaded,
+    setMediaLoaded,
+  ] = useState(false);
+
+  const [
     isFavorite,
     setIsFavorite,
   ] = useState(
@@ -121,11 +133,11 @@ export function PhotoCard({
   );
 
   // ==================================================
-  // Listen for settings changes
+  // Listen for settings changes (same tab + other tabs)
   // ==================================================
 
   useEffect(() => {
-    const handleStorage =
+    const refreshSettings =
       () => {
         setSettings(
           getSettings(),
@@ -134,13 +146,23 @@ export function PhotoCard({
 
     window.addEventListener(
       "storage",
-      handleStorage,
+      refreshSettings,
+    );
+
+    window.addEventListener(
+      SETTINGS_CHANGED_EVENT,
+      refreshSettings,
     );
 
     return () => {
       window.removeEventListener(
         "storage",
-        handleStorage,
+        refreshSettings,
+      );
+
+      window.removeEventListener(
+        SETTINGS_CHANGED_EVENT,
+        refreshSettings,
       );
     };
   }, []);
@@ -258,14 +280,18 @@ export function PhotoCard({
     true;
 
   // ==================================================
-  // Reset media error when photo changes
+  // Reset media state when the photo (or its URL) changes
   // ==================================================
 
   useEffect(() => {
     setMediaError(false);
+    // Videos report "loaded" via onLoadedData below; for images
+    // we still want the fade-in, so start hidden until onLoad fires.
+    setMediaLoaded(isVideo);
   }, [
     photo.photoId,
     mediaUrl,
+    isVideo,
   ]);
 
   // ==================================================
@@ -314,6 +340,11 @@ export function PhotoCard({
 
   // ==================================================
   // Open fullscreen preview
+  //
+  // A single click opens the preview (matching the
+  // role="button" semantics below and the Enter/Space
+  // keyboard handler) — a double-click requirement here
+  // was invisible to users and inconsistent with keyboard use.
   // ==================================================
 
   function handlePreviewOpen(
@@ -336,7 +367,7 @@ export function PhotoCard({
       return;
     }
 
-    if (!mediaUrl) {
+    if (!mediaUrl || mediaError) {
       return;
     }
 
@@ -357,18 +388,31 @@ export function PhotoCard({
     ) {
       event.preventDefault();
 
-      if (mediaUrl) {
+      if (mediaUrl && !mediaError) {
         setPreviewOpen(true);
       }
     }
   }
 
   // ==================================================
-  // Media error
+  // Media error / retry
   // ==================================================
 
   function handleMediaError() {
     setMediaError(true);
+    setMediaLoaded(true);
+  }
+
+  function handleMediaLoaded() {
+    setMediaLoaded(true);
+  }
+
+  function handleRetryMedia(
+    event: ReactMouseEvent,
+  ) {
+    event.stopPropagation();
+    setMediaError(false);
+    setMediaLoaded(false);
   }
 
   // ==================================================
@@ -403,7 +447,7 @@ export function PhotoCard({
         ================================================== */}
 
         <div
-          onDoubleClick={
+          onClick={
             handlePreviewOpen
           }
           onKeyDown={
@@ -412,12 +456,18 @@ export function PhotoCard({
           role="button"
           tabIndex={0}
           aria-label={`Open ${displayName} preview`}
-          className={`relative outline-none ${
-            mediaUrl
+          className={`relative rounded-xl outline-none transition focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background ${
+            mediaUrl && !mediaError
               ? "cursor-zoom-in"
               : "cursor-default"
           }`}
         >
+          {/* Loading shimmer, visible until the media reports it's ready */}
+
+          {mediaUrl && !mediaError && !mediaLoaded ? (
+            <div className="absolute inset-0 z-[1] animate-pulse bg-muted" />
+          ) : null}
+
           {/* Media unavailable */}
 
           {!mediaUrl ||
@@ -434,6 +484,17 @@ export function PhotoCard({
                   ? "Unable to load media"
                   : "Preview unavailable"}
               </span>
+
+              {mediaError ? (
+                <button
+                  type="button"
+                  onClick={handleRetryMedia}
+                  className="mt-1 inline-flex items-center gap-1.5 rounded-full border border-border bg-background px-3 py-1 text-xs font-medium transition hover:bg-accent"
+                >
+                  <RotateCw className="size-3" />
+                  Retry
+                </button>
+              ) : null}
             </div>
           ) : isVideo ? (
             <video
@@ -447,10 +508,17 @@ export function PhotoCard({
                 autoplayVideos
               }
               playsInline
+              onLoadedData={
+                handleMediaLoaded
+              }
               onError={
                 handleMediaError
               }
-              className="aspect-square w-full object-cover transition-transform duration-300 ease-out group-hover:scale-[1.04]"
+              className={`aspect-square w-full object-cover transition-[opacity,transform] duration-300 ease-out group-hover:scale-[1.04] ${
+                mediaLoaded
+                  ? "opacity-100"
+                  : "opacity-0"
+              }`}
             />
           ) : (
             <img
@@ -458,10 +526,17 @@ export function PhotoCard({
               alt={displayName}
               loading="lazy"
               decoding="async"
+              onLoad={
+                handleMediaLoaded
+              }
               onError={
                 handleMediaError
               }
-              className="aspect-square w-full object-cover transition-transform duration-300 ease-out group-hover:scale-[1.04]"
+              className={`aspect-square w-full object-cover transition-[opacity,transform] duration-300 ease-out group-hover:scale-[1.04] ${
+                mediaLoaded
+                  ? "opacity-100"
+                  : "opacity-0"
+              }`}
             />
           )}
         </div>
@@ -471,7 +546,7 @@ export function PhotoCard({
         ================================================== */}
 
         {showFileNames ? (
-          <div className="pointer-events-none absolute inset-x-0 bottom-0 h-24 bg-gradient-to-t from-black/60 to-transparent opacity-0 transition-opacity duration-200 group-hover:opacity-100 sm:block" />
+          <div className="pointer-events-none absolute inset-x-0 bottom-0 h-24 bg-gradient-to-t from-black/60 to-transparent opacity-0 transition-opacity duration-200 group-hover:opacity-100" />
         ) : null}
 
         {/* ==================================================
@@ -480,7 +555,7 @@ export function PhotoCard({
 
         {isFavorite ? (
           <div
-            className="pointer-events-none absolute left-2 top-2 z-10 flex size-8 items-center justify-center rounded-full bg-black/45 text-white backdrop-blur-sm"
+            className="pointer-events-none absolute left-2 top-2 z-10 flex size-8 animate-in zoom-in-50 items-center justify-center rounded-full bg-black/45 text-white backdrop-blur-sm duration-200"
             aria-label="Favorite photo"
             title="Favorite"
           >
@@ -504,9 +579,7 @@ export function PhotoCard({
 
         <div
           className="absolute right-2 top-2 z-10"
-          onDoubleClick={(
-            event,
-          ) => {
+          onClick={(event) => {
             event.stopPropagation();
           }}
         >
@@ -553,7 +626,7 @@ export function PhotoCard({
 
       {previewOpen ? (
         <div
-          className="fixed inset-0 z-[100] flex items-center justify-center bg-black/85 p-4 backdrop-blur-sm sm:p-8"
+          className="fixed inset-0 z-[100] flex animate-in fade-in items-center justify-center bg-black/85 p-4 backdrop-blur-sm duration-150 sm:p-8"
           role="dialog"
           aria-modal="true"
           aria-label={`Preview of ${displayName}`}
@@ -578,7 +651,7 @@ export function PhotoCard({
           {/* Preview content */}
 
           <div
-            className="relative flex max-h-[92vh] max-w-[95vw] items-center justify-center"
+            className="relative flex max-h-[92vh] max-w-[95vw] animate-in zoom-in-95 items-center justify-center duration-150"
             onClick={(
               event,
             ) => {

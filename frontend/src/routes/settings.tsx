@@ -45,6 +45,12 @@ import { useAuth } from "@/hooks/useAuth";
 const SETTINGS_KEY =
   "photo-app-settings";
 
+// Other components (PhotoCard, PhotoGallery) listen for this so a
+// toggle here takes effect immediately, without a reload — the native
+// "storage" event only reaches *other* tabs, never this one.
+const SETTINGS_CHANGED_EVENT =
+  "photo-app-settings-changed";
+
 type SettingsState = {
   compactGrid: boolean;
   confirmTrash: boolean;
@@ -59,6 +65,24 @@ const DEFAULT_SETTINGS: SettingsState = {
   autoplayVideos: false,
   showFileNames: true,
   darkMode: false,
+};
+
+const SETTING_TOAST_COPY: Record<
+  keyof SettingsState,
+  (value: boolean) => string
+> = {
+  darkMode: (value) =>
+    value ? "Dark mode turned on" : "Dark mode turned off",
+  compactGrid: (value) =>
+    value ? "Showing a denser grid" : "Back to the standard grid",
+  showFileNames: (value) =>
+    value ? "File names will show on photos" : "File names are now hidden",
+  autoplayVideos: (value) =>
+    value ? "Videos will autoplay" : "Videos won't autoplay",
+  confirmTrash: (value) =>
+    value
+      ? "You'll be asked to confirm before deleting"
+      : "Deleting will no longer ask for confirmation",
 };
 
 // ==================================================
@@ -88,6 +112,11 @@ function SettingsPage() {
     useState<SettingsState>(
       DEFAULT_SETTINGS,
     );
+
+  const [
+    loggingOut,
+    setLoggingOut,
+  ] = useState(false);
 
   // --------------------------------------------------
   // LOAD SETTINGS
@@ -142,6 +171,21 @@ function SettingsPage() {
   // SAVE SETTINGS
   // --------------------------------------------------
 
+  function persistSettings(
+    next: SettingsState,
+  ) {
+    localStorage.setItem(
+      SETTINGS_KEY,
+      JSON.stringify(next),
+    );
+
+    // Same-tab listeners (gallery grid, photo cards) pick this up
+    // immediately; other open tabs still get the native "storage" event.
+    window.dispatchEvent(
+      new Event(SETTINGS_CHANGED_EVENT),
+    );
+  }
+
   function updateSetting<
     K extends keyof SettingsState,
   >(
@@ -154,14 +198,12 @@ function SettingsPage() {
     };
 
     setSettings(next);
-
-    localStorage.setItem(
-      SETTINGS_KEY,
-      JSON.stringify(next),
-    );
+    persistSettings(next);
 
     toast.success(
-      "Setting updated",
+      SETTING_TOAST_COPY[key](
+        value as boolean,
+      ),
     );
   }
 
@@ -183,11 +225,8 @@ function SettingsPage() {
       DEFAULT_SETTINGS,
     );
 
-    localStorage.setItem(
-      SETTINGS_KEY,
-      JSON.stringify(
-        DEFAULT_SETTINGS,
-      ),
+    persistSettings(
+      DEFAULT_SETTINGS,
     );
 
     document.documentElement.classList.remove(
@@ -203,17 +242,33 @@ function SettingsPage() {
   // LOGOUT
   // --------------------------------------------------
 
-  function handleLogout() {
-    logout();
+  async function handleLogout() {
+    if (loggingOut) {
+      return;
+    }
 
-    toast.success(
-      "You're logged out",
-    );
+    setLoggingOut(true);
 
-    void navigate({
-      to: "/login",
-      replace: true,
-    });
+    try {
+      await logout();
+
+      toast.success(
+        "You're logged out",
+      );
+
+      await navigate({
+        to: "/login",
+        replace: true,
+      });
+    } catch (error) {
+      toast.error(
+        error instanceof Error
+          ? error.message
+          : "Unable to log out.",
+      );
+    } finally {
+      setLoggingOut(false);
+    }
   }
 
   // --------------------------------------------------
@@ -243,7 +298,7 @@ function SettingsPage() {
                   to: "/dashboard",
                 })
               }
-              className="mb-5 inline-flex items-center gap-2 text-sm text-muted-foreground transition hover:text-foreground"
+              className="mb-5 inline-flex items-center gap-2 rounded-md text-sm text-muted-foreground transition hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
             >
               <ArrowLeft className="size-4" />
 
@@ -296,7 +351,7 @@ function SettingsPage() {
                     Name
                   </p>
 
-                  <p className="mt-1 font-medium capitalize">
+                  <p className="mt-1 font-medium">
                     {user?.name ||
                       "Unknown"}
                   </p>
@@ -660,13 +715,16 @@ function SettingsPage() {
 
                 <Button
                   variant="destructive"
-                  onClick={
-                    handleLogout
+                  onClick={() =>
+                    void handleLogout()
                   }
+                  disabled={loggingOut}
                 >
                   <LogOut className="size-4" />
 
-                  Log out
+                  {loggingOut
+                    ? "Logging out..."
+                    : "Log out"}
                 </Button>
 
               </div>
@@ -726,7 +784,7 @@ function SettingRow({
         onClick={() =>
           onChange(!checked)
         }
-        className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition ${
+        className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background ${
           checked
             ? "bg-primary"
             : "bg-muted-foreground/30"

@@ -64,6 +64,7 @@ type MenuPosition = {
 
 const MENU_GAP = 8;
 const VIEWPORT_GAP = 8;
+const MENU_ITEM_SELECTOR = '[role="menuitem"]:not(:disabled)';
 
 export function PhotoMenu({
   photo,
@@ -146,6 +147,67 @@ export function PhotoMenu({
     };
   }, [menuOpen]);
 
+  // ==================================================
+  // Roving focus: Up/Down move between items, Home/End
+  // jump to the first/last. This is what role="menu" +
+  // role="menuitem" implies for keyboard users, but there
+  // was no key handling for it beyond the global Escape.
+  // ==================================================
+
+  useEffect(() => {
+    if (!menuOpen) {
+      return;
+    }
+
+    function getItems(): HTMLElement[] {
+      const menu = menuRef.current;
+
+      if (!menu) {
+        return [];
+      }
+
+      return Array.from(
+        menu.querySelectorAll<HTMLElement>(MENU_ITEM_SELECTOR),
+      );
+    }
+
+    function handleMenuKeyDown(event: KeyboardEvent) {
+      const items = getItems();
+
+      if (items.length === 0) {
+        return;
+      }
+
+      const activeElement = document.activeElement;
+      const currentIndex = items.findIndex(
+        (item) => item === activeElement,
+      );
+
+      if (event.key === "ArrowDown") {
+        event.preventDefault();
+        const next = items[(currentIndex + 1 + items.length) % items.length];
+        next?.focus();
+      } else if (event.key === "ArrowUp") {
+        event.preventDefault();
+        const previous =
+          items[(currentIndex - 1 + items.length) % items.length];
+        previous?.focus();
+      } else if (event.key === "Home") {
+        event.preventDefault();
+        items[0]?.focus();
+      } else if (event.key === "End") {
+        event.preventDefault();
+        items[items.length - 1]?.focus();
+      }
+    }
+
+    document.addEventListener("keydown", handleMenuKeyDown);
+
+    return () => {
+      document.removeEventListener("keydown", handleMenuKeyDown);
+    };
+  }, [menuOpen]);
+
   useLayoutEffect(() => {
     if (!menuOpen) {
       return;
@@ -193,6 +255,11 @@ export function PhotoMenu({
         left,
         ready: true,
       });
+
+      // Focus the first item once the menu has actually settled
+      // in place, so screen readers announce it in its final spot.
+      const items = menu.querySelectorAll<HTMLElement>(MENU_ITEM_SELECTOR);
+      items[0]?.focus();
     };
 
     setMenuPosition((previous) => ({
@@ -530,19 +597,23 @@ export function PhotoMenu({
           ref={menuRef}
           role="menu"
           aria-label={`Options for ${photo.name}`}
-          className="fixed z-[200] w-[min(13rem,calc(100vw-1rem))] rounded-xl border border-border bg-popover p-1.5 text-popover-foreground shadow-2xl ring-1 ring-black/5"
+          className="fixed z-[200] w-[min(13rem,calc(100vw-1rem))] origin-top-right rounded-xl border border-border bg-popover p-1.5 text-popover-foreground shadow-2xl ring-1 ring-black/5 transition-[opacity,transform] duration-100 ease-out"
           style={{
             top: menuPosition.top,
             left: menuPosition.left,
             opacity: menuPosition.ready ? 1 : 0,
+            transform: menuPosition.ready
+              ? "scale(1)"
+              : "scale(0.96)",
             pointerEvents: menuPosition.ready ? "auto" : "none",
           }}
         >
           <button
             type="button"
             role="menuitem"
+            tabIndex={-1}
             onClick={openRename}
-            className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm transition-colors hover:bg-accent"
+            className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm transition-colors hover:bg-accent focus:bg-accent focus:outline-none"
           >
             <Pencil className="size-4 shrink-0" />
             <span>Rename</span>
@@ -551,8 +622,9 @@ export function PhotoMenu({
           <button
             type="button"
             role="menuitem"
+            tabIndex={-1}
             onClick={openMove}
-            className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm transition-colors hover:bg-accent"
+            className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm transition-colors hover:bg-accent focus:bg-accent focus:outline-none"
           >
             <FolderInput className="size-4 shrink-0" />
             <span>Move to folder</span>
@@ -561,11 +633,12 @@ export function PhotoMenu({
           <button
             type="button"
             role="menuitem"
+            tabIndex={-1}
             onClick={() => {
               closeMenu();
               onDownload?.();
             }}
-            className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm transition-colors hover:bg-accent"
+            className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm transition-colors hover:bg-accent focus:bg-accent focus:outline-none"
           >
             <Download className="size-4 shrink-0" />
             <span>Download</span>
@@ -574,11 +647,12 @@ export function PhotoMenu({
           <button
             type="button"
             role="menuitem"
+            tabIndex={-1}
             onClick={() => {
               void handleFavorite();
             }}
             disabled={favoriting}
-            className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm transition-colors hover:bg-accent disabled:cursor-not-allowed disabled:opacity-60"
+            className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm transition-colors hover:bg-accent focus:bg-accent focus:outline-none disabled:cursor-not-allowed disabled:opacity-60"
           >
             {favoriting ? (
               <Loader2 className="size-4 shrink-0 animate-spin" />
@@ -601,11 +675,12 @@ export function PhotoMenu({
           <button
             type="button"
             role="menuitem"
+            tabIndex={-1}
             onClick={() => {
               void handleShare();
             }}
             disabled={sharing}
-            className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm transition-colors hover:bg-accent disabled:cursor-not-allowed disabled:opacity-60"
+            className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm transition-colors hover:bg-accent focus:bg-accent focus:outline-none disabled:cursor-not-allowed disabled:opacity-60"
           >
             {sharing ? (
               <Loader2 className="size-4 shrink-0 animate-spin" />
@@ -620,11 +695,12 @@ export function PhotoMenu({
           <button
             type="button"
             role="menuitem"
+            tabIndex={-1}
             onClick={() => {
               closeMenu();
               setDeleteOpen(true);
             }}
-            className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm text-destructive transition-colors hover:bg-destructive/10"
+            className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm text-destructive transition-colors hover:bg-destructive/10 focus:bg-destructive/10 focus:outline-none"
           >
             <Trash2 className="size-4 shrink-0" />
             <span>Move to Trash</span>
@@ -649,7 +725,7 @@ export function PhotoMenu({
           aria-haspopup="menu"
           aria-label={`Options for ${photo.name}`}
           title="Photo options"
-          className="border-border bg-background/95 shadow-sm sm:opacity-0 sm:transition-opacity sm:group-hover:opacity-100"
+          className="border-border bg-background/95 shadow-sm sm:opacity-0 sm:transition-opacity sm:group-hover:opacity-100 sm:group-focus-within:opacity-100"
         >
           <MoreVertical className="size-4" />
         </Button>
@@ -696,7 +772,13 @@ export function PhotoMenu({
               className="flex h-10 w-full rounded-md border border-border bg-background px-3 text-sm outline-none focus:border-primary focus:ring-2 focus:ring-primary/20"
             />
 
-            <p className="text-xs text-muted-foreground">
+            <p
+              className={`text-xs ${
+                newName.length > 110
+                  ? "text-destructive"
+                  : "text-muted-foreground"
+              }`}
+            >
               {newName.length}/120
             </p>
           </div>
@@ -715,7 +797,7 @@ export function PhotoMenu({
               disabled={renaming || !newName.trim()}
             >
               {renaming ? (
-                <Loader2 className="size-4" />
+                <Loader2 className="size-4 animate-spin" />
               ) : (
                 <Pencil className="size-4" />
               )}
@@ -784,7 +866,7 @@ export function PhotoMenu({
               disabled={moving}
             >
               {moving ? (
-                <Loader2 className="size-4" />
+                <Loader2 className="size-4 animate-spin" />
               ) : (
                 <FolderInput className="size-4" />
               )}
@@ -909,7 +991,7 @@ export function PhotoMenu({
               disabled={deleting}
             >
               {deleting ? (
-                <Loader2 className="size-4" />
+                <Loader2 className="size-4 animate-spin" />
               ) : (
                 <Trash2 className="size-4" />
               )}
