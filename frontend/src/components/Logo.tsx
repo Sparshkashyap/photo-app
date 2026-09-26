@@ -42,12 +42,23 @@ export function LogoMark({ className }: { className?: string }) {
   );
 }
 
-export function Logo({ className }: { className?: string }) {
+export function Logo({
+  className,
+  wordmarkClassName,
+}: {
+  className?: string;
+  wordmarkClassName?: string;
+}) {
   return (
     <span className={cn("inline-flex items-center gap-2.5", className)}>
       <LogoMark className="hover:rotate-45" />
 
-      <span className="font-display text-lg font-semibold tracking-tight">
+      <span
+        className={cn(
+          "font-display text-lg font-semibold tracking-tight",
+          wordmarkClassName,
+        )}
+      >
         {APP_NAME}
       </span>
     </span>

@@ -31,6 +31,10 @@ import {
 } from "@/hooks/useAuth";
 
 import {
+  Logo,
+} from "@/components/Logo";
+
+import {
   Button,
 } from "@/components/ui/button";
 
@@ -430,15 +434,7 @@ export function Navbar({
           to="/dashboard"
           className="flex min-w-0 items-center gap-2.5 rounded-md transition-opacity hover:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
         >
-          <div className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-primary text-primary-foreground shadow-sm">
-            <span className="text-sm font-bold">
-              P
-            </span>
-          </div>
-
-          <span className="hidden truncate text-lg font-semibold tracking-tight sm:inline">
-            Photos
-          </span>
+          <Logo wordmarkClassName="hidden sm:inline" />
         </Link>
 
         {/* DESKTOP SEARCH + FILTERS */}
@@ -793,9 +789,9 @@ export function Navbar({
 type AccountMenuProps = {
   trigger: React.ReactNode;
   userName: string;
-  userEmail: string | null | undefined;
+  userEmail?: string | null | undefined;
   userInitials: string;
-  avatarUrl: string | null | undefined;
+  avatarUrl?: string | null | undefined;
   loggingOut: boolean;
   onFavorites: () => void;
   onSettings: () => void;
