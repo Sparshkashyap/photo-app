@@ -13,7 +13,7 @@
     Live Demo
   </a>
   •
-  <a href="https://y181ertste.execute-api.ap-south-1.amazonaws.com">
+  <a href="https://y181ertste.execute-api.ap-south-1.amazonaws.com/health">
     Backend API
   </a>
 </p>
