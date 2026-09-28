@@ -7,89 +7,165 @@ const {
   uploadUrl,
   confirmUpload,
   getPhotos,
-  deletePhoto,
+  getPhoto,
   renamePhoto,
-  movePhotoToFolder,
-  downloadUrl,
+  movePhoto,
+  downloadPhoto,
+  trashPhoto,
+  restorePhoto,
+  deletePhoto,
+  toggleFavorite,
+  getFavoritePhotos,
 } = require("../controllers/photoController");
 
-const router =
-  express.Router();
+const router = express.Router();
 
 // ==================================================
 // Upload
 // ==================================================
 
+// POST /photos/upload-url
 router.post(
   "/upload-url",
   authMiddleware,
-  uploadUrl,
+  uploadUrl
 );
 
+// POST /photos/confirm
 router.post(
   "/confirm",
   authMiddleware,
-  confirmUpload,
+  confirmUpload
 );
 
 // ==================================================
 // Get photos
 // ==================================================
 
+// GET /photos
 router.get(
   "/",
   authMiddleware,
-  getPhotos,
+  getPhotos
 );
 
-// ==================================================
-// Download URL
+// GET /photos/favorites
 //
 // IMPORTANT:
 // Keep this BEFORE /:photoId
 // ==================================================
 
 router.get(
-  "/download-url",
+  "/favorites",
   authMiddleware,
-  downloadUrl,
+  getFavoritePhotos
+);
+
+// ==================================================
+// Get single photo
+//
+// GET /photos/:photoId
+//
+// IMPORTANT:
+// Dynamic /:photoId routes should come AFTER
+// fixed routes like /favorites.
+// ==================================================
+
+router.get(
+  "/:photoId",
+  authMiddleware,
+  getPhoto
+);
+
+// ==================================================
+// Download photo
+//
+// GET /photos/:photoId/download
+//
+// IMPORTANT:
+// This route must be BEFORE /:photoId
+// ==================================================
+
+router.get(
+  "/:photoId/download",
+  authMiddleware,
+  downloadPhoto
+);
+
+// ==================================================
+// Rename photo
+//
+// PATCH /photos/:photoId
+// ==================================================
+
+router.patch(
+  "/:photoId",
+  authMiddleware,
+  renamePhoto
 );
 
 // ==================================================
 // Move photo to folder
 //
-// IMPORTANT:
-// Keep this BEFORE /:photoId
+// PATCH /photos/:photoId/folder
 // ==================================================
 
 router.patch(
   "/:photoId/folder",
   authMiddleware,
-  movePhotoToFolder,
+  movePhoto
 );
 
 // ==================================================
-// Rename photo
+// Move photo to trash
+//
+// PATCH /photos/:photoId/trash
 // ==================================================
 
 router.patch(
-  "/:photoId",
+  "/:photoId/trash",
   authMiddleware,
-  renamePhoto,
+  trashPhoto
 );
 
 // ==================================================
-// Move photo to Trash
+// Restore photo from trash
 //
-// DELETE does NOT permanently delete.
-// It only sets:
-// isTrashed = true
+// PATCH /photos/:photoId/restore
+// ==================================================
+
+router.patch(
+  "/:photoId/restore",
+  authMiddleware,
+  restorePhoto
+);
+
+// ==================================================
+// Toggle favorite
+//
+// PATCH /photos/:photoId/favorite
+// ==================================================
+
+router.patch(
+  "/:photoId/favorite",
+  authMiddleware,
+  toggleFavorite
+);
+
+// ==================================================
+// Permanently delete photo
+//
+// DELETE /photos/:photoId
 // ==================================================
 
 router.delete(
   "/:photoId",
   authMiddleware,
-  deletePhoto,
+  deletePhoto
 );
+
+// ==================================================
+// Export
+// ==================================================
 
 module.exports = router;
