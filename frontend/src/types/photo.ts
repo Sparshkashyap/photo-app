@@ -1,3 +1,12 @@
+// frontend/src/types/photo.ts
+// Add mediaType to Photo
+
+export type MediaType =
+  | "image"
+  | "video"
+  | "audio"
+  | "unknown";
+
 export interface Photo {
   id?: string;
 
@@ -16,6 +25,8 @@ export interface Photo {
   fileName: string;
 
   contentType: string;
+
+  mediaType?: MediaType;
 
   fileSize?: number;
 
@@ -40,11 +51,8 @@ export interface Photo {
   isFavorite?: boolean;
 }
 
-// ==================================================
-// TRASH
-// ==================================================
-
-export interface TrashPhoto extends Photo {
+export interface TrashPhoto
+  extends Photo {
   isTrashed: true;
 
   trashedAt?: string | null;
@@ -74,10 +82,6 @@ export interface EmptyTrashResponse {
   count?: number;
 }
 
-// ==================================================
-// SHARE
-// ==================================================
-
 export interface SharedPhoto {
   photoId: string;
 
@@ -88,6 +92,8 @@ export interface SharedPhoto {
   fileName: string;
 
   contentType: string;
+
+  mediaType?: MediaType;
 
   fileSize?: number;
 

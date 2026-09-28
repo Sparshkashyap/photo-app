@@ -1,26 +1,40 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 
-import { FolderPlus, Loader2, Plus, Search, SlidersHorizontal, X } from "lucide-react";
+import {
+  FolderPlus,
+  Loader2,
+  Plus,
+  Search,
+  SlidersHorizontal,
+  X,
+} from "lucide-react";
 
-import { useCallback, useEffect, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useState,
+} from "react";
 
 import { Navbar } from "@/components/Navbar";
-
-import { MobileNav, Sidebar } from "@/components/Sidebar";
-
+import {
+  MobileNav,
+  Sidebar,
+} from "@/components/Sidebar";
 import { UploadPhoto } from "@/components/UploadPhoto";
-
 import { CreateFolderDialog } from "@/components/CreateFolderDialog";
-
 import { FolderTree } from "@/components/FolderTree";
-
 import { PhotoGallery } from "@/components/PhotoGallery";
 
 import { Button } from "@/components/ui/button";
 
 import { useAuth } from "@/hooks/useAuth";
 
-import { getFolders, getPhotos, type PhotoSort, type PhotoType } from "@/services/api";
+import {
+  getFolders,
+  getPhotos,
+  type PhotoSort,
+  type PhotoType,
+} from "@/services/api";
 
 import type { Folder } from "@/types/folder";
 import type { Photo } from "@/types/photo";
@@ -36,18 +50,19 @@ const TYPE_LABELS: Record<PhotoType, string> = {
   all: "All types",
   image: "Images only",
   video: "Videos only",
+  audio: "Audio only",
 };
 
 export const Route = createFileRoute("/dashboard")({
   head: () => ({
     meta: [
       {
-        title: "Your photos — Photos",
+        title: "Your media — Photos",
       },
       {
         name: "description",
         content:
-          "Browse your photo library, organize folders, upload new photos and download originals.",
+          "Browse your media library, organize folders, upload photos, videos and audio files.",
       },
     ],
   }),
@@ -56,52 +71,66 @@ export const Route = createFileRoute("/dashboard")({
 });
 
 function DashboardPage() {
-  const { user, isAuthenticated, ready } = useAuth();
+  const {
+    user,
+    isAuthenticated,
+    ready,
+  } = useAuth();
 
   const navigate = useNavigate();
 
   // ==================================================
-  // PHOTOS
+  // PHOTOS / MEDIA
   // ==================================================
 
-  const [photos, setPhotos] = useState<Photo[]>([]);
+  const [photos, setPhotos] =
+    useState<Photo[]>([]);
 
-  const [loadingPhotos, setLoadingPhotos] = useState(true);
+  const [loadingPhotos, setLoadingPhotos] =
+    useState(true);
 
-  const [photoError, setPhotoError] = useState<string | undefined>();
+  const [photoError, setPhotoError] =
+    useState<string | undefined>();
 
   // ==================================================
   // FOLDERS
   // ==================================================
 
-  const [folders, setFolders] = useState<Folder[]>([]);
+  const [folders, setFolders] =
+    useState<Folder[]>([]);
 
-  const [loadingFolders, setLoadingFolders] = useState(true);
+  const [loadingFolders, setLoadingFolders] =
+    useState(true);
 
-  const [selectedFolderId, setSelectedFolderId] = useState<string | null>(null);
+  const [selectedFolderId, setSelectedFolderId] =
+    useState<string | null>(null);
 
-  const [createFolderOpen, setCreateFolderOpen] = useState(false);
+  const [createFolderOpen, setCreateFolderOpen] =
+    useState(false);
 
   // ==================================================
   // UPLOAD
   // ==================================================
 
-  const [uploadOpen, setUploadOpen] = useState(false);
+  const [uploadOpen, setUploadOpen] =
+    useState(false);
 
   // ==================================================
   // SEARCH / SORT / FILTER
-  //
-  // These states are owned by Dashboard.
-  // Navbar receives them as controlled props.
   // ==================================================
 
-  const [search, setSearch] = useState("");
+  const [search, setSearch] =
+    useState("");
 
-  const [sort, setSort] = useState<PhotoSort>("newest");
+  const [sort, setSort] =
+    useState<PhotoSort>("newest");
 
-  const [type, setType] = useState<PhotoType>("all");
+  const [type, setType] =
+    useState<PhotoType>("all");
 
-  const hasNonDefaultFilters = sort !== "newest" || type !== "all";
+  const hasNonDefaultFilters =
+    sort !== "newest" ||
+    type !== "all";
 
   function clearFilters() {
     setSort("newest");
@@ -123,163 +152,261 @@ function DashboardPage() {
         replace: true,
       });
     }
-  }, [ready, isAuthenticated, navigate]);
+  }, [
+    ready,
+    isAuthenticated,
+    navigate,
+  ]);
 
   // ==================================================
   // LOAD FOLDERS
   // ==================================================
 
-  const loadFolders = useCallback(async () => {
-    if (!isAuthenticated) {
-      return;
-    }
+  const loadFolders =
+    useCallback(async () => {
+      if (!isAuthenticated) {
+        return;
+      }
 
-    try {
-      setLoadingFolders(true);
+      try {
+        setLoadingFolders(true);
 
-      const response = await getFolders();
+        const response =
+          await getFolders();
 
-      setFolders(response.folders ?? []);
-    } catch (error) {
-      console.error("Failed to load folders:", error);
+        setFolders(
+          response.folders ?? [],
+        );
+      } catch (error) {
+        console.error(
+          "Failed to load folders:",
+          error,
+        );
 
-      setFolders([]);
-    } finally {
-      setLoadingFolders(false);
-    }
-  }, [isAuthenticated]);
+        setFolders([]);
+      } finally {
+        setLoadingFolders(false);
+      }
+    }, [isAuthenticated]);
 
   // ==================================================
-  // LOAD PHOTOS
+  // LOAD PHOTOS / MEDIA
   // ==================================================
 
-  const loadPhotos = useCallback(async () => {
-    if (!isAuthenticated) {
-      return;
-    }
+  const loadPhotos =
+    useCallback(async () => {
+      if (!isAuthenticated) {
+        return;
+      }
 
-    try {
-      setLoadingPhotos(true);
+      try {
+        setLoadingPhotos(true);
+        setPhotoError(undefined);
 
-      setPhotoError(undefined);
+        const trimmedSearch =
+          search.trim();
 
-      const trimmedSearch = search.trim();
+        const response =
+          await getPhotos({
+            ...(trimmedSearch
+              ? {
+                  search:
+                    trimmedSearch,
+                }
+              : {}),
 
-      const response = await getPhotos({
-        ...(trimmedSearch
-          ? {
-              search: trimmedSearch,
-            }
-          : {}),
+            sort,
 
-        sort,
+            type,
 
-        type,
+            ...(selectedFolderId
+              ? {
+                  folderId:
+                    selectedFolderId,
+                }
+              : {}),
+          });
 
-        ...(selectedFolderId
-          ? {
-              folderId: selectedFolderId,
-            }
-          : {}),
-      });
+        const mappedPhotos: Photo[] =
+          (response.photos ?? []).map(
+            (photo) => ({
+              id:
+                photo.photoId,
 
-      const mappedPhotos: Photo[] = (response.photos ?? []).map((photo) => ({
-        id: photo.photoId,
+              photoId:
+                photo.photoId,
 
-        photoId: photo.photoId,
+              userId:
+                photo.userId,
 
-        userId: photo.userId,
+              key:
+                photo.s3Key,
 
-        key: photo.s3Key,
+              s3Key:
+                photo.s3Key,
 
-        s3Key: photo.s3Key,
+              name:
+                photo.name ||
+                photo.fileName ||
+                photo.originalFileName ||
+                "Untitled media",
 
-        name: photo.name || photo.fileName || photo.originalFileName || "Untitled photo",
+              originalFileName:
+                photo.originalFileName ||
+                photo.fileName ||
+                "media",
 
-        originalFileName: photo.originalFileName || photo.fileName || "photo",
+              fileName:
+                photo.fileName ||
+                photo.originalFileName ||
+                "media",
 
-        fileName: photo.fileName || photo.originalFileName || "photo",
+              contentType:
+                photo.contentType ||
+                "image/jpeg",
 
-        contentType: photo.contentType || "image/jpeg",
+              fileSize:
+                photo.fileSize ?? 0,
 
-        fileSize: photo.fileSize ?? 0,
+              url:
+                photo.downloadUrl ||
+                photo.url ||
+                "",
 
-        url: photo.downloadUrl || photo.url || "",
+              downloadUrl:
+                photo.downloadUrl ||
+                photo.url ||
+                "",
 
-        downloadUrl: photo.downloadUrl || photo.url || "",
+              folderId:
+                photo.folderId ??
+                null,
 
-        folderId: photo.folderId ?? null,
+              isTrashed:
+                photo.isTrashed ??
+                false,
 
-        isTrashed: photo.isTrashed ?? false,
+              trashedAt:
+                photo.trashedAt ??
+                null,
 
-        trashedAt: photo.trashedAt ?? null,
+              uploadedAt:
+                photo.createdAt,
 
-        uploadedAt: photo.createdAt,
+              createdAt:
+                photo.createdAt,
 
-        createdAt: photo.createdAt,
+              updatedAt:
+                photo.updatedAt ??
+                photo.createdAt,
+            }),
+          );
 
-        updatedAt: photo.updatedAt ?? photo.createdAt,
-      }));
+        setPhotos(
+          mappedPhotos,
+        );
+      } catch (error) {
+        console.error(
+          "Failed to load photos:",
+          error,
+        );
 
-      setPhotos(mappedPhotos);
-    } catch (error) {
-      console.error("Failed to load photos:", error);
+        setPhotos([]);
 
-      setPhotos([]);
-
-      setPhotoError(
-        error instanceof Error ? error.message : "Unable to load photos. Please try again.",
-      );
-    } finally {
-      setLoadingPhotos(false);
-    }
-  }, [isAuthenticated, search, sort, type, selectedFolderId]);
+        setPhotoError(
+          error instanceof Error
+            ? error.message
+            : "Unable to load media. Please try again.",
+        );
+      } finally {
+        setLoadingPhotos(false);
+      }
+    }, [
+      isAuthenticated,
+      search,
+      sort,
+      type,
+      selectedFolderId,
+    ]);
 
   // ==================================================
   // INITIAL FOLDER LOAD
   // ==================================================
 
   useEffect(() => {
-    if (!ready || !isAuthenticated) {
+    if (
+      !ready ||
+      !isAuthenticated
+    ) {
       return;
     }
 
     void loadFolders();
-  }, [ready, isAuthenticated, loadFolders]);
+  }, [
+    ready,
+    isAuthenticated,
+    loadFolders,
+  ]);
 
   // ==================================================
-  // PHOTO LOAD WITH DEBOUNCE
+  // MEDIA LOAD WITH DEBOUNCE
   // ==================================================
 
   useEffect(() => {
-    if (!ready || !isAuthenticated) {
+    if (
+      !ready ||
+      !isAuthenticated
+    ) {
       return;
     }
 
-    const timer = window.setTimeout(() => {
-      void loadPhotos();
-    }, 300);
+    const timer =
+      window.setTimeout(() => {
+        void loadPhotos();
+      }, 300);
 
     return () => {
       window.clearTimeout(timer);
     };
-  }, [ready, isAuthenticated, loadPhotos]);
+  }, [
+    ready,
+    isAuthenticated,
+    loadPhotos,
+  ]);
 
   // ==================================================
   // FOLDER CREATED
   // ==================================================
 
-  async function handleFolderCreated(folder?: Folder) {
+  async function handleFolderCreated(
+    folder?: Folder,
+  ) {
     if (folder) {
-      setFolders((previous) => {
-        const exists = previous.some((item) => item.folderId === folder.folderId);
+      setFolders(
+        (previous) => {
+          const exists =
+            previous.some(
+              (item) =>
+                item.folderId ===
+                folder.folderId,
+            );
 
-        if (exists) {
-          return previous.map((item) => (item.folderId === folder.folderId ? folder : item));
-        }
+          if (exists) {
+            return previous.map(
+              (item) =>
+                item.folderId ===
+                folder.folderId
+                  ? folder
+                  : item,
+            );
+          }
 
-        return [...previous, folder];
-      });
+          return [
+            ...previous,
+            folder,
+          ];
+        },
+      );
 
       return;
     }
@@ -291,8 +418,12 @@ function DashboardPage() {
   // FOLDER SELECT
   // ==================================================
 
-  function handleFolderSelect(folderId: string | null) {
-    setSelectedFolderId(folderId);
+  function handleFolderSelect(
+    folderId: string | null,
+  ) {
+    setSelectedFolderId(
+      folderId,
+    );
 
     setSearch("");
   }
@@ -301,16 +432,21 @@ function DashboardPage() {
   // PHOTO RENAMED
   // ==================================================
 
-  function handlePhotoRenamed(updatedPhoto: Photo) {
-    setPhotos((previous) =>
-      previous.map((photo) =>
-        photo.photoId === updatedPhoto.photoId
-          ? {
-              ...photo,
-              ...updatedPhoto,
-            }
-          : photo,
-      ),
+  function handlePhotoRenamed(
+    updatedPhoto: Photo,
+  ) {
+    setPhotos(
+      (previous) =>
+        previous.map(
+          (photo) =>
+            photo.photoId ===
+            updatedPhoto.photoId
+              ? {
+                  ...photo,
+                  ...updatedPhoto,
+                }
+              : photo,
+        ),
     );
   }
 
@@ -318,29 +454,38 @@ function DashboardPage() {
   // PHOTO MOVED
   // ==================================================
 
-  function handlePhotoMoved(photo: Photo, folderId: string | null) {
-    /*
-     * Current view is a specific folder.
-     *
-     * If the photo leaves that folder,
-     * remove it immediately.
-     */
-
-    if (selectedFolderId !== null && folderId !== selectedFolderId) {
-      setPhotos((previous) => previous.filter((item) => item.photoId !== photo.photoId));
+  function handlePhotoMoved(
+    photo: Photo,
+    folderId: string | null,
+  ) {
+    if (
+      selectedFolderId !== null &&
+      folderId !== selectedFolderId
+    ) {
+      setPhotos(
+        (previous) =>
+          previous.filter(
+            (item) =>
+              item.photoId !==
+              photo.photoId,
+          ),
+      );
 
       return;
     }
 
-    /*
-     * Current view is root.
-     *
-     * If the photo moves into a folder,
-     * remove it from root.
-     */
-
-    if (selectedFolderId === null && folderId !== null) {
-      setPhotos((previous) => previous.filter((item) => item.photoId !== photo.photoId));
+    if (
+      selectedFolderId === null &&
+      folderId !== null
+    ) {
+      setPhotos(
+        (previous) =>
+          previous.filter(
+            (item) =>
+              item.photoId !==
+              photo.photoId,
+          ),
+      );
 
       return;
     }
@@ -352,16 +497,21 @@ function DashboardPage() {
   // PHOTO FAVORITE
   // ==================================================
 
-  function handlePhotoFavorite(updatedPhoto: Photo) {
-    setPhotos((previous) =>
-      previous.map((item) =>
-        item.photoId === updatedPhoto.photoId
-          ? {
-              ...item,
-              ...updatedPhoto,
-            }
-          : item,
-      ),
+  function handlePhotoFavorite(
+    updatedPhoto: Photo,
+  ) {
+    setPhotos(
+      (previous) =>
+        previous.map(
+          (item) =>
+            item.photoId ===
+            updatedPhoto.photoId
+              ? {
+                  ...item,
+                  ...updatedPhoto,
+                }
+              : item,
+        ),
     );
   }
 
@@ -369,23 +519,65 @@ function DashboardPage() {
   // PHOTO TRASHED
   // ==================================================
 
-  function handlePhotoTrashed(photo: Photo) {
-    /*
-     * Trash is a soft delete.
-     *
-     * Remove the photo from the current
-     * gallery immediately after the API
-     * operation succeeds.
-     */
-
-    setPhotos((previous) => previous.filter((item) => item.photoId !== photo.photoId));
+  function handlePhotoTrashed(
+    photo: Photo,
+  ) {
+    setPhotos(
+      (previous) =>
+        previous.filter(
+          (item) =>
+            item.photoId !==
+            photo.photoId,
+        ),
+    );
   }
 
   // ==================================================
   // UPLOAD COMPLETED
   // ==================================================
 
-  function handleUploadCompleted() {
+  function handleUploadCompleted(
+    uploadedPhoto?: Photo,
+  ) {
+    /*
+     * Add the newly uploaded item immediately
+     * when it belongs to the current view.
+     *
+     * The API reload below remains the source
+     * of truth, so DynamoDB/S3 state stays synced.
+     */
+
+    if (
+      uploadedPhoto &&
+      (
+        selectedFolderId === null ||
+        uploadedPhoto.folderId ===
+          selectedFolderId
+      )
+    ) {
+      setPhotos(
+        (previous) => {
+          const alreadyExists =
+            previous.some(
+              (item) =>
+                item.photoId ===
+                uploadedPhoto.photoId,
+            );
+
+          if (
+            alreadyExists
+          ) {
+            return previous;
+          }
+
+          return [
+            uploadedPhoto,
+            ...previous,
+          ];
+        },
+      );
+    }
+
     void loadPhotos();
   }
 
@@ -393,12 +585,39 @@ function DashboardPage() {
   // LOADING SCREEN
   // ==================================================
 
-  if (!ready || !isAuthenticated) {
+  if (
+    !ready ||
+    !isAuthenticated
+  ) {
     return (
-      <div className="flex min-h-screen flex-col items-center justify-center gap-3 bg-background">
-        <Loader2 className="size-7 animate-spin text-primary" aria-hidden="true" />
+      <div
+        className="
+          flex
+          min-h-screen
+          flex-col
+          items-center
+          justify-center
+          gap-3
+          bg-background
+        "
+      >
+        <Loader2
+          className="
+            size-7
+            animate-spin
+            text-primary
+          "
+          aria-hidden="true"
+        />
 
-        <span className="text-sm text-muted-foreground">Loading your library...</span>
+        <span
+          className="
+            text-sm
+            text-muted-foreground
+          "
+        >
+          Loading your library...
+        </span>
       </div>
     );
   }
@@ -407,7 +626,29 @@ function DashboardPage() {
   // UI DATA
   // ==================================================
 
-  const selectedFolder = folders.find((folder) => folder.folderId === selectedFolderId);
+  const selectedFolder =
+    folders.find(
+      (folder) =>
+        folder.folderId ===
+        selectedFolderId,
+    );
+
+  const libraryLabel =
+    loadingPhotos
+      ? "Loading your media..."
+      : selectedFolder
+        ? `${selectedFolder.name} · ${
+            photos.length
+          } ${
+            photos.length === 1
+              ? "item"
+              : "items"
+          }`
+        : `${photos.length} ${
+            photos.length === 1
+              ? "item"
+              : "items"
+          } in your library`;
 
   // ==================================================
   // UI
@@ -419,179 +660,511 @@ function DashboardPage() {
         search={search}
         sort={sort}
         type={type}
-        onSearchChange={setSearch}
-        onSortChange={setSort}
-        onTypeChange={setType}
+        onSearchChange={
+          setSearch
+        }
+        onSortChange={
+          setSort
+        }
+        onTypeChange={
+          setType
+        }
       />
 
       <MobileNav />
 
-      <div className="mx-auto flex w-full max-w-[1600px]">
+      <div
+        className="
+          mx-auto
+          flex
+          w-full
+          max-w-[1600px]
+        "
+      >
         <Sidebar />
 
-        <main className="min-w-0 flex-1 px-4 py-6 pb-24 sm:px-6 sm:py-8 lg:pb-8">
-          {/* HEADER */}
+        <main
+          className="
+            min-w-0
+            flex-1
+            px-4
+            py-6
+            pb-24
+            sm:px-6
+            sm:py-8
+            lg:pb-8
+          "
+        >
+          {/* ==================================================
+              HEADER
+          ================================================== */}
 
-          <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-            <div>
-              <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">My Photos</h1>
+          <div
+            className="
+              flex
+              flex-col
+              gap-4
+              lg:flex-row
+              lg:items-center
+              lg:justify-between
+            "
+          >
+            <div className="min-w-0">
+              <h1
+                className="
+                  text-2xl
+                  font-semibold
+                  tracking-tight
+                  sm:text-3xl
+                "
+              >
+                My Photos
+              </h1>
 
-              <p className="mt-1 text-sm text-muted-foreground">
-                {loadingPhotos
-                  ? "Loading your photos..."
-                  : selectedFolder
-                    ? `${selectedFolder.name} · ${photos.length} ${
-                        photos.length === 1 ? "photo" : "photos"
-                      }`
-                    : `${photos.length} ${
-                        photos.length === 1 ? "photo" : "photos"
-                      } in your library`}
+              <p
+                className="
+                  mt-1
+                  text-sm
+                  text-muted-foreground
+                "
+              >
+                {libraryLabel}
               </p>
             </div>
 
-            <div className="flex flex-col gap-2 sm:flex-row">
+            <div
+              className="
+                flex
+                flex-col
+                gap-2
+                sm:flex-row
+              "
+            >
               <Button
                 variant="outline"
-                className="rounded-xl transition-all hover:border-foreground/20 active:scale-[0.98]"
-                onClick={() => setCreateFolderOpen(true)}
+                className="
+                  w-full
+                  rounded-xl
+                  transition-all
+                  hover:border-foreground/20
+                  active:scale-[0.98]
+                  sm:w-auto
+                "
+                onClick={() =>
+                  setCreateFolderOpen(
+                    true,
+                  )
+                }
               >
-                <FolderPlus className="size-4" />
+                <FolderPlus
+                  className="size-4"
+                  aria-hidden="true"
+                />
+
                 New folder
               </Button>
 
               <Button
-                className="rounded-xl shadow-sm transition-all hover:shadow active:scale-[0.98]"
-                onClick={() => setUploadOpen(true)}
+                className="
+                  w-full
+                  rounded-xl
+                  shadow-sm
+                  transition-all
+                  hover:shadow
+                  active:scale-[0.98]
+                  sm:w-auto
+                "
+                onClick={() =>
+                  setUploadOpen(
+                    true,
+                  )
+                }
               >
-                <Plus className="size-4" />
-                Upload photo
+                <Plus
+                  className="size-4"
+                  aria-hidden="true"
+                />
+
+                Upload media
               </Button>
             </div>
           </div>
 
-          {/* ACTIVE SORT / TYPE FILTERS */}
+          {/* ==================================================
+              ACTIVE SORT / TYPE FILTERS
+          ================================================== */}
 
           {hasNonDefaultFilters ? (
-            <div className="animate-in fade-in slide-in-from-top-1 mt-4 flex flex-wrap items-center gap-2 rounded-xl border border-primary/30 bg-primary/5 px-4 py-2.5 text-sm duration-200">
-              <SlidersHorizontal className="size-4 text-primary" />
+            <div
+              className="
+                animate-in
+                fade-in
+                slide-in-from-top-1
+                mt-4
+                flex
+                flex-wrap
+                items-center
+                gap-2
+                rounded-xl
+                border
+                border-primary/30
+                bg-primary/5
+                px-4
+                py-2.5
+                text-sm
+                duration-200
+              "
+            >
+              <SlidersHorizontal
+                className="
+                  size-4
+                  shrink-0
+                  text-primary
+                "
+                aria-hidden="true"
+              />
 
-              <span className="text-muted-foreground">Showing</span>
+              <span className="text-muted-foreground">
+                Showing
+              </span>
 
-              <span className="font-medium text-foreground">{TYPE_LABELS[type]}</span>
+              <span className="font-medium text-foreground">
+                {TYPE_LABELS[type]}
+              </span>
 
-              <span className="text-muted-foreground" aria-hidden="true">
+              <span
+                className="text-muted-foreground"
+                aria-hidden="true"
+              >
                 ·
               </span>
 
-              <span className="font-medium text-foreground">{SORT_LABELS[sort]}</span>
+              <span className="font-medium text-foreground">
+                {SORT_LABELS[sort]}
+              </span>
 
               <button
                 type="button"
-                onClick={clearFilters}
-                className="ml-auto inline-flex items-center gap-1 rounded-lg px-2 py-1 text-primary transition hover:bg-primary/10"
+                onClick={
+                  clearFilters
+                }
+                className="
+                  ml-auto
+                  inline-flex
+                  items-center
+                  gap-1
+                  rounded-lg
+                  px-2
+                  py-1
+                  text-primary
+                  transition
+                  hover:bg-primary/10
+                "
               >
-                <X className="size-3.5" />
+                <X
+                  className="size-3.5"
+                  aria-hidden="true"
+                />
+
                 Clear filters
               </button>
             </div>
           ) : null}
 
-          {/* FOLDERS */}
+          {/* ==================================================
+              FOLDERS
+          ================================================== */}
 
           <section
-            className="mt-6 rounded-xl border border-border bg-card p-4 shadow-sm transition-shadow hover:shadow-md"
+            className="
+              mt-6
+              rounded-xl
+              border
+              border-border
+              bg-card
+              p-4
+              shadow-sm
+              transition-shadow
+              hover:shadow-md
+            "
             aria-label="Folders"
           >
-            <div className="mb-3 flex items-center justify-between">
-              <div>
-                <h2 className="text-sm font-semibold">Folders</h2>
+            <div
+              className="
+                mb-3
+                flex
+                items-center
+                justify-between
+                gap-3
+              "
+            >
+              <div className="min-w-0">
+                <h2 className="text-sm font-semibold">
+                  Folders
+                </h2>
 
-                <p className="text-xs text-muted-foreground">Organize your photos</p>
+                <p className="text-xs text-muted-foreground">
+                  Organize your photos
+                </p>
               </div>
 
               <Button
                 variant="ghost"
                 size="sm"
-                className="rounded-lg"
-                onClick={() => setCreateFolderOpen(true)}
+                className="
+                  shrink-0
+                  rounded-lg
+                "
+                onClick={() =>
+                  setCreateFolderOpen(
+                    true,
+                  )
+                }
               >
-                <FolderPlus className="size-4" />
+                <FolderPlus
+                  className="size-4"
+                  aria-hidden="true"
+                />
+
                 Create
               </Button>
             </div>
 
             {loadingFolders ? (
-              <div className="flex items-center gap-2 py-3 text-sm text-muted-foreground">
-                <Loader2 className="size-4 animate-spin text-primary" />
+              <div
+                className="
+                  flex
+                  items-center
+                  gap-2
+                  py-3
+                  text-sm
+                  text-muted-foreground
+                "
+              >
+                <Loader2
+                  className="
+                    size-4
+                    animate-spin
+                    text-primary
+                  "
+                  aria-hidden="true"
+                />
+
                 Loading folders...
               </div>
-            ) : folders.length === 0 ? (
-              <div className="flex flex-col items-center gap-2 rounded-lg border border-dashed border-border py-6 text-center">
-                <FolderPlus className="size-5 text-muted-foreground" />
+            ) : folders.length ===
+              0 ? (
+              <div
+                className="
+                  flex
+                  flex-col
+                  items-center
+                  gap-2
+                  rounded-lg
+                  border
+                  border-dashed
+                  border-border
+                  py-6
+                  text-center
+                "
+              >
+                <FolderPlus
+                  className="
+                    size-5
+                    text-muted-foreground
+                  "
+                  aria-hidden="true"
+                />
 
-                <p className="text-sm text-muted-foreground">
-                  No folders yet — create one to start organizing.
+                <p
+                  className="
+                    text-sm
+                    text-muted-foreground
+                  "
+                >
+                  No folders yet — create
+                  one to start organizing.
                 </p>
               </div>
             ) : (
               <FolderTree
                 folders={folders}
-                selectedFolderId={selectedFolderId}
-                onSelect={handleFolderSelect}
-                onCreateFolder={() => setCreateFolderOpen(true)}
-                onChanged={loadFolders}
+                selectedFolderId={
+                  selectedFolderId
+                }
+                onSelect={
+                  handleFolderSelect
+                }
+                onCreateFolder={() =>
+                  setCreateFolderOpen(
+                    true,
+                  )
+                }
+                onChanged={
+                  loadFolders
+                }
               />
             )}
           </section>
 
-          {/* ACTIVE SEARCH STATUS */}
+          {/* ==================================================
+              ACTIVE SEARCH STATUS
+          ================================================== */}
 
           {search.trim() ? (
-            <div className="animate-in fade-in slide-in-from-top-1 mt-4 flex flex-wrap items-center gap-2 rounded-xl border border-border bg-card px-4 py-3 text-sm duration-200">
-              <Search className="size-4 text-muted-foreground" />
+            <div
+              className="
+                animate-in
+                fade-in
+                slide-in-from-top-1
+                mt-4
+                flex
+                flex-wrap
+                items-center
+                gap-2
+                rounded-xl
+                border
+                border-border
+                bg-card
+                px-4
+                py-3
+                text-sm
+                duration-200
+              "
+            >
+              <Search
+                className="
+                  size-4
+                  shrink-0
+                  text-muted-foreground
+                "
+                aria-hidden="true"
+              />
 
-              <span className="text-muted-foreground">Searching for</span>
+              <span className="text-muted-foreground">
+                Searching for
+              </span>
 
-              <span className="font-medium">"{search.trim()}"</span>
+              <span
+                className="
+                  min-w-0
+                  truncate
+                  font-medium
+                "
+                title={search.trim()}
+              >
+                "{search.trim()}"
+              </span>
 
               <button
                 type="button"
-                onClick={() => setSearch("")}
-                className="ml-auto inline-flex items-center gap-1 rounded-lg px-2 py-1 text-primary transition hover:bg-primary/10"
+                onClick={() =>
+                  setSearch("")
+                }
+                className="
+                  ml-auto
+                  inline-flex
+                  shrink-0
+                  items-center
+                  gap-1
+                  rounded-lg
+                  px-2
+                  py-1
+                  text-primary
+                  transition
+                  hover:bg-primary/10
+                "
               >
-                <X className="size-3.5" />
+                <X
+                  className="size-3.5"
+                  aria-hidden="true"
+                />
+
                 Clear
               </button>
             </div>
           ) : null}
 
-          {/* CURRENT FOLDER */}
+          {/* ==================================================
+              CURRENT FOLDER
+          ================================================== */}
 
-          <div className="mb-4 mt-8 flex items-center justify-between">
-            <div>
-              <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
-                {selectedFolder ? selectedFolder.name : "My Photos"}
+          <div
+            className="
+              mb-4
+              mt-8
+              flex
+              items-center
+              justify-between
+              gap-3
+            "
+          >
+            <div className="min-w-0">
+              <h2
+                className="
+                  truncate
+                  text-sm
+                  font-semibold
+                  uppercase
+                  tracking-wide
+                  text-muted-foreground
+                "
+                title={
+                  selectedFolder
+                    ? selectedFolder.name
+                    : "My Photos"
+                }
+              >
+                {selectedFolder
+                  ? selectedFolder.name
+                  : "My Photos"}
               </h2>
             </div>
 
             {!loadingPhotos ? (
-              <span className="rounded-full bg-muted px-2.5 py-1 text-xs font-medium text-muted-foreground">
-                {photos.length} {photos.length === 1 ? "item" : "items"}
+              <span
+                className="
+                  shrink-0
+                  rounded-full
+                  bg-muted
+                  px-2.5
+                  py-1
+                  text-xs
+                  font-medium
+                  text-muted-foreground
+                "
+              >
+                {photos.length}{" "}
+                {photos.length === 1
+                  ? "item"
+                  : "items"}
               </span>
             ) : null}
           </div>
 
-          {/* GALLERY */}
+          {/* ==================================================
+              GALLERY
+          ================================================== */}
 
           <PhotoGallery
             photos={photos}
             folders={folders}
             loading={loadingPhotos}
-            onUploadClick={() => setUploadOpen(true)}
-            onRenamed={handlePhotoRenamed}
-            onMoved={handlePhotoMoved}
-            onTrashed={handlePhotoTrashed}
-            onFavorite={handlePhotoFavorite}
+            onUploadClick={() =>
+              setUploadOpen(true)
+            }
+            onRenamed={
+              handlePhotoRenamed
+            }
+            onMoved={
+              handlePhotoMoved
+            }
+            onTrashed={
+              handlePhotoTrashed
+            }
+            onFavorite={
+              handlePhotoFavorite
+            }
             onRetry={() => {
               void loadPhotos();
             }}
@@ -602,33 +1175,69 @@ function DashboardPage() {
               : {})}
           />
 
-          {/* UPLOAD */}
+          {/* ==================================================
+              UPLOAD MEDIA
+          ================================================== */}
 
           <UploadPhoto
             open={uploadOpen}
-            onOpenChange={setUploadOpen}
-            onUploaded={handleUploadCompleted}
+            onOpenChange={
+              setUploadOpen
+            }
+            onUploaded={
+              handleUploadCompleted
+            }
           />
 
-          {/* CREATE FOLDER */}
+          {/* ==================================================
+              CREATE FOLDER
+          ================================================== */}
 
           <CreateFolderDialog
             open={createFolderOpen}
-            onOpenChange={setCreateFolderOpen}
-            onCreated={handleFolderCreated}
+            onOpenChange={
+              setCreateFolderOpen
+            }
+            onCreated={
+              handleFolderCreated
+            }
           />
         </main>
       </div>
 
-      {/* FLOATING UPLOAD BUTTON — MOBILE */}
+      {/* ==================================================
+          FLOATING UPLOAD BUTTON — MOBILE
+      ================================================== */}
 
       <button
         type="button"
-        onClick={() => setUploadOpen(true)}
-        aria-label="Upload photo"
-        className="fixed bottom-20 right-4 z-40 flex size-14 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-lg transition-all hover:shadow-xl active:scale-95 lg:hidden"
+        onClick={() =>
+          setUploadOpen(true)
+        }
+        aria-label="Upload media"
+        className="
+          fixed
+          bottom-20
+          right-4
+          z-40
+          flex
+          size-14
+          items-center
+          justify-center
+          rounded-full
+          bg-primary
+          text-primary-foreground
+          shadow-lg
+          transition-all
+          hover:shadow-xl
+          active:scale-95
+          lg:hidden
+        "
       >
-        <Plus className="size-6" />
+        <Plus
+          className="size-6"
+          aria-hidden="true"
+        />
       </button>
     </div>
   );

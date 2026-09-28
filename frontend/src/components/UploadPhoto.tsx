@@ -1,6 +1,18 @@
-import { CheckCircle2, ImageUp, Loader2, UploadCloud, X } from "lucide-react";
+import {
+  CheckCircle2,
+  FileAudio,
+  FileVideo,
+  ImageUp,
+  Loader2,
+  UploadCloud,
+  X,
+} from "lucide-react";
 
-import { useEffect, useRef, useState } from "react";
+import {
+  useEffect,
+  useRef,
+  useState,
+} from "react";
 
 import { toast } from "sonner";
 
@@ -19,16 +31,24 @@ import { Progress } from "@/components/ui/progress";
 import {
   ALLOWED_EXTENSIONS_LABEL,
   ALLOWED_MIME_TYPES,
+  getMediaType,
   MAX_FILE_SIZE_BYTES,
   MAX_FILE_SIZE_MB,
   formatFileSize,
 } from "@/lib/constants";
 
-import { requestUploadUrl, uploadToPresignedUrl, confirmUpload } from "@/services/api";
+import {
+  confirmUpload,
+  requestUploadUrl,
+  uploadToPresignedUrl,
+} from "@/services/api";
 
 import type { Photo } from "@/types/photo";
 
-type Status = "idle" | "uploading" | "success";
+type Status =
+  | "idle"
+  | "uploading"
+  | "success";
 
 export function UploadPhoto({
   open,
@@ -39,25 +59,37 @@ export function UploadPhoto({
   onOpenChange: (open: boolean) => void;
   onUploaded: (photo: Photo) => void;
 }) {
-  const inputRef = useRef<HTMLInputElement>(null);
+  const inputRef =
+    useRef<HTMLInputElement>(null);
 
-  const [file, setFile] = useState<File | null>(null);
+  const [file, setFile] =
+    useState<File | null>(null);
 
-  const [photoName, setPhotoName] = useState("");
+  const [photoName, setPhotoName] =
+    useState("");
 
-  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [previewUrl, setPreviewUrl] =
+    useState<string | null>(null);
 
-  const [dragging, setDragging] = useState(false);
+  const [dragging, setDragging] =
+    useState(false);
 
-  const [status, setStatus] = useState<Status>("idle");
+  const [status, setStatus] =
+    useState<Status>("idle");
 
-  const [progress, setProgress] = useState(0);
+  const [progress, setProgress] =
+    useState(0);
 
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] =
+    useState<string | null>(null);
 
-  // --------------------------------------------------
-  // Preview
-  // --------------------------------------------------
+  const mediaType = file
+    ? getMediaType(file.type)
+    : null;
+
+  // ==================================================
+  // PREVIEW URL
+  // ==================================================
 
   useEffect(() => {
     if (!file) {
@@ -65,20 +97,24 @@ export function UploadPhoto({
       return;
     }
 
-    const url = URL.createObjectURL(file);
+    const url =
+      URL.createObjectURL(file);
 
     setPreviewUrl(url);
 
-    return () => URL.revokeObjectURL(url);
+    return () => {
+      URL.revokeObjectURL(url);
+    };
   }, [file]);
 
-  // --------------------------------------------------
-  // Reset
-  // --------------------------------------------------
+  // ==================================================
+  // RESET
+  // ==================================================
 
   function reset() {
     setFile(null);
     setPhotoName("");
+    setPreviewUrl(null);
     setStatus("idle");
     setProgress(0);
     setError(null);
@@ -89,27 +125,41 @@ export function UploadPhoto({
     }
   }
 
-  // --------------------------------------------------
-  // Select file
-  // --------------------------------------------------
+  // ==================================================
+  // SELECT FILE
+  // ==================================================
 
-  function selectFile(candidate: File | undefined) {
-    if (!candidate) return;
+  function selectFile(
+    candidate?: File,
+  ) {
+    if (!candidate) {
+      return;
+    }
 
-    if (!(ALLOWED_MIME_TYPES as readonly string[]).includes(candidate.type)) {
+    const supported =
+      (
+        ALLOWED_MIME_TYPES as readonly string[]
+      ).includes(candidate.type);
+
+    if (!supported) {
       setFile(null);
 
       setError(
-        `That file type isn't supported. Please choose a ${ALLOWED_EXTENSIONS_LABEL} image.`,
+        `Unsupported file type. Choose ${ALLOWED_EXTENSIONS_LABEL}.`,
       );
 
       return;
     }
 
-    if (candidate.size > MAX_FILE_SIZE_BYTES) {
+    if (
+      candidate.size >
+      MAX_FILE_SIZE_BYTES
+    ) {
       setFile(null);
 
-      setError(`This photo is larger than ${MAX_FILE_SIZE_MB} MB. Please choose a smaller file.`);
+      setError(
+        `This file is larger than ${MAX_FILE_SIZE_MB} MB.`,
+      );
 
       return;
     }
@@ -117,32 +167,58 @@ export function UploadPhoto({
     setError(null);
     setStatus("idle");
     setProgress(0);
-
     setFile(candidate);
 
-    // Default custom name = filename without extension
-    const defaultName = candidate.name.replace(/\.[^/.]+$/, "");
+    const defaultName =
+      candidate.name
+        .replace(/\.[^/.]+$/, "")
+        .replace(/\s+/g, " ")
+        .trim()
+        .slice(0, 120);
 
     setPhotoName(defaultName);
   }
 
-  // --------------------------------------------------
-  // Upload
-  // --------------------------------------------------
+  // ==================================================
+  // OPEN FILE PICKER
+  // ==================================================
+
+  function openFilePicker() {
+    if (
+      status === "uploading"
+    ) {
+      return;
+    }
+
+    inputRef.current?.click();
+  }
+
+  // ==================================================
+  // UPLOAD
+  // ==================================================
 
   async function handleUpload() {
-    if (!file) return;
+    if (!file) {
+      return;
+    }
 
-    const cleanName = photoName.trim();
+    const cleanName =
+      photoName.trim();
 
     if (!cleanName) {
-      setError("Please enter a name for your photo.");
+      setError(
+        "Please enter a name for your media.",
+      );
 
       return;
     }
 
-    if (cleanName.length > 120) {
-      setError("Photo name cannot exceed 120 characters.");
+    if (
+      cleanName.length > 120
+    ) {
+      setError(
+        "Media name cannot exceed 120 characters.",
+      );
 
       return;
     }
@@ -152,85 +228,451 @@ export function UploadPhoto({
     setError(null);
 
     try {
+      // ------------------------------------------------
       // 1. Get presigned S3 URL
-      const { uploadUrl, key, photoId } = await requestUploadUrl({
-        fileName: file.name,
-        contentType: file.type,
-      });
+      // ------------------------------------------------
 
-      // 2. Upload directly to S3
-      await uploadToPresignedUrl(uploadUrl, file, setProgress);
-
-      // 3. Save metadata in DynamoDB
-      const response = await confirmUpload({
-        photoId,
+      const {
+        uploadUrl,
         key,
+        photoId,
+      } =
+        await requestUploadUrl({
+          fileName:
+            file.name,
 
-        name: cleanName,
+          contentType:
+            file.type,
+        });
 
-        fileName: file.name,
-        contentType: file.type,
-        fileSize: file.size,
-      });
+      // ------------------------------------------------
+      // 2. Upload directly to S3
+      // ------------------------------------------------
 
-      // 4. Frontend photo
+      await uploadToPresignedUrl(
+        uploadUrl,
+        file,
+        setProgress,
+      );
+
+      // ------------------------------------------------
+      // 3. Save DynamoDB metadata
+      // ------------------------------------------------
+
+      const response =
+        await confirmUpload({
+          photoId,
+
+          key,
+
+          name:
+            cleanName,
+
+          fileName:
+            file.name,
+
+          contentType:
+            file.type,
+
+          fileSize:
+            file.size,
+        });
+
+      // ------------------------------------------------
+      // 4. Add uploaded media immediately
+      // ------------------------------------------------
+
+      const savedPhoto =
+        response.photo;
+
       const uploadedPhoto: Photo = {
-        id: response.photo.photoId,
+        id:
+          savedPhoto.photoId,
 
-        photoId: response.photo.photoId,
+        photoId:
+          savedPhoto.photoId,
 
-        key: response.photo.s3Key,
+        userId:
+          savedPhoto.userId,
 
-        name: response.photo.name,
+        key:
+          savedPhoto.s3Key,
 
-        originalFileName: response.photo.originalFileName,
+        s3Key:
+          savedPhoto.s3Key,
 
-        fileName: response.photo.fileName,
+        name:
+          savedPhoto.name,
 
-        url: previewUrl ?? "",
+        fileName:
+          savedPhoto.fileName,
 
-        contentType: response.photo.contentType,
+        url:
+          previewUrl ?? "",
 
-        fileSize: response.photo.fileSize,
+        contentType:
+          savedPhoto.contentType,
 
-        uploadedAt: response.photo.createdAt,
+        mediaType:
+          savedPhoto.mediaType ??
+          mediaType ??
+          "image",
 
-        createdAt: response.photo.createdAt,
+        fileSize:
+          savedPhoto.fileSize ??
+          file.size,
 
-        updatedAt: response.photo.updatedAt,
+        ...(savedPhoto.originalFileName !==
+        undefined
+          ? {
+              originalFileName:
+                savedPhoto.originalFileName,
+            }
+          : {}),
+
+        ...(savedPhoto.downloadUrl !==
+        undefined
+          ? {
+              downloadUrl:
+                savedPhoto.downloadUrl,
+            }
+          : {}),
+
+        ...(savedPhoto.folderId !==
+        undefined
+          ? {
+              folderId:
+                savedPhoto.folderId ??
+                null,
+            }
+          : {}),
+
+        isFavorite:
+          savedPhoto.isFavorite ??
+          false,
+
+        isTrashed:
+          savedPhoto.isTrashed ??
+          false,
+
+        uploadedAt:
+          savedPhoto.createdAt ??
+          new Date().toISOString(),
+
+        createdAt:
+          savedPhoto.createdAt ??
+          new Date().toISOString(),
+
+        ...(savedPhoto.updatedAt !==
+        undefined
+          ? {
+              updatedAt:
+                savedPhoto.updatedAt,
+            }
+          : {}),
       };
 
-      onUploaded(uploadedPhoto);
+      onUploaded(
+        uploadedPhoto,
+      );
 
       setStatus("success");
+      setProgress(100);
 
-      toast.success("Photo uploaded successfully");
+      toast.success(
+        "Media uploaded successfully",
+      );
 
       window.setTimeout(() => {
         reset();
         onOpenChange(false);
-      }, 1100);
-    } catch (error) {
-      console.error("Upload error:", error);
+      }, 900);
+    } catch (uploadError) {
+      console.error(
+        "Upload error:",
+        uploadError,
+      );
+
+      const message =
+        uploadError instanceof Error
+          ? uploadError.message
+          : "Upload failed. Please try again.";
 
       setStatus("idle");
       setProgress(0);
+      setError(message);
 
-      setError("Upload failed. Please try again.");
-
-      toast.error("Upload failed. Please try again.");
+      toast.error(
+        "Upload failed",
+        {
+          description:
+            message,
+        },
+      );
     }
   }
 
-  // --------------------------------------------------
+  // ==================================================
+  // MEDIA PREVIEW
+  // ==================================================
+
+  function renderPreview() {
+    if (
+      !file ||
+      !previewUrl
+    ) {
+      return null;
+    }
+
+    // ------------------------------------------------
+    // VIDEO
+    // ------------------------------------------------
+
+    if (
+      mediaType === "video"
+    ) {
+      return (
+        <div
+          className="
+            relative
+            aspect-video
+            w-full
+            min-w-0
+            overflow-hidden
+            rounded-2xl
+            bg-black
+            ring-1
+            ring-border
+          "
+        >
+          <video
+            src={previewUrl}
+            controls
+            playsInline
+            preload="metadata"
+            className="
+              absolute
+              inset-0
+              h-full
+              w-full
+              max-w-full
+              object-contain
+            "
+          />
+        </div>
+      );
+    }
+
+    // ------------------------------------------------
+    // AUDIO
+    // ------------------------------------------------
+
+    if (
+      mediaType === "audio"
+    ) {
+      return (
+        <div
+          className="
+            flex
+            min-h-[180px]
+            w-full
+            min-w-0
+            items-center
+            justify-center
+            rounded-2xl
+            bg-surface-muted
+            p-5
+            ring-1
+            ring-border
+            sm:min-h-[210px]
+          "
+        >
+          <div
+            className="
+              w-full
+              min-w-0
+              max-w-xl
+              rounded-2xl
+              border
+              border-border
+              bg-background
+              p-5
+              shadow-soft
+            "
+          >
+            <div
+              className="
+                flex
+                min-w-0
+                items-center
+                gap-3
+              "
+            >
+              <span
+                className="
+                  flex
+                  size-11
+                  shrink-0
+                  items-center
+                  justify-center
+                  rounded-xl
+                  bg-accent
+                  text-primary
+                "
+              >
+                <FileAudio
+                  className="size-5"
+                  aria-hidden="true"
+                />
+              </span>
+
+              <div className="min-w-0">
+                <p
+                  className="
+                    truncate
+                    text-sm
+                    font-semibold
+                  "
+                >
+                  {file.name}
+                </p>
+
+                <p
+                  className="
+                    mt-1
+                    text-xs
+                    text-muted-foreground
+                  "
+                >
+                  MP3 audio ·{" "}
+                  {formatFileSize(
+                    file.size,
+                  )}
+                </p>
+              </div>
+            </div>
+
+            <audio
+              src={previewUrl}
+              controls
+              preload="metadata"
+              className="
+                mt-5
+                block
+                w-full
+                max-w-full
+              "
+            />
+          </div>
+        </div>
+      );
+    }
+
+    // ------------------------------------------------
+    // IMAGE
+    // ------------------------------------------------
+
+    return (
+      <div
+        className="
+          relative
+          aspect-video
+          w-full
+          min-w-0
+          overflow-hidden
+          rounded-2xl
+          bg-muted
+          ring-1
+          ring-border
+        "
+      >
+        <img
+          src={previewUrl}
+          alt={`Preview of ${
+            photoName ||
+            file.name
+          }`}
+          className="
+            absolute
+            inset-0
+            h-full
+            w-full
+            max-w-full
+            object-contain
+          "
+        />
+      </div>
+    );
+  }
+
+  // ==================================================
+  // MEDIA ICON
+  // ==================================================
+
+  function renderMediaIcon() {
+    if (
+      mediaType === "video"
+    ) {
+      return (
+        <FileVideo
+          className="size-5"
+          aria-hidden="true"
+        />
+      );
+    }
+
+    if (
+      mediaType === "audio"
+    ) {
+      return (
+        <FileAudio
+          className="size-5"
+          aria-hidden="true"
+        />
+      );
+    }
+
+    return (
+      <ImageUp
+        className="size-5"
+        aria-hidden="true"
+      />
+    );
+  }
+
+  // ==================================================
+  // MEDIA LABEL
+  // ==================================================
+
+  function mediaLabel() {
+    if (
+      mediaType === "video"
+    ) {
+      return "MP4 video";
+    }
+
+    if (
+      mediaType === "audio"
+    ) {
+      return "MP3 audio";
+    }
+
+    return "Image";
+  }
+
+  // ==================================================
   // UI
-  // --------------------------------------------------
+  // ==================================================
 
   return (
     <Dialog
       open={open}
       onOpenChange={(next) => {
-        if (status === "uploading") return;
+        if (
+          status === "uploading"
+        ) {
+          return;
+        }
 
         if (!next) {
           reset();
@@ -239,168 +681,598 @@ export function UploadPhoto({
         onOpenChange(next);
       }}
     >
-      <DialogContent className="sm:max-w-lg">
-        <DialogHeader>
-          <DialogTitle>Upload photo</DialogTitle>
+      <DialogContent
+        className="
+          flex
+          w-[calc(100vw-24px)]
+          max-w-[760px]
+          min-w-0
+          max-h-[calc(100vh-24px)]
+          flex-col
+          gap-0
+          overflow-hidden
+          rounded-2xl
+          p-0
+          sm:max-h-[calc(100vh-48px)]
+        "
+      >
+        <div
+          className="
+            min-w-0
+            overflow-y-auto
+          "
+        >
+          {/* ==================================================
+              HEADER
+          ================================================== */}
 
-          <DialogDescription>
-            {ALLOWED_EXTENSIONS_LABEL} · up to {MAX_FILE_SIZE_MB} MB
-          </DialogDescription>
-        </DialogHeader>
-
-        <input
-          ref={inputRef}
-          type="file"
-          accept={ALLOWED_MIME_TYPES.join(",")}
-          className="sr-only"
-          onChange={(event) => selectFile(event.target.files?.[0])}
-        />
-
-        {!file ? (
-          <button
-            type="button"
-            onClick={() => inputRef.current?.click()}
-            onDragOver={(event) => {
-              event.preventDefault();
-              setDragging(true);
-            }}
-            onDragLeave={() => setDragging(false)}
-            onDrop={(event) => {
-              event.preventDefault();
-
-              setDragging(false);
-
-              selectFile(event.dataTransfer.files?.[0]);
-            }}
-            className={`flex w-full flex-col items-center rounded-xl border-2 border-dashed px-6 py-12 text-center transition ${
-              dragging
-                ? "border-primary bg-accent"
-                : "border-border bg-surface-muted hover:border-primary/50 hover:bg-accent/60"
-            }`}
+          <div
+            className="
+              border-b
+              border-border
+              px-5
+              py-4
+              pr-14
+              sm:px-6
+              sm:py-5
+            "
           >
-            <span className="mb-4 inline-flex size-12 items-center justify-center rounded-2xl bg-surface text-primary shadow-soft">
-              <UploadCloud className="size-6" aria-hidden="true" />
-            </span>
+            <DialogHeader
+              className="
+                space-y-1
+                text-left
+              "
+            >
+              <DialogTitle
+                className="
+                  text-xl
+                  font-semibold
+                  tracking-tight
+                  sm:text-2xl
+                "
+              >
+                Upload media
+              </DialogTitle>
 
-            <span className="text-sm font-semibold">Drag &amp; drop your photo here</span>
+              <DialogDescription>
+                {ALLOWED_EXTENSIONS_LABEL}
+                {" · "}
+                up to{" "}
+                {MAX_FILE_SIZE_MB} MB
+              </DialogDescription>
+            </DialogHeader>
+          </div>
 
-            <span className="mt-1 text-sm text-muted-foreground">or choose a photo</span>
-          </button>
-        ) : (
-          <div className="space-y-4">
-            {/* Preview */}
-            <div className="flex gap-4 rounded-xl border border-border bg-surface-muted p-3">
-              {previewUrl ? (
-                <img
-                  src={previewUrl}
-                  alt={`Preview of ${photoName}`}
-                  className="size-24 shrink-0 rounded-lg object-cover"
-                />
-              ) : null}
+          {/* ==================================================
+              CONTENT
+          ================================================== */}
 
-              <div className="min-w-0 flex-1">
-                <p className="truncate text-sm font-semibold">{file.name}</p>
+          <div
+            className="
+              min-w-0
+              space-y-5
+              px-5
+              py-5
+              sm:px-6
+              sm:py-6
+            "
+          >
+            <input
+              ref={inputRef}
+              type="file"
+              accept={ALLOWED_MIME_TYPES.join(
+                ",",
+              )}
+              className="sr-only"
+              onChange={(event) =>
+                selectFile(
+                  event.target.files?.[0],
+                )
+              }
+            />
 
-                <p className="mt-1 text-xs text-muted-foreground">
-                  {formatFileSize(file.size)} · {file.type.replace("image/", "").toUpperCase()}
-                </p>
+            {/* ==================================================
+                EMPTY STATE
+            ================================================== */}
 
-                {status === "idle" ? (
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="mt-2 h-8 px-2 text-xs"
-                    onClick={() => {
-                      reset();
+            {!file ? (
+              <button
+                type="button"
+                onClick={
+                  openFilePicker
+                }
+                onDragOver={(event) => {
+                  event.preventDefault();
+                  setDragging(true);
+                }}
+                onDragLeave={() =>
+                  setDragging(false)
+                }
+                onDrop={(event) => {
+                  event.preventDefault();
 
-                      inputRef.current?.click();
-                    }}
-                  >
-                    <X className="size-3.5" aria-hidden="true" />
-                    Remove / change
-                  </Button>
-                ) : null}
-              </div>
-            </div>
+                  setDragging(false);
 
-            {/* Custom name */}
-            {status !== "success" ? (
-              <div className="space-y-2">
-                <label htmlFor="photo-name" className="text-sm font-medium">
-                  Photo name
-                </label>
+                  selectFile(
+                    event.dataTransfer
+                      .files?.[0],
+                  );
+                }}
+                className={`
+                  flex
+                  min-h-[270px]
+                  w-full
+                  min-w-0
+                  flex-col
+                  items-center
+                  justify-center
+                  rounded-2xl
+                  border-2
+                  border-dashed
+                  px-6
+                  py-10
+                  text-center
+                  transition
+                  sm:min-h-[300px]
+                  ${
+                    dragging
+                      ? "border-primary bg-accent"
+                      : "border-border bg-surface-muted hover:border-primary/50 hover:bg-accent/50"
+                  }
+                `}
+              >
+                <span
+                  className="
+                    mb-4
+                    flex
+                    size-14
+                    items-center
+                    justify-center
+                    rounded-2xl
+                    bg-background
+                    text-primary
+                    shadow-soft
+                  "
+                >
+                  <UploadCloud
+                    className="size-7"
+                    aria-hidden="true"
+                  />
+                </span>
 
-                <input
-                  id="photo-name"
-                  value={photoName}
-                  maxLength={120}
-                  disabled={status === "uploading"}
-                  onChange={(event) => setPhotoName(event.target.value)}
-                  placeholder="e.g. Vrindavan Trip"
-                  className="flex h-10 w-full rounded-md border border-border bg-background px-3 text-sm outline-none transition placeholder:text-muted-foreground focus:border-primary focus:ring-2 focus:ring-primary/20 disabled:opacity-60"
-                />
+                <span
+                  className="
+                    text-base
+                    font-semibold
+                  "
+                >
+                  Drag &amp; drop your media
+                  here
+                </span>
 
-                <p className="text-xs text-muted-foreground">
-                  Choose a name you'll recognize later.
-                </p>
-              </div>
-            ) : null}
+                <span
+                  className="
+                    mt-1
+                    text-sm
+                    text-muted-foreground
+                  "
+                >
+                  or click to choose a file
+                </span>
 
-            {/* Progress */}
-            {status === "uploading" ? (
-              <div className="space-y-2" aria-live="polite">
-                <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                  <Loader2 className="size-4 animate-spin" aria-hidden="true" />
-                  Uploading photo… {progress}%
+                <span
+                  className="
+                    mt-4
+                    rounded-full
+                    bg-background
+                    px-3
+                    py-1.5
+                    text-xs
+                    text-muted-foreground
+                  "
+                >
+                  Images · MP4 · MP3 · max{" "}
+                  {MAX_FILE_SIZE_MB} MB
+                </span>
+              </button>
+            ) : (
+              <>
+                {/* ==================================================
+                    PREVIEW
+                ================================================== */}
+
+                <div className="min-w-0">
+                  {renderPreview()}
                 </div>
 
-                <Progress value={progress} />
-              </div>
-            ) : null}
+                {/* ==================================================
+                    FILE INFO
+                ================================================== */}
 
-            {/* Success */}
-            {status === "success" ? (
+                <div
+                  className="
+                    flex
+                    min-w-0
+                    items-center
+                    gap-3
+                    rounded-xl
+                    border
+                    border-border
+                    bg-surface-muted
+                    p-3
+                  "
+                >
+                  <span
+                    className="
+                      flex
+                      size-10
+                      shrink-0
+                      items-center
+                      justify-center
+                      rounded-xl
+                      bg-background
+                      text-primary
+                    "
+                  >
+                    {renderMediaIcon()}
+                  </span>
+
+                  <div
+                    className="
+                      min-w-0
+                      flex-1
+                    "
+                  >
+                    <p
+                      className="
+                        truncate
+                        text-sm
+                        font-semibold
+                      "
+                      title={file.name}
+                    >
+                      {file.name}
+                    </p>
+
+                    <p
+                      className="
+                        mt-1
+                        text-xs
+                        text-muted-foreground
+                      "
+                    >
+                      {formatFileSize(
+                        file.size,
+                      )}
+                      {" · "}
+                      {mediaLabel()}
+                    </p>
+                  </div>
+
+                  {status === "idle" ? (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={
+                        openFilePicker
+                      }
+                      className="shrink-0"
+                    >
+                      Change
+                    </Button>
+                  ) : null}
+
+                  {status === "idle" ? (
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      onClick={reset}
+                      className="
+                        size-9
+                        shrink-0
+                      "
+                      aria-label="Remove file"
+                    >
+                      <X
+                        className="size-4"
+                        aria-hidden="true"
+                      />
+                    </Button>
+                  ) : null}
+                </div>
+
+                {/* ==================================================
+                    NAME
+                ================================================== */}
+
+                {status !==
+                "success" ? (
+                  <div
+                    className="
+                      min-w-0
+                      space-y-2
+                    "
+                  >
+                    <div
+                      className="
+                        flex
+                        items-center
+                        justify-between
+                        gap-3
+                      "
+                    >
+                      <label
+                        htmlFor="photo-name"
+                        className="
+                          text-sm
+                          font-medium
+                        "
+                      >
+                        Name
+                      </label>
+
+                      <span
+                        className="
+                          shrink-0
+                          text-xs
+                          text-muted-foreground
+                        "
+                      >
+                        {photoName.length}/120
+                      </span>
+                    </div>
+
+                    <input
+                      id="photo-name"
+                      value={photoName}
+                      maxLength={120}
+                      disabled={
+                        status ===
+                        "uploading"
+                      }
+                      onChange={(event) =>
+                        setPhotoName(
+                          event.target.value,
+                        )
+                      }
+                      placeholder="e.g. Vrindavan Trip"
+                      className="
+                        h-11
+                        w-full
+                        min-w-0
+                        rounded-xl
+                        border
+                        border-border
+                        bg-background
+                        px-3.5
+                        text-sm
+                        outline-none
+                        transition
+                        placeholder:text-muted-foreground
+                        focus:border-primary
+                        focus:ring-2
+                        focus:ring-primary/20
+                        disabled:cursor-not-allowed
+                        disabled:opacity-60
+                      "
+                    />
+                  </div>
+                ) : null}
+
+                {/* ==================================================
+                    PROGRESS
+                ================================================== */}
+
+                {status ===
+                "uploading" ? (
+                  <div
+                    className="
+                      min-w-0
+                      space-y-2
+                      rounded-xl
+                      border
+                      border-border
+                      bg-surface-muted
+                      p-3.5
+                    "
+                    aria-live="polite"
+                  >
+                    <div
+                      className="
+                        flex
+                        items-center
+                        justify-between
+                        gap-3
+                        text-sm
+                      "
+                    >
+                      <span
+                        className="
+                          flex
+                          min-w-0
+                          items-center
+                          gap-2
+                          text-muted-foreground
+                        "
+                      >
+                        <Loader2
+                          className="
+                            size-4
+                            shrink-0
+                            animate-spin
+                          "
+                          aria-hidden="true"
+                        />
+
+                        <span className="truncate">
+                          Uploading media…
+                        </span>
+                      </span>
+
+                      <span
+                        className="
+                          shrink-0
+                          font-semibold
+                          tabular-nums
+                        "
+                      >
+                        {progress}%
+                      </span>
+                    </div>
+
+                    <Progress
+                      value={progress}
+                      className="h-2"
+                    />
+                  </div>
+                ) : null}
+
+                {/* ==================================================
+                    SUCCESS
+                ================================================== */}
+
+                {status ===
+                "success" ? (
+                  <div
+                    className="
+                      flex
+                      items-center
+                      gap-2
+                      rounded-xl
+                      bg-accent
+                      px-4
+                      py-3
+                      text-sm
+                      font-medium
+                      text-primary
+                    "
+                    aria-live="polite"
+                  >
+                    <CheckCircle2
+                      className="
+                        size-4
+                        shrink-0
+                      "
+                      aria-hidden="true"
+                    />
+
+                    Media uploaded
+                    successfully
+                  </div>
+                ) : null}
+              </>
+            )}
+
+            {/* ==================================================
+                ERROR
+            ================================================== */}
+
+            {error ? (
               <p
-                className="flex items-center gap-2 text-sm font-medium text-primary"
-                aria-live="polite"
+                role="alert"
+                className="
+                  rounded-xl
+                  bg-destructive/10
+                  px-3.5
+                  py-3
+                  text-sm
+                  font-medium
+                  leading-5
+                  text-destructive
+                "
               >
-                <CheckCircle2 className="size-4" aria-hidden="true" />
-                Photo uploaded successfully
+                {error}
               </p>
             ) : null}
           </div>
-        )}
 
-        {error ? (
-          <p role="alert" className="text-sm font-medium text-destructive">
-            {error}
-          </p>
-        ) : null}
+          {/* ==================================================
+              FOOTER
+          ================================================== */}
 
-        {file && status !== "success" ? (
-          <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
-            <Button
-              variant="outline"
-              onClick={() => {
-                reset();
-                onOpenChange(false);
-              }}
-              disabled={status === "uploading"}
+          {file &&
+          status !== "success" ? (
+            <div
+              className="
+                sticky
+                bottom-0
+                flex
+                flex-col-reverse
+                gap-2
+                border-t
+                border-border
+                bg-background/95
+                px-5
+                py-4
+                backdrop-blur
+                sm:flex-row
+                sm:justify-end
+                sm:px-6
+              "
             >
-              Cancel
-            </Button>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => {
+                  reset();
+                  onOpenChange(false);
+                }}
+                disabled={
+                  status ===
+                  "uploading"
+                }
+                className="
+                  w-full
+                  sm:w-auto
+                "
+              >
+                Cancel
+              </Button>
 
-            <Button onClick={handleUpload} disabled={status === "uploading" || !photoName.trim()}>
-              {status === "uploading" ? (
-                <Loader2 className="size-4 animate-spin" aria-hidden="true" />
-              ) : (
-                <ImageUp className="size-4" aria-hidden="true" />
-              )}
-              Upload photo
-            </Button>
-          </div>
-        ) : null}
+              <Button
+                type="button"
+                onClick={
+                  handleUpload
+                }
+                disabled={
+                  status ===
+                    "uploading" ||
+                  !photoName.trim()
+                }
+                className="
+                  w-full
+                  sm:w-auto
+                "
+              >
+                {status ===
+                "uploading" ? (
+                  <Loader2
+                    className="
+                      size-4
+                      animate-spin
+                    "
+                    aria-hidden="true"
+                  />
+                ) : (
+                  <UploadCloud
+                    className="size-4"
+                    aria-hidden="true"
+                  />
+                )}
+
+                {status ===
+                "uploading"
+                  ? "Uploading…"
+                  : "Upload media"}
+              </Button>
+            </div>
+          ) : null}
+        </div>
       </DialogContent>
     </Dialog>
   );
 }
+
+export default UploadPhoto;

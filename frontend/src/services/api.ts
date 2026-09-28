@@ -427,7 +427,7 @@ export async function confirmUpload(input: {
 
 export type PhotoSort = "newest" | "oldest" | "name_asc" | "name_desc";
 
-export type PhotoType = "all" | "image" | "video";
+export type PhotoType = "all" | "image" | "video" | "audio";
 
 export type GetPhotosOptions = {
   search?: string;
