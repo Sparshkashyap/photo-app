@@ -1,11 +1,4 @@
-import {
-  Heart,
-  ImageOff,
-  Loader2,
-  RotateCw,
-  Video,
-  X,
-} from "lucide-react";
+import { Heart, ImageOff, Loader2, RotateCw, Video, X } from "lucide-react";
 
 import {
   useEffect,
@@ -18,9 +11,7 @@ import { toast } from "sonner";
 
 import { PhotoMenu } from "@/components/PhotoMenu";
 
-import {
-  requestDownloadUrl,
-} from "@/services/api";
+import { requestDownloadUrl } from "@/services/api";
 
 import type { Folder } from "@/types/folder";
 import type { Photo } from "@/types/photo";
@@ -30,22 +21,13 @@ type PhotoCardProps = {
 
   folders: Folder[];
 
-  onRenamed?: (
-    photo: Photo,
-  ) => void;
+  onRenamed?: (photo: Photo) => void;
 
-  onMoved?: (
-    photo: Photo,
-    folderId: string | null,
-  ) => void;
+  onMoved?: (photo: Photo, folderId: string | null) => void;
 
-  onTrashed?: (
-    photo: Photo,
-  ) => void;
+  onTrashed?: (photo: Photo) => void;
 
-  onFavorite?: (
-    photo: Photo,
-  ) => void;
+  onFavorite?: (photo: Photo) => void;
 };
 
 type PhotoAppSettings = {
@@ -56,35 +38,26 @@ type PhotoAppSettings = {
   darkMode?: boolean;
 };
 
-const SETTINGS_KEY =
-  "photo-app-settings";
+const SETTINGS_KEY = "photo-app-settings";
 
 // Dispatched by the Settings page after every write, so preferences
 // (autoplay, file names, ...) take effect immediately in this tab too —
 // the native "storage" event only fires in *other* tabs.
-const SETTINGS_CHANGED_EVENT =
-  "photo-app-settings-changed";
+const SETTINGS_CHANGED_EVENT = "photo-app-settings-changed";
 
 function getSettings(): PhotoAppSettings {
-  if (
-    typeof window === "undefined"
-  ) {
+  if (typeof window === "undefined") {
     return {};
   }
 
   try {
-    const stored =
-      localStorage.getItem(
-        SETTINGS_KEY,
-      );
+    const stored = localStorage.getItem(SETTINGS_KEY);
 
     if (!stored) {
       return {};
     }
 
-    return JSON.parse(
-      stored,
-    ) as PhotoAppSettings;
+    return JSON.parse(stored) as PhotoAppSettings;
   } catch {
     return {};
   }
@@ -98,72 +71,35 @@ export function PhotoCard({
   onTrashed,
   onFavorite,
 }: PhotoCardProps) {
-  const [
-    downloading,
-    setDownloading,
-  ] = useState(false);
+  const [downloading, setDownloading] = useState(false);
 
-  const [
-    previewOpen,
-    setPreviewOpen,
-  ] = useState(false);
+  const [previewOpen, setPreviewOpen] = useState(false);
 
-  const [
-    settings,
-    setSettings,
-  ] = useState<PhotoAppSettings>(
-    getSettings,
-  );
+  const [settings, setSettings] = useState<PhotoAppSettings>(getSettings);
 
-  const [
-    mediaError,
-    setMediaError,
-  ] = useState(false);
+  const [mediaError, setMediaError] = useState(false);
 
-  const [
-    mediaLoaded,
-    setMediaLoaded,
-  ] = useState(false);
+  const [mediaLoaded, setMediaLoaded] = useState(false);
 
-  const [
-    isFavorite,
-    setIsFavorite,
-  ] = useState(
-    photo.isFavorite === true,
-  );
+  const [isFavorite, setIsFavorite] = useState(photo.isFavorite === true);
 
   // ==================================================
   // Listen for settings changes (same tab + other tabs)
   // ==================================================
 
   useEffect(() => {
-    const refreshSettings =
-      () => {
-        setSettings(
-          getSettings(),
-        );
-      };
+    const refreshSettings = () => {
+      setSettings(getSettings());
+    };
 
-    window.addEventListener(
-      "storage",
-      refreshSettings,
-    );
+    window.addEventListener("storage", refreshSettings);
 
-    window.addEventListener(
-      SETTINGS_CHANGED_EVENT,
-      refreshSettings,
-    );
+    window.addEventListener(SETTINGS_CHANGED_EVENT, refreshSettings);
 
     return () => {
-      window.removeEventListener(
-        "storage",
-        refreshSettings,
-      );
+      window.removeEventListener("storage", refreshSettings);
 
-      window.removeEventListener(
-        SETTINGS_CHANGED_EVENT,
-        refreshSettings,
-      );
+      window.removeEventListener(SETTINGS_CHANGED_EVENT, refreshSettings);
     };
   }, []);
 
@@ -172,12 +108,8 @@ export function PhotoCard({
   // ==================================================
 
   useEffect(() => {
-    setIsFavorite(
-      photo.isFavorite === true,
-    );
-  }, [
-    photo.isFavorite,
-  ]);
+    setIsFavorite(photo.isFavorite === true);
+  }, [photo.isFavorite]);
 
   // ==================================================
   // Download
@@ -191,61 +123,33 @@ export function PhotoCard({
     setDownloading(true);
 
     try {
-      const response =
-        await requestDownloadUrl(
-          photo.photoId,
-        );
+      const response = await requestDownloadUrl(photo.photoId);
 
-      const link =
-        document.createElement(
-          "a",
-        );
+      const link = document.createElement("a");
 
-      link.href =
-        response.downloadUrl;
+      link.href = response.downloadUrl;
 
-      link.download =
-        photo.name ||
-        photo.fileName ||
-        "photo";
+      link.download = photo.name || photo.fileName || "photo";
 
       link.target = "_blank";
 
-      link.rel =
-        "noopener noreferrer";
+      link.rel = "noopener noreferrer";
 
-      document.body.appendChild(
-        link,
-      );
+      document.body.appendChild(link);
 
       link.click();
 
       link.remove();
 
-      toast.success(
-        "Download started",
-        {
-          description:
-            photo.name ||
-            photo.fileName ||
-            "Your file",
-        },
-      );
+      toast.success("Download started", {
+        description: photo.name || photo.fileName || "Your file",
+      });
     } catch (error) {
-      console.error(
-        "Download failed:",
-        error,
-      );
+      console.error("Download failed:", error);
 
-      toast.error(
-        "Download failed",
-        {
-          description:
-            error instanceof Error
-              ? error.message
-              : "Please try again.",
-        },
-      );
+      toast.error("Download failed", {
+        description: error instanceof Error ? error.message : "Please try again.",
+      });
     } finally {
       setDownloading(false);
     }
@@ -255,29 +159,15 @@ export function PhotoCard({
   // Media information
   // ==================================================
 
-  const isVideo =
-    photo.contentType?.startsWith(
-      "video/",
-    ) ?? false;
+  const isVideo = photo.contentType?.startsWith("video/") ?? false;
 
-  const mediaUrl =
-    photo.url ||
-    photo.downloadUrl ||
-    "";
+  const mediaUrl = photo.url || photo.downloadUrl || "";
 
-  const displayName =
-    photo.name ||
-    photo.fileName ||
-    photo.originalFileName ||
-    "Untitled photo";
+  const displayName = photo.name || photo.fileName || photo.originalFileName || "Untitled photo";
 
-  const showFileNames =
-    settings.showFileNames !==
-    false;
+  const showFileNames = settings.showFileNames !== false;
 
-  const autoplayVideos =
-    settings.autoplayVideos ===
-    true;
+  const autoplayVideos = settings.autoplayVideos === true;
 
   // ==================================================
   // Reset media state when the photo (or its URL) changes
@@ -288,11 +178,7 @@ export function PhotoCard({
     // Videos report "loaded" via onLoadedData below; for images
     // we still want the fade-in, so start hidden until onLoad fires.
     setMediaLoaded(isVideo);
-  }, [
-    photo.photoId,
-    mediaUrl,
-    isVideo,
-  ]);
+  }, [photo.photoId, mediaUrl, isVideo]);
 
   // ==================================================
   // Close preview with Escape
@@ -303,40 +189,24 @@ export function PhotoCard({
       return;
     }
 
-    function handleKeyDown(
-      event: globalThis.KeyboardEvent,
-    ) {
-      if (
-        event.key ===
-        "Escape"
-      ) {
+    function handleKeyDown(event: globalThis.KeyboardEvent) {
+      if (event.key === "Escape") {
         setPreviewOpen(false);
       }
     }
 
-    document.addEventListener(
-      "keydown",
-      handleKeyDown,
-    );
+    document.addEventListener("keydown", handleKeyDown);
 
-    const previousOverflow =
-      document.body.style.overflow;
+    const previousOverflow = document.body.style.overflow;
 
-    document.body.style.overflow =
-      "hidden";
+    document.body.style.overflow = "hidden";
 
     return () => {
-      document.removeEventListener(
-        "keydown",
-        handleKeyDown,
-      );
+      document.removeEventListener("keydown", handleKeyDown);
 
-      document.body.style.overflow =
-        previousOverflow;
+      document.body.style.overflow = previousOverflow;
     };
-  }, [
-    previewOpen,
-  ]);
+  }, [previewOpen]);
 
   // ==================================================
   // Open fullscreen preview
@@ -347,23 +217,12 @@ export function PhotoCard({
   // was invisible to users and inconsistent with keyboard use.
   // ==================================================
 
-  function handlePreviewOpen(
-    event: ReactMouseEvent<HTMLElement>,
-  ) {
-    if (
-      event.target instanceof
-      HTMLVideoElement
-    ) {
+  function handlePreviewOpen(event: ReactMouseEvent<HTMLElement>) {
+    if (event.target instanceof HTMLVideoElement) {
       return;
     }
 
-    if (
-      event.target instanceof
-        HTMLElement &&
-      event.target.closest(
-        "button",
-      )
-    ) {
+    if (event.target instanceof HTMLElement && event.target.closest("button")) {
       return;
     }
 
@@ -378,14 +237,8 @@ export function PhotoCard({
   // Keyboard preview
   // ==================================================
 
-  function handlePreviewKeyDown(
-    event: ReactKeyboardEvent<HTMLElement>,
-  ) {
-    if (
-      event.key ===
-        "Enter" ||
-      event.key === " "
-    ) {
+  function handlePreviewKeyDown(event: ReactKeyboardEvent<HTMLElement>) {
+    if (event.key === "Enter" || event.key === " ") {
       event.preventDefault();
 
       if (mediaUrl && !mediaError) {
@@ -407,9 +260,7 @@ export function PhotoCard({
     setMediaLoaded(true);
   }
 
-  function handleRetryMedia(
-    event: ReactMouseEvent,
-  ) {
+  function handleRetryMedia(event: ReactMouseEvent) {
     event.stopPropagation();
     setMediaError(false);
     setMediaLoaded(false);
@@ -419,20 +270,12 @@ export function PhotoCard({
   // Favorite
   // ==================================================
 
-  function handleFavorite(
-    updatedPhoto: Photo,
-  ) {
-    const nextFavorite =
-      updatedPhoto.isFavorite ===
-      true;
+  function handleFavorite(updatedPhoto: Photo) {
+    const nextFavorite = updatedPhoto.isFavorite === true;
 
-    setIsFavorite(
-      nextFavorite,
-    );
+    setIsFavorite(nextFavorite);
 
-    onFavorite?.(
-      updatedPhoto,
-    );
+    onFavorite?.(updatedPhoto);
   }
 
   return (
@@ -447,19 +290,13 @@ export function PhotoCard({
         ================================================== */}
 
         <div
-          onClick={
-            handlePreviewOpen
-          }
-          onKeyDown={
-            handlePreviewKeyDown
-          }
+          onClick={handlePreviewOpen}
+          onKeyDown={handlePreviewKeyDown}
           role="button"
           tabIndex={0}
           aria-label={`Open ${displayName} preview`}
           className={`relative rounded-xl outline-none transition focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background ${
-            mediaUrl && !mediaError
-              ? "cursor-zoom-in"
-              : "cursor-default"
+            mediaUrl && !mediaError ? "cursor-zoom-in" : "cursor-default"
           }`}
         >
           {/* Loading shimmer, visible until the media reports it's ready */}
@@ -470,8 +307,7 @@ export function PhotoCard({
 
           {/* Media unavailable */}
 
-          {!mediaUrl ||
-          mediaError ? (
+          {!mediaUrl || mediaError ? (
             <div className="flex aspect-square w-full flex-col items-center justify-center gap-2 bg-muted">
               {isVideo ? (
                 <Video className="size-10 text-muted-foreground" />
@@ -480,9 +316,7 @@ export function PhotoCard({
               )}
 
               <span className="px-4 text-center text-xs text-muted-foreground">
-                {mediaError
-                  ? "Unable to load media"
-                  : "Preview unavailable"}
+                {mediaError ? "Unable to load media" : "Preview unavailable"}
               </span>
 
               {mediaError ? (
@@ -501,23 +335,13 @@ export function PhotoCard({
               src={mediaUrl}
               controls
               preload="metadata"
-              autoPlay={
-                autoplayVideos
-              }
-              muted={
-                autoplayVideos
-              }
+              autoPlay={autoplayVideos}
+              muted={autoplayVideos}
               playsInline
-              onLoadedData={
-                handleMediaLoaded
-              }
-              onError={
-                handleMediaError
-              }
+              onLoadedData={handleMediaLoaded}
+              onError={handleMediaError}
               className={`aspect-square w-full object-cover transition-[opacity,transform] duration-300 ease-out group-hover:scale-[1.04] ${
-                mediaLoaded
-                  ? "opacity-100"
-                  : "opacity-0"
+                mediaLoaded ? "opacity-100" : "opacity-0"
               }`}
             />
           ) : (
@@ -526,16 +350,10 @@ export function PhotoCard({
               alt={displayName}
               loading="lazy"
               decoding="async"
-              onLoad={
-                handleMediaLoaded
-              }
-              onError={
-                handleMediaError
-              }
+              onLoad={handleMediaLoaded}
+              onError={handleMediaError}
               className={`aspect-square w-full object-cover transition-[opacity,transform] duration-300 ease-out group-hover:scale-[1.04] ${
-                mediaLoaded
-                  ? "opacity-100"
-                  : "opacity-0"
+                mediaLoaded ? "opacity-100" : "opacity-0"
               }`}
             />
           )}
@@ -586,24 +404,13 @@ export function PhotoCard({
           <PhotoMenu
             photo={photo}
             folders={folders}
-            onRenamed={
-              onRenamed ??
-              ((_: Photo) => {})
-            }
-            onMoved={
-              onMoved ??
-              ((_: Photo, __: string | null) => {})
-            }
+            onRenamed={onRenamed ?? ((_: Photo) => {})}
+            onMoved={onMoved ?? ((_: Photo, __: string | null) => {})}
             onDownload={() => {
               void handleDownload();
             }}
-            onTrashed={
-              onTrashed ??
-              ((_: Photo) => {})
-            }
-            onFavorite={
-              handleFavorite
-            }
+            onTrashed={onTrashed ?? ((_: Photo) => {})}
+            onFavorite={handleFavorite}
           />
         </div>
 
@@ -652,9 +459,7 @@ export function PhotoCard({
 
           <div
             className="relative flex max-h-[92vh] max-w-[95vw] animate-in zoom-in-95 items-center justify-center duration-150"
-            onClick={(
-              event,
-            ) => {
+            onClick={(event) => {
               event.stopPropagation();
             }}
           >

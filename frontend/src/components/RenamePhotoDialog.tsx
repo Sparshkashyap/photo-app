@@ -1,12 +1,6 @@
-import {
-  Loader2,
-  Pencil,
-} from "lucide-react";
+import { Loader2, Pencil } from "lucide-react";
 
-import {
-  useEffect,
-  useState,
-} from "react";
+import { useEffect, useState } from "react";
 
 import { toast } from "sonner";
 
@@ -28,15 +22,11 @@ import type { Photo } from "@/types/photo";
 type RenamePhotoDialogProps = {
   open: boolean;
 
-  onOpenChange: (
-    open: boolean,
-  ) => void;
+  onOpenChange: (open: boolean) => void;
 
   photo: Photo;
 
-  onRenamed?: (
-    photo: Photo,
-  ) => void;
+  onRenamed?: (photo: Photo) => void;
 };
 
 export function RenamePhotoDialog({
@@ -45,11 +35,9 @@ export function RenamePhotoDialog({
   photo,
   onRenamed,
 }: RenamePhotoDialogProps) {
-  const [name, setName] =
-    useState(photo.name);
+  const [name, setName] = useState(photo.name);
 
-  const [saving, setSaving] =
-    useState(false);
+  const [saving, setSaving] = useState(false);
 
   // Reset the input whenever
   // the dialog is opened.
@@ -64,32 +52,25 @@ export function RenamePhotoDialog({
   // --------------------------------------------------
 
   async function handleRename() {
-    const cleanName =
-      name.trim();
+    const cleanName = name.trim();
 
     // Validate empty name
     if (!cleanName) {
-      toast.error(
-        "Photo name cannot be empty",
-      );
+      toast.error("Photo name cannot be empty");
 
       return;
     }
 
     // Validate maximum length
     if (cleanName.length > 120) {
-      toast.error(
-        "Photo name cannot exceed 120 characters",
-      );
+      toast.error("Photo name cannot exceed 120 characters");
 
       return;
     }
 
     // If name has not changed,
     // simply close the dialog.
-    if (
-      cleanName === photo.name
-    ) {
+    if (cleanName === photo.name) {
       onOpenChange(false);
 
       return;
@@ -98,14 +79,9 @@ export function RenamePhotoDialog({
     setSaving(true);
 
     try {
-      const response =
-        await renamePhoto(
-          photo.photoId,
-          cleanName,
-        );
+      const response = await renamePhoto(photo.photoId, cleanName);
 
-      const updated =
-        response.photo;
+      const updated = response.photo;
 
       // Preserve the existing photo
       // and update the fields returned
@@ -113,54 +89,36 @@ export function RenamePhotoDialog({
       const updatedPhoto: Photo = {
         ...photo,
 
-        name:
-          updated.name,
+        name: updated.name,
 
-        fileName:
-          updated.fileName ??
-          photo.fileName,
+        fileName: updated.fileName ?? photo.fileName,
 
         ...(updated.originalFileName !== undefined
           ? {
-              originalFileName:
-                updated.originalFileName,
+              originalFileName: updated.originalFileName,
             }
           : {}),
 
         ...(updated.updatedAt !== undefined
           ? {
-              updatedAt:
-                updated.updatedAt,
+              updatedAt: updated.updatedAt,
             }
           : {}),
       };
 
       // Send the updated photo
       // back to the parent component.
-      onRenamed?.(
-        updatedPhoto,
-      );
+      onRenamed?.(updatedPhoto);
 
-      toast.success(
-        "Photo renamed successfully",
-      );
+      toast.success("Photo renamed successfully");
 
       onOpenChange(false);
     } catch (error) {
-      console.error(
-        "Rename failed:",
-        error,
-      );
+      console.error("Rename failed:", error);
 
-      toast.error(
-        "Rename failed",
-        {
-          description:
-            error instanceof Error
-              ? error.message
-              : "Please try again.",
-        },
-      );
+      toast.error("Rename failed", {
+        description: error instanceof Error ? error.message : "Please try again.",
+      });
     } finally {
       setSaving(false);
     }
@@ -179,13 +137,10 @@ export function RenamePhotoDialog({
     >
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>
-            Rename photo
-          </DialogTitle>
+          <DialogTitle>Rename photo</DialogTitle>
 
           <DialogDescription>
-            Give this photo a name you can
-            easily recognize later.
+            Give this photo a name you can easily recognize later.
           </DialogDescription>
         </DialogHeader>
 
@@ -194,10 +149,7 @@ export function RenamePhotoDialog({
         --------------------------------------------- */}
 
         <div className="space-y-2">
-          <label
-            htmlFor={`rename-${photo.photoId}`}
-            className="text-sm font-medium"
-          >
+          <label htmlFor={`rename-${photo.photoId}`} className="text-sm font-medium">
             Photo name
           </label>
 
@@ -209,14 +161,10 @@ export function RenamePhotoDialog({
             disabled={saving}
             placeholder="Enter photo name"
             onChange={(event) => {
-              setName(
-                event.target.value,
-              );
+              setName(event.target.value);
             }}
             onKeyDown={(event) => {
-              if (
-                event.key === "Enter"
-              ) {
+              if (event.key === "Enter") {
                 event.preventDefault();
 
                 void handleRename();
@@ -226,13 +174,9 @@ export function RenamePhotoDialog({
           />
 
           <div className="flex justify-between text-xs text-muted-foreground">
-            <span>
-              Maximum 120 characters
-            </span>
+            <span>Maximum 120 characters</span>
 
-            <span>
-              {name.length}/120
-            </span>
+            <span>{name.length}/120</span>
           </div>
         </div>
 
@@ -254,10 +198,7 @@ export function RenamePhotoDialog({
 
           <Button
             type="button"
-            disabled={
-              saving ||
-              !name.trim()
-            }
+            disabled={saving || !name.trim()}
             onClick={() => {
               void handleRename();
             }}
@@ -265,15 +206,10 @@ export function RenamePhotoDialog({
             {saving ? (
               <Loader2 className="size-4 animate-spin" />
             ) : (
-              <Pencil
-                className="size-4"
-                aria-hidden="true"
-              />
+              <Pencil className="size-4" aria-hidden="true" />
             )}
 
-            {saving
-              ? "Saving..."
-              : "Rename"}
+            {saving ? "Saving..." : "Rename"}
           </Button>
         </DialogFooter>
       </DialogContent>

@@ -21,11 +21,7 @@ export interface Photo {
 
   folderId?: string | null;
 
-  status?:
-    | "UPLOADING"
-    | "READY"
-    | "FAILED"
-    | string;
+  status?: "UPLOADING" | "READY" | "FAILED" | string;
 
   url?: string;
 

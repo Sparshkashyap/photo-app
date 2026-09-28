@@ -7,58 +7,32 @@ import {
   Video,
 } from "lucide-react";
 
-import {
-  createFileRoute,
-  useNavigate,
-} from "@tanstack/react-router";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
 
-import {
-  useEffect,
-  useState,
-} from "react";
+import { useEffect, useState } from "react";
 
 import { toast } from "sonner";
 
-import {
-  getSharedPhoto,
-} from "@/services/api";
+import { getSharedPhoto } from "@/services/api";
 
-import type {
-  SharedPhoto,
-} from "@/types/photo";
+import type { SharedPhoto } from "@/types/photo";
 
-export const Route =
-  createFileRoute("/shared")({
-    component:
-      SharedPhotoPage,
-  });
+export const Route = createFileRoute("/shared")({
+  component: SharedPhotoPage,
+});
 
 function SharedPhotoPage() {
-  const {
-    token,
-  } = Route.useParams() as {
+  const { token } = Route.useParams() as {
     token: string;
   };
 
-  const navigate =
-    useNavigate();
+  const navigate = useNavigate();
 
-  const [
-    photo,
-    setPhoto,
-  ] = useState<
-    SharedPhoto | null
-  >(null);
+  const [photo, setPhoto] = useState<SharedPhoto | null>(null);
 
-  const [
-    loading,
-    setLoading,
-  ] = useState(true);
+  const [loading, setLoading] = useState(true);
 
-  const [
-    error,
-    setError,
-  ] = useState("");
+  const [error, setError] = useState("");
 
   useEffect(() => {
     let cancelled = false;
@@ -68,35 +42,21 @@ function SharedPhotoPage() {
         setLoading(true);
         setError("");
 
-        const response =
-          await getSharedPhoto(
-            token,
-          );
+        const response = await getSharedPhoto(token);
 
         if (cancelled) {
           return;
         }
 
-        setPhoto(
-          response.photo,
-        );
+        setPhoto(response.photo);
       } catch (error) {
-        console.error(
-          "Failed to load shared photo:",
-          error,
-        );
+        console.error("Failed to load shared photo:", error);
 
-        if (
-          cancelled
-        ) {
+        if (cancelled) {
           return;
         }
 
-        setError(
-          error instanceof Error
-            ? error.message
-            : "This shared link is unavailable.",
-        );
+        setError(error instanceof Error ? error.message : "This shared link is unavailable.");
       } finally {
         if (!cancelled) {
           setLoading(false);
@@ -116,41 +76,26 @@ function SharedPhotoPage() {
       return;
     }
 
-    const link =
-      document.createElement(
-        "a",
-      );
+    const link = document.createElement("a");
 
-    link.href =
-      photo.downloadUrl;
+    link.href = photo.downloadUrl;
 
-    link.download =
-      photo.name ||
-      photo.fileName ||
-      "photo";
+    link.download = photo.name || photo.fileName || "photo";
 
     link.target = "_blank";
 
-    link.rel =
-      "noopener noreferrer";
+    link.rel = "noopener noreferrer";
 
-    document.body.appendChild(
-      link,
-    );
+    document.body.appendChild(link);
 
     link.click();
 
     link.remove();
 
-    toast.success(
-      "Download started",
-    );
+    toast.success("Download started");
   }
 
-  const isVideo =
-    photo?.contentType?.startsWith(
-      "video/",
-    ) ?? false;
+  const isVideo = photo?.contentType?.startsWith("video/") ?? false;
 
   return (
     <div className="min-h-screen bg-background">
@@ -166,20 +111,16 @@ function SharedPhotoPage() {
             className="inline-flex items-center gap-2 text-sm font-medium transition hover:text-primary"
           >
             <ArrowLeft className="size-4" />
-
             Photos
           </button>
 
           {photo ? (
             <button
               type="button"
-              onClick={
-                handleDownload
-              }
+              onClick={handleDownload}
               className="inline-flex items-center gap-2 rounded-lg border border-border px-3 py-2 text-sm font-medium transition hover:bg-accent"
             >
               <Download className="size-4" />
-
               Download
             </button>
           ) : null}
@@ -191,9 +132,7 @@ function SharedPhotoPage() {
           <div className="flex flex-col items-center gap-3 text-center">
             <Loader2 className="size-8 animate-spin text-primary" />
 
-            <p className="text-sm text-muted-foreground">
-              Loading shared photo...
-            </p>
+            <p className="text-sm text-muted-foreground">Loading shared photo...</p>
           </div>
         ) : error ? (
           <div className="w-full max-w-md rounded-2xl border border-border bg-card p-8 text-center shadow-sm">
@@ -201,13 +140,9 @@ function SharedPhotoPage() {
               <ExternalLink className="size-6" />
             </div>
 
-            <h1 className="mt-5 text-xl font-semibold">
-              Link unavailable
-            </h1>
+            <h1 className="mt-5 text-xl font-semibold">Link unavailable</h1>
 
-            <p className="mt-2 text-sm text-muted-foreground">
-              {error}
-            </p>
+            <p className="mt-2 text-sm text-muted-foreground">{error}</p>
 
             <button
               type="button"
@@ -219,7 +154,6 @@ function SharedPhotoPage() {
               className="mt-6 inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground"
             >
               <ArrowLeft className="size-4" />
-
               Go to Photos
             </button>
           </div>
@@ -227,14 +161,10 @@ function SharedPhotoPage() {
           <section className="w-full">
             <div className="mb-5">
               <h1 className="truncate text-xl font-semibold sm:text-2xl">
-                {photo.name ||
-                  photo.fileName ||
-                  "Shared photo"}
+                {photo.name || photo.fileName || "Shared photo"}
               </h1>
 
-              <p className="mt-1 text-sm text-muted-foreground">
-                Shared with a secure link
-              </p>
+              <p className="mt-1 text-sm text-muted-foreground">Shared with a secure link</p>
             </div>
 
             <div className="overflow-hidden rounded-2xl border border-border bg-card shadow-sm">
@@ -242,9 +172,7 @@ function SharedPhotoPage() {
                 {photo.downloadUrl ? (
                   isVideo ? (
                     <video
-                      src={
-                        photo.downloadUrl
-                      }
+                      src={photo.downloadUrl}
                       controls
                       playsInline
                       preload="metadata"
@@ -252,58 +180,37 @@ function SharedPhotoPage() {
                     />
                   ) : (
                     <img
-                      src={
-                        photo.downloadUrl
-                      }
-                      alt={
-                        photo.name ||
-                        "Shared photo"
-                      }
+                      src={photo.downloadUrl}
+                      alt={photo.name || "Shared photo"}
                       className="max-h-[75vh] max-w-full rounded-xl object-contain"
                     />
                   )
                 ) : (
                   <div className="flex flex-col items-center gap-3 text-muted-foreground">
-                    {isVideo ? (
-                      <Video className="size-12" />
-                    ) : (
-                      <ImageIcon className="size-12" />
-                    )}
+                    {isVideo ? <Video className="size-12" /> : <ImageIcon className="size-12" />}
 
-                    <p>
-                      Preview unavailable
-                    </p>
+                    <p>Preview unavailable</p>
                   </div>
                 )}
               </div>
 
               <div className="flex flex-col gap-3 border-t border-border p-4 sm:flex-row sm:items-center sm:justify-between">
                 <div className="min-w-0">
-                  <p className="truncate text-sm font-medium">
-                    {photo.fileName}
-                  </p>
+                  <p className="truncate text-sm font-medium">{photo.fileName}</p>
 
                   {photo.fileSize ? (
                     <p className="text-xs text-muted-foreground">
-                      {(
-                        photo.fileSize /
-                        1024 /
-                        1024
-                      ).toFixed(2)}{" "}
-                      MB
+                      {(photo.fileSize / 1024 / 1024).toFixed(2)} MB
                     </p>
                   ) : null}
                 </div>
 
                 <button
                   type="button"
-                  onClick={
-                    handleDownload
-                  }
+                  onClick={handleDownload}
                   className="inline-flex shrink-0 items-center justify-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition hover:opacity-90"
                 >
                   <Download className="size-4" />
-
                   Download
                 </button>
               </div>

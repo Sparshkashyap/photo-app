@@ -1,118 +1,61 @@
-import {
-  Link,
-  createFileRoute,
-  useNavigate,
-} from "@tanstack/react-router";
+import { Link, createFileRoute, useNavigate } from "@tanstack/react-router";
 
-import {
-  Check,
-  Eye,
-  EyeOff,
-  Loader2,
-  Lock,
-  Mail,
-  User,
-  X,
-} from "lucide-react";
+import { Check, Eye, EyeOff, Loader2, Lock, Mail, User, X } from "lucide-react";
 
-import {
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-} from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
-import {
-  toast,
-} from "sonner";
+import { toast } from "sonner";
 
-import {
-  AuthLayout,
-} from "@/components/AuthLayout";
+import { AuthLayout } from "@/components/AuthLayout";
 
-import {
-  Button,
-} from "@/components/ui/button";
+import { Button } from "@/components/ui/button";
 
-import {
-  Input,
-} from "@/components/ui/input";
+import { Input } from "@/components/ui/input";
 
-import {
-  Label,
-} from "@/components/ui/label";
+import { Label } from "@/components/ui/label";
 
-import {
-  useAuth,
-} from "@/hooks/useAuth";
+import { useAuth } from "@/hooks/useAuth";
 
-import {
-  ApiError,
-} from "@/services/api";
+import { ApiError } from "@/services/api";
 
-export const Route =
-  createFileRoute(
-    "/signup",
-  )({
-    head: () => ({
-      meta: [
-        {
-          title:
-            "Create your account — Photos",
-        },
-        {
-          name: "description",
-          content:
-            "Create a free Photos account to store and download your photos securely.",
-        },
-      ],
-    }),
+export const Route = createFileRoute("/signup")({
+  head: () => ({
+    meta: [
+      {
+        title: "Create your account — Photos",
+      },
+      {
+        name: "description",
+        content: "Create a free Photos account to store and download your photos securely.",
+      },
+    ],
+  }),
 
-    component:
-      SignupPage,
-  });
+  component: SignupPage,
+});
 
-const EMAIL_PATTERN =
-  /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
-function passwordStrength(
-  password: string,
-) {
+function passwordStrength(password: string) {
   let score = 0;
 
-  if (
-    password.length >= 8
-  ) {
+  if (password.length >= 8) {
     score += 1;
   }
 
-  if (
-    password.length >= 12
-  ) {
+  if (password.length >= 12) {
     score += 1;
   }
 
-  if (
-    /[A-Z]/.test(password) &&
-    /[a-z]/.test(password)
-  ) {
+  if (/[A-Z]/.test(password) && /[a-z]/.test(password)) {
     score += 1;
   }
 
-  if (
-    /\d/.test(password) ||
-    /[^A-Za-z0-9]/.test(password)
-  ) {
+  if (/\d/.test(password) || /[^A-Za-z0-9]/.test(password)) {
     score += 1;
   }
 
-  const labels = [
-    "Too short",
-    "Weak",
-    "Fair",
-    "Good",
-    "Strong",
-  ];
+  const labels = ["Too short", "Weak", "Fair", "Good", "Strong"];
 
   const colors = [
     "bg-destructive",
@@ -130,80 +73,35 @@ function passwordStrength(
 }
 
 function SignupPage() {
-  const {
-    signup,
-    loginWithProvider,
-    isAuthenticated,
-    ready,
-  } = useAuth();
+  const { signup, loginWithProvider, isAuthenticated, ready } = useAuth();
 
-  const navigate =
-    useNavigate();
+  const navigate = useNavigate();
 
-  const nameInputRef =
-    useRef<HTMLInputElement>(null);
+  const nameInputRef = useRef<HTMLInputElement>(null);
 
-  const [
-    values,
-    setValues,
-  ] = useState({
+  const [values, setValues] = useState({
     name: "",
     email: "",
     password: "",
     confirmPassword: "",
   });
 
-  const [
-    showPassword,
-    setShowPassword,
-  ] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
 
-  const [
-    errors,
-    setErrors,
-  ] = useState<
-    Partial<
-      Record<
-        | "name"
-        | "email"
-        | "password"
-        | "confirmPassword",
-        string
-      >
-    >
+  const [errors, setErrors] = useState<
+    Partial<Record<"name" | "email" | "password" | "confirmPassword", string>>
   >({});
 
-  const [
-    formError,
-    setFormError,
-  ] = useState<
-    string | null
-  >(null);
+  const [formError, setFormError] = useState<string | null>(null);
 
-  const [
-    submitting,
-    setSubmitting,
-  ] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
 
-  const [
-    googleLoading,
-    setGoogleLoading,
-  ] = useState(false);
+  const [googleLoading, setGoogleLoading] = useState(false);
 
-  const strength =
-    useMemo(
-      () =>
-        passwordStrength(
-          values.password,
-        ),
-      [values.password],
-    );
+  const strength = useMemo(() => passwordStrength(values.password), [values.password]);
 
   const passwordsMatch =
-    values.confirmPassword.length >
-      0 &&
-    values.confirmPassword ===
-      values.password;
+    values.confirmPassword.length > 0 && values.confirmPassword === values.password;
 
   /*
    * ==================================================
@@ -216,108 +114,59 @@ function SignupPage() {
   }, []);
 
   useEffect(() => {
-    if (
-      ready &&
-      isAuthenticated
-    ) {
+    if (ready && isAuthenticated) {
       void navigate({
         to: "/dashboard",
         replace: true,
       });
     }
-  }, [
-    ready,
-    isAuthenticated,
-    navigate,
-  ]);
+  }, [ready, isAuthenticated, navigate]);
 
-  function update(
-    field: keyof typeof values,
-    value: string,
-  ) {
-    setValues(
-      (previous) => ({
-        ...previous,
-        [field]: value,
-      }),
-    );
+  function update(field: keyof typeof values, value: string) {
+    setValues((previous) => ({
+      ...previous,
+      [field]: value,
+    }));
 
-    setErrors(
-      (previous) => ({
-        ...previous,
-        [field]:
-          undefined,
-      }),
-    );
+    setErrors((previous) => ({
+      ...previous,
+      [field]: undefined,
+    }));
 
     setFormError(null);
   }
 
-  async function handleSubmit(
-    event: React.FormEvent<HTMLFormElement>,
-  ) {
+  async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
-    const nextErrors: Partial<
-      Record<
-        | "name"
-        | "email"
-        | "password"
-        | "confirmPassword",
-        string
-      >
-    > = {};
+    const nextErrors: Partial<Record<"name" | "email" | "password" | "confirmPassword", string>> =
+      {};
 
-    const normalizedName =
-      values.name.trim();
+    const normalizedName = values.name.trim();
 
-    const normalizedEmail =
-      values.email
-        .trim()
-        .toLowerCase();
+    const normalizedEmail = values.email.trim().toLowerCase();
 
-    if (
-      normalizedName.length < 2
-    ) {
-      nextErrors.name =
-        "Please enter your full name.";
+    if (normalizedName.length < 2) {
+      nextErrors.name = "Please enter your full name.";
     }
 
-    if (
-      !EMAIL_PATTERN.test(
-        normalizedEmail,
-      )
-    ) {
-      nextErrors.email =
-        "Please enter a valid email address.";
+    if (!EMAIL_PATTERN.test(normalizedEmail)) {
+      nextErrors.email = "Please enter a valid email address.";
     }
 
-    if (
-      values.password.length < 8
-    ) {
-      nextErrors.password =
-        "Password must be at least 8 characters.";
+    if (values.password.length < 8) {
+      nextErrors.password = "Password must be at least 8 characters.";
     }
 
-    if (
-      values.confirmPassword !==
-      values.password
-    ) {
-      nextErrors.confirmPassword =
-        "Passwords do not match.";
+    if (values.confirmPassword !== values.password) {
+      nextErrors.confirmPassword = "Passwords do not match.";
     }
 
-    setErrors(
-      nextErrors,
-    );
+    setErrors(nextErrors);
 
     setFormError(null);
 
-    if (
-      Object.keys(
-        nextErrors,
-      ).length > 0
-    ) {
+    if (Object.keys(nextErrors).length > 0) {
       if (nextErrors.name) {
         nameInputRef.current?.focus();
       }
@@ -327,19 +176,13 @@ function SignupPage() {
     setSubmitting(true);
 
     try {
-      const user =
-        await signup({
-          name:
-            normalizedName,
-          email:
-            normalizedEmail,
-          password:
-            values.password,
-        });
+      const user = await signup({
+        name: normalizedName,
+        email: normalizedEmail,
+        password: values.password,
+      });
 
-      toast.success(
-        `Account created — welcome, ${user.name.split(" ")[0]}`,
-      );
+      toast.success(`Account created — welcome, ${user.name.split(" ")[0]}`);
 
       await navigate({
         to: "/dashboard",
@@ -348,11 +191,7 @@ function SignupPage() {
     } catch (error) {
       if (
         error instanceof ApiError &&
-        (
-          error.code ===
-            "ACTIVE_SESSION_EXISTS" ||
-          error.status === 409
-        )
+        (error.code === "ACTIVE_SESSION_EXISTS" || error.status === 409)
       ) {
         setFormError(
           "This account is already active on another device. Please log out there first.",
@@ -370,10 +209,7 @@ function SignupPage() {
   }
 
   async function handleGoogleSignup() {
-    if (
-      googleLoading ||
-      submitting
-    ) {
+    if (googleLoading || submitting) {
       return;
     }
 
@@ -381,15 +217,9 @@ function SignupPage() {
     setGoogleLoading(true);
 
     try {
-      await loginWithProvider(
-        "google",
-      );
+      await loginWithProvider("google");
     } catch (error) {
-      setFormError(
-        error instanceof Error
-          ? error.message
-          : "Unable to continue with Google.",
-      );
+      setFormError(error instanceof Error ? error.message : "Unable to continue with Google.");
 
       setGoogleLoading(false);
     }
@@ -418,22 +248,13 @@ function SignupPage() {
           type="button"
           variant="outline"
           className="h-12 w-full gap-3 rounded-xl border-border bg-background text-sm font-semibold shadow-sm transition-all hover:border-foreground/20 hover:bg-muted active:scale-[0.99]"
-          disabled={
-            submitting ||
-            googleLoading
-          }
-          onClick={() =>
-            void handleGoogleSignup()
-          }
+          disabled={submitting || googleLoading}
+          onClick={() => void handleGoogleSignup()}
         >
           {googleLoading ? (
             <Loader2 className="size-4 animate-spin" />
           ) : (
-            <svg
-              className="size-4"
-              viewBox="0 0 24 24"
-              aria-hidden="true"
-            >
+            <svg className="size-4" viewBox="0 0 24 24" aria-hidden="true">
               <path
                 fill="#4285F4"
                 d="M21.35 12.23c0-.79-.07-1.55-.22-2.27H12v4.3h5.24a4.48 4.48 0 0 1-1.94 2.94v2.45h3.14c1.84-1.7 2.91-4.2 2.91-7.42Z"
@@ -456,17 +277,12 @@ function SignupPage() {
             </svg>
           )}
 
-          {googleLoading
-            ? "Connecting to Google..."
-            : "Continue with Google"}
+          {googleLoading ? "Connecting to Google..." : "Continue with Google"}
         </Button>
 
         {/* DIVIDER */}
 
-        <div
-          className="flex items-center gap-3"
-          role="separator"
-        >
+        <div className="flex items-center gap-3" role="separator">
           <div className="h-px flex-1 bg-border" />
 
           <span className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
@@ -478,19 +294,11 @@ function SignupPage() {
 
         {/* SIGNUP FORM */}
 
-        <form
-          onSubmit={
-            handleSubmit
-          }
-          noValidate
-          className="space-y-4"
-        >
+        <form onSubmit={handleSubmit} noValidate className="space-y-4">
           {/* NAME */}
 
           <div className="space-y-2">
-            <Label htmlFor="name">
-              Full name
-            </Label>
+            <Label htmlFor="name">Full name</Label>
 
             <div className="relative">
               <User
@@ -503,30 +311,16 @@ function SignupPage() {
                 id="name"
                 autoComplete="name"
                 value={values.name}
-                onChange={(event) =>
-                  update(
-                    "name",
-                    event.target.value,
-                  )
-                }
-                aria-invalid={Boolean(
-                  errors.name,
-                )}
-                aria-describedby={
-                  errors.name
-                    ? "name-error"
-                    : undefined
-                }
+                onChange={(event) => update("name", event.target.value)}
+                aria-invalid={Boolean(errors.name)}
+                aria-describedby={errors.name ? "name-error" : undefined}
                 placeholder="Sparsh Kashyap"
                 className="h-11 rounded-xl pl-10 transition-shadow focus-visible:ring-2"
               />
             </div>
 
             {errors.name ? (
-              <p
-                id="name-error"
-                className="text-xs font-medium text-destructive"
-              >
+              <p id="name-error" className="text-xs font-medium text-destructive">
                 {errors.name}
               </p>
             ) : null}
@@ -535,9 +329,7 @@ function SignupPage() {
           {/* EMAIL */}
 
           <div className="space-y-2">
-            <Label htmlFor="email">
-              Email
-            </Label>
+            <Label htmlFor="email">Email</Label>
 
             <div className="relative">
               <Mail
@@ -550,30 +342,16 @@ function SignupPage() {
                 type="email"
                 autoComplete="email"
                 value={values.email}
-                onChange={(event) =>
-                  update(
-                    "email",
-                    event.target.value,
-                  )
-                }
-                aria-invalid={Boolean(
-                  errors.email,
-                )}
-                aria-describedby={
-                  errors.email
-                    ? "email-error"
-                    : undefined
-                }
+                onChange={(event) => update("email", event.target.value)}
+                aria-invalid={Boolean(errors.email)}
+                aria-describedby={errors.email ? "email-error" : undefined}
                 placeholder="you@example.com"
                 className="h-11 rounded-xl pl-10 transition-shadow focus-visible:ring-2"
               />
             </div>
 
             {errors.email ? (
-              <p
-                id="email-error"
-                className="text-xs font-medium text-destructive"
-              >
+              <p id="email-error" className="text-xs font-medium text-destructive">
                 {errors.email}
               </p>
             ) : null}
@@ -582,9 +360,7 @@ function SignupPage() {
           {/* PASSWORD */}
 
           <div className="space-y-2">
-            <Label htmlFor="password">
-              Password
-            </Label>
+            <Label htmlFor="password">Password</Label>
 
             <div className="relative">
               <Lock
@@ -594,70 +370,37 @@ function SignupPage() {
 
               <Input
                 id="password"
-                type={
-                  showPassword
-                    ? "text"
-                    : "password"
-                }
+                type={showPassword ? "text" : "password"}
                 autoComplete="new-password"
                 value={values.password}
-                onChange={(event) =>
-                  update(
-                    "password",
-                    event.target.value,
-                  )
-                }
+                onChange={(event) => update("password", event.target.value)}
                 className="h-11 rounded-xl pl-10 pr-11 transition-shadow focus-visible:ring-2"
                 placeholder="At least 8 characters"
-                aria-invalid={Boolean(
-                  errors.password,
-                )}
-                aria-describedby={
-                  errors.password
-                    ? "password-error"
-                    : undefined
-                }
+                aria-invalid={Boolean(errors.password)}
+                aria-describedby={errors.password ? "password-error" : undefined}
               />
 
               <button
                 type="button"
-                onClick={() =>
-                  setShowPassword(
-                    (value) =>
-                      !value,
-                  )
-                }
-                aria-label={
-                  showPassword
-                    ? "Hide password"
-                    : "Show password"
-                }
+                onClick={() => setShowPassword((value) => !value)}
+                aria-label={showPassword ? "Hide password" : "Show password"}
                 className="absolute right-1 top-1 inline-flex size-9 items-center justify-center rounded-lg text-muted-foreground transition hover:bg-muted hover:text-foreground"
               >
-                {showPassword ? (
-                  <EyeOff className="size-4" />
-                ) : (
-                  <Eye className="size-4" />
-                )}
+                {showPassword ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
               </button>
             </div>
 
             {values.password ? (
               <div className="flex items-center gap-2 pt-0.5">
                 <span className="flex flex-1 gap-1">
-                  {[0, 1, 2, 3].map(
-                    (index) => (
-                      <span
-                        key={index}
-                        className={`h-1.5 flex-1 rounded-full transition-colors duration-300 ${
-                          index <
-                          strength.score
-                            ? strength.color
-                            : "bg-border"
-                        }`}
-                      />
-                    ),
-                  )}
+                  {[0, 1, 2, 3].map((index) => (
+                    <span
+                      key={index}
+                      className={`h-1.5 flex-1 rounded-full transition-colors duration-300 ${
+                        index < strength.score ? strength.color : "bg-border"
+                      }`}
+                    />
+                  ))}
                 </span>
 
                 <span className="w-16 text-right text-xs text-muted-foreground">
@@ -667,10 +410,7 @@ function SignupPage() {
             ) : null}
 
             {errors.password ? (
-              <p
-                id="password-error"
-                className="text-xs font-medium text-destructive"
-              >
+              <p id="password-error" className="text-xs font-medium text-destructive">
                 {errors.password}
               </p>
             ) : null}
@@ -679,9 +419,7 @@ function SignupPage() {
           {/* CONFIRM PASSWORD */}
 
           <div className="space-y-2">
-            <Label htmlFor="confirmPassword">
-              Confirm password
-            </Label>
+            <Label htmlFor="confirmPassword">Confirm password</Label>
 
             <div className="relative">
               <Lock
@@ -691,38 +429,18 @@ function SignupPage() {
 
               <Input
                 id="confirmPassword"
-                type={
-                  showPassword
-                    ? "text"
-                    : "password"
-                }
+                type={showPassword ? "text" : "password"}
                 autoComplete="new-password"
-                value={
-                  values.confirmPassword
-                }
-                onChange={(event) =>
-                  update(
-                    "confirmPassword",
-                    event.target.value,
-                  )
-                }
-                aria-invalid={Boolean(
-                  errors.confirmPassword,
-                )}
-                aria-describedby={
-                  errors.confirmPassword
-                    ? "confirm-password-error"
-                    : undefined
-                }
+                value={values.confirmPassword}
+                onChange={(event) => update("confirmPassword", event.target.value)}
+                aria-invalid={Boolean(errors.confirmPassword)}
+                aria-describedby={errors.confirmPassword ? "confirm-password-error" : undefined}
                 placeholder="Re-enter your password"
                 className="h-11 rounded-xl pl-10 pr-10 transition-shadow focus-visible:ring-2"
               />
 
               {values.confirmPassword ? (
-                <span
-                  className="absolute right-3 top-1/2 -translate-y-1/2"
-                  aria-hidden="true"
-                >
+                <span className="absolute right-3 top-1/2 -translate-y-1/2" aria-hidden="true">
                   {passwordsMatch ? (
                     <Check className="size-4 text-emerald-500" />
                   ) : (
@@ -733,13 +451,8 @@ function SignupPage() {
             </div>
 
             {errors.confirmPassword ? (
-              <p
-                id="confirm-password-error"
-                className="text-xs font-medium text-destructive"
-              >
-                {
-                  errors.confirmPassword
-                }
+              <p id="confirm-password-error" className="text-xs font-medium text-destructive">
+                {errors.confirmPassword}
               </p>
             ) : null}
           </div>
@@ -760,18 +473,11 @@ function SignupPage() {
           <Button
             type="submit"
             className="h-11 w-full rounded-xl text-sm font-semibold transition-all active:scale-[0.99]"
-            disabled={
-              submitting ||
-              googleLoading
-            }
+            disabled={submitting || googleLoading}
           >
-            {submitting ? (
-              <Loader2 className="mr-2 size-4 animate-spin" />
-            ) : null}
+            {submitting ? <Loader2 className="mr-2 size-4 animate-spin" /> : null}
 
-            {submitting
-              ? "Creating account..."
-              : "Create account"}
+            {submitting ? "Creating account..." : "Create account"}
           </Button>
         </form>
       </div>

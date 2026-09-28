@@ -82,14 +82,12 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { title: "Photos — Your memories, beautifully organized" },
       {
         name: "description",
-        content:
-          "Photos is a calm, photo-first place to store, browse and download your pictures.",
+        content: "Photos is a calm, photo-first place to store, browse and download your pictures.",
       },
       { property: "og:title", content: "Photos — Your memories, beautifully organized" },
       {
         property: "og:description",
-        content:
-          "Photos is a calm, photo-first place to store, browse and download your pictures.",
+        content: "Photos is a calm, photo-first place to store, browse and download your pictures.",
       },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },

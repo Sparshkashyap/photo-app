@@ -11,38 +11,19 @@ import {
   X,
 } from "lucide-react";
 
-import {
-  Link,
-  useNavigate,
-} from "@tanstack/react-router";
+import { Link, useNavigate } from "@tanstack/react-router";
 
-import {
-  useEffect,
-  useRef,
-  useState,
-} from "react";
+import { useEffect, useRef, useState } from "react";
 
-import {
-  toast,
-} from "sonner";
+import { toast } from "sonner";
 
-import {
-  useAuth,
-} from "@/hooks/useAuth";
+import { useAuth } from "@/hooks/useAuth";
 
-import {
-  Logo,
-} from "@/components/Logo";
+import { Logo } from "@/components/Logo";
 
-import {
-  Button,
-} from "@/components/ui/button";
+import { Button } from "@/components/ui/button";
 
-import {
-  Avatar,
-  AvatarFallback,
-  AvatarImage,
-} from "@/components/ui/avatar";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 
 import {
   DropdownMenu,
@@ -53,14 +34,9 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 
-import {
-  Input,
-} from "@/components/ui/input";
+import { Input } from "@/components/ui/input";
 
-import type {
-  PhotoSort,
-  PhotoType,
-} from "@/services/api";
+import type { PhotoSort, PhotoType } from "@/services/api";
 
 // --------------------------------------------------
 // Config
@@ -95,17 +71,11 @@ type NavbarProps = {
 
   type?: PhotoType;
 
-  onSearchChange?: (
-    value: string,
-  ) => void;
+  onSearchChange?: (value: string) => void;
 
-  onSortChange?: (
-    value: PhotoSort,
-  ) => void;
+  onSortChange?: (value: PhotoSort) => void;
 
-  onTypeChange?: (
-    value: PhotoType,
-  ) => void;
+  onTypeChange?: (value: PhotoType) => void;
 
   /**
    * Opens the mobile navigation/sidebar.
@@ -116,19 +86,13 @@ type NavbarProps = {
   onMobileMenuClick?: () => void;
 };
 
-function getInitials(
-  name: string,
-): string {
+function getInitials(name: string): string {
   return (
     name
       ?.split(/\s+/)
       .filter(Boolean)
       .slice(0, 2)
-      .map(
-        (part) =>
-          part[0]?.toUpperCase() ??
-          "",
-      )
+      .map((part) => part[0]?.toUpperCase() ?? "")
       .join("") || "U"
   );
 }
@@ -142,59 +106,27 @@ export function Navbar({
   onTypeChange,
   onMobileMenuClick,
 }: NavbarProps) {
-  const {
-    user,
-    logout,
-  } = useAuth();
+  const { user, logout } = useAuth();
 
-  const navigate =
-    useNavigate();
+  const navigate = useNavigate();
 
-  const [
-    loggingOut,
-    setLoggingOut,
-  ] = useState(false);
+  const [loggingOut, setLoggingOut] = useState(false);
 
-  const [
-    localSearch,
-    setLocalSearch,
-  ] = useState("");
+  const [localSearch, setLocalSearch] = useState("");
 
-  const [
-    localSort,
-    setLocalSort,
-  ] = useState<PhotoSort>(
-    "newest",
-  );
+  const [localSort, setLocalSort] = useState<PhotoSort>("newest");
 
-  const [
-    localType,
-    setLocalType,
-  ] = useState<PhotoType>(
-    "all",
-  );
+  const [localType, setLocalType] = useState<PhotoType>("all");
 
-  const [
-    mobileSearchOpen,
-    setMobileSearchOpen,
-  ] = useState(false);
+  const [mobileSearchOpen, setMobileSearchOpen] = useState(false);
 
-  const [
-    scrolled,
-    setScrolled,
-  ] = useState(false);
+  const [scrolled, setScrolled] = useState(false);
 
-  const search =
-    controlledSearch ??
-    localSearch;
+  const search = controlledSearch ?? localSearch;
 
-  const sort =
-    controlledSort ??
-    localSort;
+  const sort = controlledSort ?? localSort;
 
-  const type =
-    controlledType ??
-    localType;
+  const type = controlledType ?? localType;
 
   // --------------------------------------------------
   // Debounced search: the input feels instant, the
@@ -202,16 +134,11 @@ export function Navbar({
   // short pause so we're not re-filtering on every key.
   // --------------------------------------------------
 
-  const [
-    searchDraft,
-    setSearchDraft,
-  ] = useState(search);
+  const [searchDraft, setSearchDraft] = useState(search);
 
-  const desktopSearchRef =
-    useRef<HTMLInputElement>(null);
+  const desktopSearchRef = useRef<HTMLInputElement>(null);
 
-  const mobileSearchRef =
-    useRef<HTMLInputElement>(null);
+  const mobileSearchRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     // Keep the draft in sync if the value changes from outside
@@ -236,9 +163,7 @@ export function Navbar({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchDraft]);
 
-  function commitSearchImmediately(
-    value: string,
-  ) {
+  function commitSearchImmediately(value: string) {
     setSearchDraft(value);
 
     if (onSearchChange) {
@@ -254,12 +179,8 @@ export function Navbar({
   // --------------------------------------------------
 
   useEffect(() => {
-    function handleKeyDown(
-      event: KeyboardEvent,
-    ) {
-      const isSearchShortcut =
-        (event.metaKey || event.ctrlKey) &&
-        event.key.toLowerCase() === "k";
+    function handleKeyDown(event: KeyboardEvent) {
+      const isSearchShortcut = (event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "k";
 
       if (isSearchShortcut) {
         event.preventDefault();
@@ -268,24 +189,14 @@ export function Navbar({
         // Desktop input is visible at md+, mobile input only
         // once the toolbar is open — focus whichever exists.
         requestAnimationFrame(() => {
-          (
-            desktopSearchRef.current ??
-            mobileSearchRef.current
-          )?.focus();
+          (desktopSearchRef.current ?? mobileSearchRef.current)?.focus();
         });
       }
     }
 
-    window.addEventListener(
-      "keydown",
-      handleKeyDown,
-    );
+    window.addEventListener("keydown", handleKeyDown);
 
-    return () =>
-      window.removeEventListener(
-        "keydown",
-        handleKeyDown,
-      );
+    return () => window.removeEventListener("keydown", handleKeyDown);
   }, []);
 
   // --------------------------------------------------
@@ -300,22 +211,12 @@ export function Navbar({
 
     handleScroll();
 
-    window.addEventListener(
-      "scroll",
-      handleScroll,
-      { passive: true },
-    );
+    window.addEventListener("scroll", handleScroll, { passive: true });
 
-    return () =>
-      window.removeEventListener(
-        "scroll",
-        handleScroll,
-      );
+    return () => window.removeEventListener("scroll", handleScroll);
   }, []);
 
-  function handleSortChange(
-    value: PhotoSort,
-  ) {
+  function handleSortChange(value: PhotoSort) {
     if (onSortChange) {
       onSortChange(value);
     } else {
@@ -323,9 +224,7 @@ export function Navbar({
     }
   }
 
-  function handleTypeChange(
-    value: PhotoType,
-  ) {
+  function handleTypeChange(value: PhotoType) {
     if (onTypeChange) {
       onTypeChange(value);
     } else {
@@ -343,20 +242,14 @@ export function Navbar({
     try {
       await logout();
 
-      toast.success(
-        "You're logged out",
-      );
+      toast.success("You're logged out");
 
       await navigate({
         to: "/login",
         replace: true,
       });
     } catch (error) {
-      toast.error(
-        error instanceof Error
-          ? error.message
-          : "Unable to log out.",
-      );
+      toast.error(error instanceof Error ? error.message : "Unable to log out.");
     } finally {
       setLoggingOut(false);
     }
@@ -380,36 +273,23 @@ export function Navbar({
     });
   }
 
-  const userName =
-    user?.name ||
-    "User";
+  const userName = user?.name || "User";
 
-  const userInitials =
-    getInitials(userName);
+  const userInitials = getInitials(userName);
 
   // Optional field — guarded like this so the component still
   // compiles if your `User` type doesn't declare `avatarUrl` yet.
-  const avatarUrl = (
-    user as
-      | { avatarUrl?: string | null }
-      | null
-      | undefined
-  )?.avatarUrl;
+  const avatarUrl = (user as { avatarUrl?: string | null } | null | undefined)?.avatarUrl;
 
-  const hasActiveFilters =
-    type !== "all" ||
-    sort !== "newest";
+  const hasActiveFilters = type !== "all" || sort !== "newest";
 
   return (
     <header
       className={`sticky top-0 z-50 border-b bg-background/80 backdrop-blur-xl transition-shadow duration-200 ${
-        scrolled
-          ? "border-border shadow-sm"
-          : "border-transparent"
+        scrolled ? "border-border shadow-sm" : "border-transparent"
       }`}
     >
       <div className="mx-auto flex min-h-16 w-full max-w-[1600px] items-center gap-2 px-3 sm:px-5">
-
         {/* MOBILE MENU / SIDEBAR TRIGGER */}
 
         <div className="flex md:hidden">
@@ -440,7 +320,6 @@ export function Navbar({
         {/* DESKTOP SEARCH + FILTERS */}
 
         <div className="hidden min-w-0 flex-1 items-center gap-2 md:flex">
-
           {/* SEARCH */}
 
           <div className="relative min-w-0 max-w-2xl flex-1">
@@ -452,11 +331,7 @@ export function Navbar({
             <Input
               ref={desktopSearchRef}
               value={searchDraft}
-              onChange={(event) =>
-                setSearchDraft(
-                  event.target.value,
-                )
-              }
+              onChange={(event) => setSearchDraft(event.target.value)}
               onKeyDown={(event) => {
                 if (event.key === "Escape") {
                   commitSearchImmediately("");
@@ -471,9 +346,7 @@ export function Navbar({
             {searchDraft ? (
               <button
                 type="button"
-                onClick={() =>
-                  commitSearchImmediately("")
-                }
+                onClick={() => commitSearchImmediately("")}
                 className="absolute right-2 top-1/2 flex size-7 -translate-y-1/2 items-center justify-center rounded-md text-muted-foreground transition hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
                 aria-label="Clear search"
               >
@@ -490,20 +363,12 @@ export function Navbar({
 
           <select
             value={sort}
-            onChange={(event) =>
-              handleSortChange(
-                event.target
-                  .value as PhotoSort,
-              )
-            }
+            onChange={(event) => handleSortChange(event.target.value as PhotoSort)}
             className="h-10 rounded-md border border-input bg-card px-3 text-sm outline-none transition focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/20"
             aria-label="Sort photos"
           >
             {SORT_OPTIONS.map((option) => (
-              <option
-                key={option.value}
-                value={option.value}
-              >
+              <option key={option.value} value={option.value}>
                 {option.label}
               </option>
             ))}
@@ -513,36 +378,22 @@ export function Navbar({
 
           <div
             className={`flex h-10 items-center gap-2 rounded-md border px-2.5 transition-colors ${
-              type !== "all"
-                ? "border-primary/40 bg-primary/5"
-                : "border-input bg-card"
+              type !== "all" ? "border-primary/40 bg-primary/5" : "border-input bg-card"
             }`}
           >
             <Filter
-              className={`size-4 ${
-                type !== "all"
-                  ? "text-primary"
-                  : "text-muted-foreground"
-              }`}
+              className={`size-4 ${type !== "all" ? "text-primary" : "text-muted-foreground"}`}
               aria-hidden="true"
             />
 
             <select
               value={type}
-              onChange={(event) =>
-                handleTypeChange(
-                  event.target
-                    .value as PhotoType,
-                )
-              }
+              onChange={(event) => handleTypeChange(event.target.value as PhotoType)}
               className="bg-transparent text-sm outline-none"
               aria-label="Filter photos by type"
             >
               {TYPE_OPTIONS.map((option) => (
-                <option
-                  key={option.value}
-                  value={option.value}
-                >
+                <option key={option.value} value={option.value}>
                   {option.label}
                 </option>
               ))}
@@ -553,38 +404,20 @@ export function Navbar({
         {/* MOBILE ACTIONS */}
 
         <div className="ml-auto flex items-center gap-0.5 md:hidden">
-
           {/* MOBILE SEARCH */}
 
           <Button
             type="button"
             variant="ghost"
             size="icon"
-            onClick={() =>
-              setMobileSearchOpen(
-                (open) => !open,
-              )
-            }
+            onClick={() => setMobileSearchOpen((open) => !open)}
             className="relative"
-            aria-label={
-              mobileSearchOpen
-                ? "Close search"
-                : "Search photos"
-            }
-            title={
-              mobileSearchOpen
-                ? "Close search"
-                : "Search photos"
-            }
+            aria-label={mobileSearchOpen ? "Close search" : "Search photos"}
+            title={mobileSearchOpen ? "Close search" : "Search photos"}
           >
-            {mobileSearchOpen ? (
-              <X className="size-5" />
-            ) : (
-              <Search className="size-5" />
-            )}
+            {mobileSearchOpen ? <X className="size-5" /> : <Search className="size-5" />}
 
-            {!mobileSearchOpen &&
-            hasActiveFilters ? (
+            {!mobileSearchOpen && hasActiveFilters ? (
               <span
                 className="absolute right-1.5 top-1.5 size-1.5 rounded-full bg-primary"
                 aria-hidden="true"
@@ -601,9 +434,7 @@ export function Navbar({
             onFavorites={goToFavorites}
             onSettings={goToSettings}
             onTrash={goToTrash}
-            onLogout={() =>
-              void handleLogout()
-            }
+            onLogout={() => void handleLogout()}
             trigger={
               <Button
                 type="button"
@@ -614,16 +445,9 @@ export function Navbar({
                 title="Account menu"
               >
                 <Avatar className="size-8">
-                  {avatarUrl ? (
-                    <AvatarImage
-                      src={avatarUrl}
-                      alt={userName}
-                    />
-                  ) : null}
+                  {avatarUrl ? <AvatarImage src={avatarUrl} alt={userName} /> : null}
 
-                  <AvatarFallback className="text-xs font-semibold">
-                    {userInitials}
-                  </AvatarFallback>
+                  <AvatarFallback className="text-xs font-semibold">{userInitials}</AvatarFallback>
                 </Avatar>
               </Button>
             }
@@ -633,7 +457,6 @@ export function Navbar({
         {/* DESKTOP ACCOUNT */}
 
         <div className="hidden items-center gap-3 md:flex">
-
           <AccountMenu
             userName={userName}
             userEmail={user?.email}
@@ -643,9 +466,7 @@ export function Navbar({
             onFavorites={goToFavorites}
             onSettings={goToSettings}
             onTrash={goToTrash}
-            onLogout={() =>
-              void handleLogout()
-            }
+            onLogout={() => void handleLogout()}
             trigger={
               <Button
                 type="button"
@@ -654,16 +475,9 @@ export function Navbar({
                 aria-label="Open account menu"
               >
                 <Avatar className="size-7">
-                  {avatarUrl ? (
-                    <AvatarImage
-                      src={avatarUrl}
-                      alt={userName}
-                    />
-                  ) : null}
+                  {avatarUrl ? <AvatarImage src={avatarUrl} alt={userName} /> : null}
 
-                  <AvatarFallback className="text-xs font-semibold">
-                    {userInitials}
-                  </AvatarFallback>
+                  <AvatarFallback className="text-xs font-semibold">{userInitials}</AvatarFallback>
                 </Avatar>
 
                 <span className="hidden max-w-32 truncate text-sm font-medium lg:inline">
@@ -682,9 +496,7 @@ export function Navbar({
 
       <div
         className={`grid overflow-hidden border-border transition-[grid-template-rows] duration-200 ease-out md:hidden ${
-          mobileSearchOpen
-            ? "grid-rows-[1fr] border-t"
-            : "grid-rows-[0fr] border-t-0"
+          mobileSearchOpen ? "grid-rows-[1fr] border-t" : "grid-rows-[0fr] border-t-0"
         }`}
       >
         <div className="min-h-0 px-3 py-3">
@@ -697,11 +509,7 @@ export function Navbar({
             <Input
               ref={mobileSearchRef}
               value={searchDraft}
-              onChange={(event) =>
-                setSearchDraft(
-                  event.target.value,
-                )
-              }
+              onChange={(event) => setSearchDraft(event.target.value)}
               onKeyDown={(event) => {
                 if (event.key === "Escape") {
                   commitSearchImmediately("");
@@ -716,9 +524,7 @@ export function Navbar({
             {searchDraft ? (
               <button
                 type="button"
-                onClick={() =>
-                  commitSearchImmediately("")
-                }
+                onClick={() => commitSearchImmediately("")}
                 className="absolute right-2 top-1/2 flex size-7 -translate-y-1/2 items-center justify-center rounded-md text-muted-foreground transition hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
                 aria-label="Clear search"
               >
@@ -730,20 +536,12 @@ export function Navbar({
           <div className="mt-2 flex gap-2">
             <select
               value={sort}
-              onChange={(event) =>
-                handleSortChange(
-                  event.target
-                    .value as PhotoSort,
-                )
-              }
+              onChange={(event) => handleSortChange(event.target.value as PhotoSort)}
               className="h-9 min-w-0 flex-1 rounded-md border border-input bg-background px-2 text-sm outline-none transition focus-visible:ring-2 focus-visible:ring-ring/20"
               aria-label="Sort photos"
             >
               {SORT_OPTIONS.map((option) => (
-                <option
-                  key={option.value}
-                  value={option.value}
-                >
+                <option key={option.value} value={option.value}>
                   {option.label}
                 </option>
               ))}
@@ -751,12 +549,7 @@ export function Navbar({
 
             <select
               value={type}
-              onChange={(event) =>
-                handleTypeChange(
-                  event.target
-                    .value as PhotoType,
-                )
-              }
+              onChange={(event) => handleTypeChange(event.target.value as PhotoType)}
               className={`h-9 min-w-0 flex-1 rounded-md border px-2 text-sm outline-none transition focus-visible:ring-2 focus-visible:ring-ring/20 ${
                 type !== "all"
                   ? "border-primary/40 bg-primary/5 text-primary"
@@ -765,10 +558,7 @@ export function Navbar({
               aria-label="Filter photos by type"
             >
               {TYPE_OPTIONS.map((option) => (
-                <option
-                  key={option.value}
-                  value={option.value}
-                >
+                <option key={option.value} value={option.value}>
                   {option.label}
                 </option>
               ))}
@@ -811,19 +601,12 @@ function AccountMenu({
 }: AccountMenuProps) {
   return (
     <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        {trigger}
-      </DropdownMenuTrigger>
+      <DropdownMenuTrigger asChild>{trigger}</DropdownMenuTrigger>
 
-      <DropdownMenuContent
-        align="end"
-        className="w-60"
-      >
+      <DropdownMenuContent align="end" className="w-60">
         <DropdownMenuLabel>
           <div className="flex flex-col">
-            <span className="truncate">
-              {userName}
-            </span>
+            <span className="truncate">{userName}</span>
 
             {userEmail ? (
               <span className="truncate text-xs font-normal text-muted-foreground">

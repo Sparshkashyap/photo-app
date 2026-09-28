@@ -51,8 +51,6 @@ export interface PhotoResponse {
   message?: string;
 }
 
-
-
 export type Folder = {
   folderId: string;
   userId: string;

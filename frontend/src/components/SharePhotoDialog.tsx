@@ -1,23 +1,10 @@
-import {
-  Check,
-  Copy,
-  ExternalLink,
-  Link2,
-  Loader2,
-  Share2,
-  X,
-} from "lucide-react";
+import { Check, Copy, ExternalLink, Link2, Loader2, Share2, X } from "lucide-react";
 
-import {
-  useEffect,
-  useState,
-} from "react";
+import { useEffect, useState } from "react";
 
 import { toast } from "sonner";
 
-import {
-  Button,
-} from "@/components/ui/button";
+import { Button } from "@/components/ui/button";
 
 import {
   Dialog,
@@ -28,61 +15,30 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 
-import {
-  createShare,
-  revokeShare,
-} from "@/services/api";
+import { createShare, revokeShare } from "@/services/api";
 
-import type {
-  Photo,
-} from "@/types/photo";
+import type { Photo } from "@/types/photo";
 
 type SharePhotoDialogProps = {
   open: boolean;
 
-  onOpenChange: (
-    open: boolean,
-  ) => void;
+  onOpenChange: (open: boolean) => void;
 
   photo: Photo;
 };
 
-export function SharePhotoDialog({
-  open,
-  onOpenChange,
-  photo,
-}: SharePhotoDialogProps) {
-  const [
-    loading,
-    setLoading,
-  ] = useState(false);
+export function SharePhotoDialog({ open, onOpenChange, photo }: SharePhotoDialogProps) {
+  const [loading, setLoading] = useState(false);
 
-  const [
-    revoking,
-    setRevoking,
-  ] = useState(false);
+  const [revoking, setRevoking] = useState(false);
 
-  const [
-    shareUrl,
-    setShareUrl,
-  ] = useState("");
+  const [shareUrl, setShareUrl] = useState("");
 
-  const [
-    shareId,
-    setShareId,
-  ] = useState("");
+  const [shareId, setShareId] = useState("");
 
-  const [
-    expiresAt,
-    setExpiresAt,
-  ] = useState<
-    string | null
-  >(null);
+  const [expiresAt, setExpiresAt] = useState<string | null>(null);
 
-  const [
-    copied,
-    setCopied,
-  ] = useState(false);
+  const [copied, setCopied] = useState(false);
 
   useEffect(() => {
     if (!open) {
@@ -94,63 +50,35 @@ export function SharePhotoDialog({
   }, [open]);
 
   async function handleCreateShare() {
-    if (
-      loading ||
-      revoking
-    ) {
+    if (loading || revoking) {
       return;
     }
 
     setLoading(true);
 
     try {
-      const response =
-        await createShare(
-          photo.photoId,
-        );
+      const response = await createShare(photo.photoId);
 
-      const share =
-        response.share;
+      const share = response.share;
 
       const generatedUrl =
-        share.shareUrl ||
-        `${window.location.origin}/shared/${encodeURIComponent(
-          share.token,
-        )}`;
+        share.shareUrl || `${window.location.origin}/shared/${encodeURIComponent(share.token)}`;
 
-      setShareUrl(
-        generatedUrl,
-      );
+      setShareUrl(generatedUrl);
 
-      setShareId(
-        share.shareId,
-      );
+      setShareId(share.shareId);
 
-      setExpiresAt(
-        share.expiresAt ??
-          null,
-      );
+      setExpiresAt(share.expiresAt ?? null);
 
       setCopied(false);
 
-      toast.success(
-        "Share link created",
-      );
+      toast.success("Share link created");
     } catch (error) {
-      console.error(
-        "Create share failed:",
-        error,
-      );
+      console.error("Create share failed:", error);
 
-      toast.error(
-        "Couldn't create share link",
-        {
-          description:
-            error instanceof Error
-              ? error.message
-              : "Please try again.",
-        },
-      );
+      toast.error("Couldn't create share link", {
+        description: error instanceof Error ? error.message : "Please try again.",
+      });
     } finally {
       setLoading(false);
     }
@@ -162,32 +90,21 @@ export function SharePhotoDialog({
     }
 
     try {
-      await navigator.clipboard.writeText(
-        shareUrl,
-      );
+      await navigator.clipboard.writeText(shareUrl);
 
       setCopied(true);
 
-      toast.success(
-        "Share link copied",
-      );
+      toast.success("Share link copied");
 
       window.setTimeout(() => {
         setCopied(false);
       }, 2000);
     } catch (error) {
-      console.error(
-        "Copy share link failed:",
-        error,
-      );
+      console.error("Copy share link failed:", error);
 
-      toast.error(
-        "Couldn't copy link",
-        {
-          description:
-            "Please copy the link manually.",
-        },
-      );
+      toast.error("Couldn't copy link", {
+        description: "Please copy the link manually.",
+      });
     }
   }
 
@@ -196,113 +113,69 @@ export function SharePhotoDialog({
       return;
     }
 
-    window.open(
-      shareUrl,
-      "_blank",
-      "noopener,noreferrer",
-    );
+    window.open(shareUrl, "_blank", "noopener,noreferrer");
   }
 
   async function handleRevoke() {
-    if (
-      revoking ||
-      loading ||
-      !shareId
-    ) {
+    if (revoking || loading || !shareId) {
       return;
     }
 
     setRevoking(true);
 
     try {
-      await revokeShare(
-        photo.photoId,
-        shareId,
-      );
+      await revokeShare(photo.photoId, shareId);
 
       setShareUrl("");
       setShareId("");
       setExpiresAt(null);
       setCopied(false);
 
-      toast.success(
-        "Share link revoked",
-      );
+      toast.success("Share link revoked");
     } catch (error) {
-      console.error(
-        "Revoke share failed:",
-        error,
-      );
+      console.error("Revoke share failed:", error);
 
-      toast.error(
-        "Couldn't revoke share link",
-        {
-          description:
-            error instanceof Error
-              ? error.message
-              : "Please try again.",
-        },
-      );
+      toast.error("Couldn't revoke share link", {
+        description: error instanceof Error ? error.message : "Please try again.",
+      });
     } finally {
       setRevoking(false);
     }
   }
 
-  function formatExpiry(
-    value: string | null,
-  ) {
+  function formatExpiry(value: string | null) {
     if (!value) {
       return "No expiry information";
     }
 
-    const date =
-      new Date(value);
+    const date = new Date(value);
 
-    if (
-      Number.isNaN(
-        date.getTime(),
-      )
-    ) {
+    if (Number.isNaN(date.getTime())) {
       return "Expiry unavailable";
     }
 
     return `Expires ${date.toLocaleString()}`;
   }
 
-  function handleDialogChange(
-    nextOpen: boolean,
-  ) {
-    if (
-      loading ||
-      revoking
-    ) {
+  function handleDialogChange(nextOpen: boolean) {
+    if (loading || revoking) {
       return;
     }
 
-    onOpenChange(
-      nextOpen,
-    );
+    onOpenChange(nextOpen);
   }
 
   return (
-    <Dialog
-      open={open}
-      onOpenChange={
-        handleDialogChange
-      }
-    >
+    <Dialog open={open} onOpenChange={handleDialogChange}>
       <DialogContent className="sm:max-w-lg">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Share2 className="size-5" />
-
             Share photo
           </DialogTitle>
 
           <DialogDescription>
-            Create a secure link that
-            allows anyone with the link
-            to view this photo.
+            Create a secure link that allows anyone with the link to view this photo.
           </DialogDescription>
         </DialogHeader>
 
@@ -310,16 +183,12 @@ export function SharePhotoDialog({
           {/* PHOTO INFO */}
           <div className="rounded-xl border border-border bg-muted/40 p-4">
             <p className="truncate text-sm font-medium">
-              {photo.name ||
-                photo.fileName ||
-                "Photo"}
+              {photo.name || photo.fileName || "Photo"}
             </p>
 
             <p className="mt-1 text-xs text-muted-foreground">
-              Anyone with the generated
-              link can access this shared
-              photo until the link is
-              revoked or expires.
+              Anyone with the generated link can access this shared photo until the link is revoked
+              or expires.
             </p>
           </div>
 
@@ -330,25 +199,17 @@ export function SharePhotoDialog({
                 <Link2 className="size-6" />
               </div>
 
-              <h3 className="mt-3 font-medium">
-                Create a share link
-              </h3>
+              <h3 className="mt-3 font-medium">Create a share link</h3>
 
               <p className="mt-1 text-sm text-muted-foreground">
-                Generate a secure public
-                viewing link for this photo.
+                Generate a secure public viewing link for this photo.
               </p>
 
               <Button
                 type="button"
                 className="mt-5"
-                onClick={() =>
-                  void handleCreateShare()
-                }
-                disabled={
-                  loading ||
-                  revoking
-                }
+                onClick={() => void handleCreateShare()}
+                disabled={loading || revoking}
               >
                 {loading ? (
                   <Loader2 className="mr-2 size-4 animate-spin" />
@@ -356,9 +217,7 @@ export function SharePhotoDialog({
                   <Link2 className="mr-2 size-4" />
                 )}
 
-                {loading
-                  ? "Creating..."
-                  : "Create link"}
+                {loading ? "Creating..." : "Create link"}
               </Button>
             </div>
           ) : (
@@ -372,9 +231,7 @@ export function SharePhotoDialog({
                     readOnly
                     className="h-10 min-w-0 flex-1 rounded-md border border-border bg-background px-3 text-sm outline-none focus:ring-2 focus:ring-primary/20"
                     aria-label="Share link"
-                    onFocus={(
-                      event,
-                    ) => {
+                    onFocus={(event) => {
                       event.currentTarget.select();
                     }}
                   />
@@ -383,28 +240,16 @@ export function SharePhotoDialog({
                     type="button"
                     variant="outline"
                     size="icon"
-                    onClick={() =>
-                      void handleCopy()
-                    }
-                    disabled={
-                      revoking
-                    }
+                    onClick={() => void handleCopy()}
+                    disabled={revoking}
                     aria-label="Copy share link"
                     title="Copy link"
                   >
-                    {copied ? (
-                      <Check className="size-4" />
-                    ) : (
-                      <Copy className="size-4" />
-                    )}
+                    {copied ? <Check className="size-4" /> : <Copy className="size-4" />}
                   </Button>
                 </div>
 
-                <p className="mt-2 text-xs text-muted-foreground">
-                  {formatExpiry(
-                    expiresAt,
-                  )}
-                </p>
+                <p className="mt-2 text-xs text-muted-foreground">{formatExpiry(expiresAt)}</p>
               </div>
 
               {/* ACTIONS */}
@@ -412,50 +257,31 @@ export function SharePhotoDialog({
                 <Button
                   type="button"
                   variant="outline"
-                  onClick={
-                    handleOpenLink
-                  }
-                  disabled={
-                    revoking
-                  }
+                  onClick={handleOpenLink}
+                  disabled={revoking}
                 >
                   <ExternalLink className="mr-2 size-4" />
-
                   Open link
                 </Button>
 
                 <Button
                   type="button"
                   variant="outline"
-                  onClick={() =>
-                    void handleCopy()
-                  }
-                  disabled={
-                    revoking
-                  }
+                  onClick={() => void handleCopy()}
+                  disabled={revoking}
                 >
-                  {copied ? (
-                    <Check className="mr-2 size-4" />
-                  ) : (
-                    <Copy className="mr-2 size-4" />
-                  )}
+                  {copied ? <Check className="mr-2 size-4" /> : <Copy className="mr-2 size-4" />}
 
-                  {copied
-                    ? "Copied"
-                    : "Copy link"}
+                  {copied ? "Copied" : "Copy link"}
                 </Button>
               </div>
 
               {/* REVOKE */}
               <div className="rounded-xl border border-destructive/20 bg-destructive/5 p-4">
-                <p className="text-sm font-medium">
-                  Stop sharing
-                </p>
+                <p className="text-sm font-medium">Stop sharing</p>
 
                 <p className="mt-1 text-xs text-muted-foreground">
-                  Revoking this link will
-                  immediately prevent anyone
-                  from accessing this shared
+                  Revoking this link will immediately prevent anyone from accessing this shared
                   photo.
                 </p>
 
@@ -464,13 +290,8 @@ export function SharePhotoDialog({
                   variant="destructive"
                   size="sm"
                   className="mt-3"
-                  onClick={() =>
-                    void handleRevoke()
-                  }
-                  disabled={
-                    revoking ||
-                    loading
-                  }
+                  onClick={() => void handleRevoke()}
+                  disabled={revoking || loading}
                 >
                   {revoking ? (
                     <Loader2 className="mr-2 size-4 animate-spin" />
@@ -478,9 +299,7 @@ export function SharePhotoDialog({
                     <X className="mr-2 size-4" />
                   )}
 
-                  {revoking
-                    ? "Revoking..."
-                    : "Revoke link"}
+                  {revoking ? "Revoking..." : "Revoke link"}
                 </Button>
               </div>
             </div>
@@ -491,13 +310,8 @@ export function SharePhotoDialog({
           <Button
             type="button"
             variant="outline"
-            onClick={() =>
-              onOpenChange(false)
-            }
-            disabled={
-              loading ||
-              revoking
-            }
+            onClick={() => onOpenChange(false)}
+            disabled={loading || revoking}
           >
             Close
           </Button>

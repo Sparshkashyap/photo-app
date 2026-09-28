@@ -1,138 +1,63 @@
-import {
-  Link,
-  createFileRoute,
-  useNavigate,
-} from "@tanstack/react-router";
+import { Link, createFileRoute, useNavigate } from "@tanstack/react-router";
 
-import {
-  Eye,
-  EyeOff,
-  Loader2,
-  Lock,
-  Mail,
-} from "lucide-react";
+import { Eye, EyeOff, Loader2, Lock, Mail } from "lucide-react";
 
-import {
-  useEffect,
-  useRef,
-  useState,
-} from "react";
+import { useEffect, useRef, useState } from "react";
 
-import {
-  toast,
-} from "sonner";
+import { toast } from "sonner";
 
-import {
-  AuthLayout,
-} from "@/components/AuthLayout";
+import { AuthLayout } from "@/components/AuthLayout";
 
-import {
-  Button,
-} from "@/components/ui/button";
+import { Button } from "@/components/ui/button";
 
-import {
-  Input,
-} from "@/components/ui/input";
+import { Input } from "@/components/ui/input";
 
-import {
-  Label,
-} from "@/components/ui/label";
+import { Label } from "@/components/ui/label";
 
-import {
-  useAuth,
-} from "@/hooks/useAuth";
+import { useAuth } from "@/hooks/useAuth";
 
-import {
-  ApiError,
-} from "@/services/api";
+import { ApiError } from "@/services/api";
 
-export const Route =
-  createFileRoute(
-    "/login",
-  )({
-    head: () => ({
-      meta: [
-        {
-          title:
-            "Log in — Photos",
-        },
-        {
-          name: "description",
-          content:
-            "Log in to Photos to view, upload and download your photo library.",
-        },
-      ],
-    }),
+export const Route = createFileRoute("/login")({
+  head: () => ({
+    meta: [
+      {
+        title: "Log in — Photos",
+      },
+      {
+        name: "description",
+        content: "Log in to Photos to view, upload and download your photo library.",
+      },
+    ],
+  }),
 
-    component:
-      LoginPage,
-  });
+  component: LoginPage,
+});
 
-const EMAIL_PATTERN =
-  /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 function LoginPage() {
-  const {
-    login,
-    loginWithProvider,
-    isAuthenticated,
-    ready,
-  } = useAuth();
+  const { login, loginWithProvider, isAuthenticated, ready } = useAuth();
 
-  const navigate =
-    useNavigate();
+  const navigate = useNavigate();
 
-  const emailInputRef =
-    useRef<HTMLInputElement>(null);
+  const emailInputRef = useRef<HTMLInputElement>(null);
 
-  const [
-    email,
-    setEmail,
-  ] = useState("");
+  const [email, setEmail] = useState("");
 
-  const [
-    password,
-    setPassword,
-  ] = useState("");
+  const [password, setPassword] = useState("");
 
-  const [
-    showPassword,
-    setShowPassword,
-  ] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
 
-  const [
-    errors,
-    setErrors,
-  ] = useState<
-    Partial<
-      Record<
-        "email" | "password",
-        string
-      >
-    >
-  >({});
+  const [errors, setErrors] = useState<Partial<Record<"email" | "password", string>>>({});
 
-  const [
-    formError,
-    setFormError,
-  ] = useState<
-    string | null
-  >(null);
+  const [formError, setFormError] = useState<string | null>(null);
 
-  const [
-    activeSession,
-    setActiveSession,
-  ] = useState(false);
+  const [activeSession, setActiveSession] = useState(false);
 
-  const [
-    submitting,
-    setSubmitting,
-  ] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
 
-  const [
-    googleLoading,
-    setGoogleLoading,
-  ] = useState(false);
+  const [googleLoading, setGoogleLoading] = useState(false);
 
   /*
    * ==================================================
@@ -151,20 +76,13 @@ function LoginPage() {
    */
 
   useEffect(() => {
-    if (
-      ready &&
-      isAuthenticated
-    ) {
+    if (ready && isAuthenticated) {
       void navigate({
         to: "/dashboard",
         replace: true,
       });
     }
-  }, [
-    ready,
-    isAuthenticated,
-    navigate,
-  ]);
+  }, [ready, isAuthenticated, navigate]);
 
   /*
    * ==================================================
@@ -173,29 +91,19 @@ function LoginPage() {
    */
 
   useEffect(() => {
-    if (
-      typeof window ===
-      "undefined"
-    ) {
+    if (typeof window === "undefined") {
       return;
     }
 
-    const oauthError =
-      sessionStorage.getItem(
-        "photos.oauth.error",
-      );
+    const oauthError = sessionStorage.getItem("photos.oauth.error");
 
     if (!oauthError) {
       return;
     }
 
-    setFormError(
-      oauthError,
-    );
+    setFormError(oauthError);
 
-    sessionStorage.removeItem(
-      "photos.oauth.error",
-    );
+    sessionStorage.removeItem("photos.oauth.error");
   }, []);
 
   /*
@@ -204,52 +112,28 @@ function LoginPage() {
    * ==================================================
    */
 
-  async function handleSubmit(
-    event: React.FormEvent<HTMLFormElement>,
-  ) {
+  async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
-    const nextErrors: Partial<
-      Record<
-        "email" | "password",
-        string
-      >
-    > = {};
+    const nextErrors: Partial<Record<"email" | "password", string>> = {};
 
-    const normalizedEmail =
-      email
-        .trim()
-        .toLowerCase();
+    const normalizedEmail = email.trim().toLowerCase();
 
-    if (
-      !EMAIL_PATTERN.test(
-        normalizedEmail,
-      )
-    ) {
-      nextErrors.email =
-        "Please enter a valid email address.";
+    if (!EMAIL_PATTERN.test(normalizedEmail)) {
+      nextErrors.email = "Please enter a valid email address.";
     }
 
-    if (
-      password.length < 8
-    ) {
-      nextErrors.password =
-        "Password must be at least 8 characters.";
+    if (password.length < 8) {
+      nextErrors.password = "Password must be at least 8 characters.";
     }
 
-    setErrors(
-      nextErrors,
-    );
+    setErrors(nextErrors);
 
     setFormError(null);
 
     setActiveSession(false);
 
-    if (
-      Object.keys(
-        nextErrors,
-      ).length > 0
-    ) {
+    if (Object.keys(nextErrors).length > 0) {
       // Move focus to the first invalid field so keyboard/screen-reader
       // users land exactly where they need to fix things.
       if (nextErrors.email) {
@@ -261,17 +145,13 @@ function LoginPage() {
     setSubmitting(true);
 
     try {
-      const user =
-        await login({
-          email:
-            normalizedEmail,
+      const user = await login({
+        email: normalizedEmail,
 
-          password,
-        });
+        password,
+      });
 
-      toast.success(
-        `Welcome back, ${user.name.split(" ")[0]}`,
-      );
+      toast.success(`Welcome back, ${user.name.split(" ")[0]}`);
 
       await navigate({
         to: "/dashboard",
@@ -280,17 +160,11 @@ function LoginPage() {
     } catch (error) {
       if (
         error instanceof ApiError &&
-        (
-          error.code ===
-            "ACTIVE_SESSION_EXISTS" ||
-          error.code ===
-            "ACTIVE_SESSION" ||
-          error.status === 409
-        )
+        (error.code === "ACTIVE_SESSION_EXISTS" ||
+          error.code === "ACTIVE_SESSION" ||
+          error.status === 409)
       ) {
-        setActiveSession(
-          true,
-        );
+        setActiveSession(true);
 
         setFormError(
           "This account is already logged in on another device. Please log out from that device first.",
@@ -314,10 +188,7 @@ function LoginPage() {
    */
 
   async function handleGoogleLogin() {
-    if (
-      googleLoading ||
-      submitting
-    ) {
+    if (googleLoading || submitting) {
       return;
     }
 
@@ -328,17 +199,11 @@ function LoginPage() {
     setGoogleLoading(true);
 
     try {
-      await loginWithProvider(
-        "google",
-      );
+      await loginWithProvider("google");
     } catch (error) {
       setGoogleLoading(false);
 
-      setFormError(
-        error instanceof Error
-          ? error.message
-          : "Unable to continue with Google.",
-      );
+      setFormError(error instanceof Error ? error.message : "Unable to continue with Google.");
     }
   }
 
@@ -371,22 +236,13 @@ function LoginPage() {
           type="button"
           variant="outline"
           className="h-12 w-full rounded-xl border-border bg-background text-sm font-semibold shadow-sm transition-all hover:border-foreground/20 hover:bg-muted active:scale-[0.99]"
-          disabled={
-            googleLoading ||
-            submitting
-          }
-          onClick={() =>
-            void handleGoogleLogin()
-          }
+          disabled={googleLoading || submitting}
+          onClick={() => void handleGoogleLogin()}
         >
           {googleLoading ? (
             <Loader2 className="mr-2 size-4 animate-spin" />
           ) : (
-            <svg
-              className="mr-2 size-4"
-              viewBox="0 0 24 24"
-              aria-hidden="true"
-            >
+            <svg className="mr-2 size-4" viewBox="0 0 24 24" aria-hidden="true">
               <path
                 fill="#4285F4"
                 d="M23.52 12.27c0-.85-.08-1.67-.22-2.45H12v4.64h6.46c-.28 1.5-1.13 2.78-2.4 3.63v3.02h3.89c2.28-2.1 3.57-5.2 3.57-8.84z"
@@ -406,17 +262,12 @@ function LoginPage() {
             </svg>
           )}
 
-          {googleLoading
-            ? "Connecting to Google..."
-            : "Continue with Google"}
+          {googleLoading ? "Connecting to Google..." : "Continue with Google"}
         </Button>
 
         {/* DIVIDER */}
 
-        <div
-          className="flex items-center gap-3"
-          role="separator"
-        >
+        <div className="flex items-center gap-3" role="separator">
           <div className="h-px flex-1 bg-border" />
 
           <span className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
@@ -428,19 +279,11 @@ function LoginPage() {
 
         {/* FORM */}
 
-        <form
-          onSubmit={
-            handleSubmit
-          }
-          noValidate
-          className="space-y-4"
-        >
+        <form onSubmit={handleSubmit} noValidate className="space-y-4">
           {/* EMAIL */}
 
           <div className="space-y-2">
-            <Label htmlFor="email">
-              Email
-            </Label>
+            <Label htmlFor="email">Email</Label>
 
             <div className="relative">
               <Mail
@@ -455,35 +298,22 @@ function LoginPage() {
                 autoComplete="email"
                 value={email}
                 onChange={(event) => {
-                  setEmail(
-                    event.target.value,
-                  );
+                  setEmail(event.target.value);
 
-                  setErrors(
-                    (previous) => {
-                      const next =
-                        {
-                          ...previous,
-                        };
+                  setErrors((previous) => {
+                    const next = {
+                      ...previous,
+                    };
 
-                      delete next.email;
+                    delete next.email;
 
-                      return next;
-                    },
-                  );
+                    return next;
+                  });
 
-                  setFormError(
-                    null,
-                  );
+                  setFormError(null);
                 }}
-                aria-invalid={Boolean(
-                  errors.email,
-                )}
-                aria-describedby={
-                  errors.email
-                    ? "email-error"
-                    : undefined
-                }
+                aria-invalid={Boolean(errors.email)}
+                aria-describedby={errors.email ? "email-error" : undefined}
                 placeholder="you@example.com"
                 className="h-11 rounded-xl pl-10 transition-shadow focus-visible:ring-2"
               />
@@ -503,9 +333,7 @@ function LoginPage() {
 
           <div className="space-y-2">
             <div className="flex items-center justify-between">
-              <Label htmlFor="password">
-                Password
-              </Label>
+              <Label htmlFor="password">Password</Label>
 
               <a
                 href="/forgot-password"
@@ -524,75 +352,42 @@ function LoginPage() {
 
               <Input
                 id="password"
-                type={
-                  showPassword
-                    ? "text"
-                    : "password"
-                }
+                type={showPassword ? "text" : "password"}
                 autoComplete="current-password"
                 value={password}
                 onChange={(event) => {
-                  setPassword(
-                    event.target.value,
-                  );
+                  setPassword(event.target.value);
 
-                  setErrors(
-                    (previous) => {
-                      const next =
-                        {
-                          ...previous,
-                        };
+                  setErrors((previous) => {
+                    const next = {
+                      ...previous,
+                    };
 
-                      delete next.password;
+                    delete next.password;
 
-                      return next;
-                    },
-                  );
+                    return next;
+                  });
 
-                  setFormError(
-                    null,
-                  );
+                  setFormError(null);
                 }}
                 className="h-11 rounded-xl pl-10 pr-11 transition-shadow focus-visible:ring-2"
                 placeholder="Enter your password"
-                aria-invalid={Boolean(
-                  errors.password,
-                )}
-                aria-describedby={
-                  errors.password
-                    ? "password-error"
-                    : undefined
-                }
+                aria-invalid={Boolean(errors.password)}
+                aria-describedby={errors.password ? "password-error" : undefined}
               />
 
               <button
                 type="button"
-                onClick={() =>
-                  setShowPassword(
-                    (value) =>
-                      !value,
-                  )
-                }
-                aria-label={
-                  showPassword
-                    ? "Hide password"
-                    : "Show password"
-                }
+                onClick={() => setShowPassword((value) => !value)}
+                aria-label={showPassword ? "Hide password" : "Show password"}
                 className="absolute right-1 top-1 inline-flex size-9 items-center justify-center rounded-lg text-muted-foreground transition hover:bg-muted hover:text-foreground"
               >
-                {showPassword ? (
-                  <EyeOff className="size-4" />
-                ) : (
-                  <Eye className="size-4" />
-                )}
+                {showPassword ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
               </button>
             </div>
 
             {errors.password ? (
-              <p
-                id="password-error"
-                className="text-xs font-medium text-destructive"
-              >
+              <p id="password-error" className="text-xs font-medium text-destructive">
                 {errors.password}
               </p>
             ) : null}
@@ -617,8 +412,7 @@ function LoginPage() {
 
           {/* ERROR */}
 
-          {formError &&
-          !activeSession ? (
+          {formError && !activeSession ? (
             <div
               role="alert"
               className="animate-in fade-in slide-in-from-top-1 rounded-xl border border-destructive/25 bg-destructive/5 px-4 py-3 text-sm font-medium text-destructive duration-200"
@@ -632,18 +426,11 @@ function LoginPage() {
           <Button
             type="submit"
             className="h-11 w-full rounded-xl text-sm font-semibold transition-all active:scale-[0.99]"
-            disabled={
-              submitting ||
-              googleLoading
-            }
+            disabled={submitting || googleLoading}
           >
-            {submitting ? (
-              <Loader2 className="mr-2 size-4 animate-spin" />
-            ) : null}
+            {submitting ? <Loader2 className="mr-2 size-4 animate-spin" /> : null}
 
-            {submitting
-              ? "Logging in..."
-              : "Log in"}
+            {submitting ? "Logging in..." : "Log in"}
           </Button>
         </form>
       </div>

@@ -14,12 +14,7 @@ export function LogoMark({ className }: { className?: string }) {
         className,
       )}
     >
-      <svg
-        viewBox="0 0 24 24"
-        className="size-5"
-        fill="none"
-        aria-hidden="true"
-      >
+      <svg viewBox="0 0 24 24" className="size-5" fill="none" aria-hidden="true">
         <g className="text-primary">
           {APERTURE_BLADE_ANGLES.map((angle, index) => (
             <rect
@@ -53,12 +48,7 @@ export function Logo({
     <span className={cn("inline-flex items-center gap-2.5", className)}>
       <LogoMark className="hover:rotate-45" />
 
-      <span
-        className={cn(
-          "font-display text-lg font-semibold tracking-tight",
-          wordmarkClassName,
-        )}
-      >
+      <span className={cn("font-display text-lg font-semibold tracking-tight", wordmarkClassName)}>
         {APP_NAME}
       </span>
     </span>
