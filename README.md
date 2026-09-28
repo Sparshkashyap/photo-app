@@ -38,7 +38,7 @@ The backend is designed around AWS serverless infrastructure, using **API Gatewa
 
 ### Backend API
 
-🔗 **https://y181ertste.execute-api.ap-south-1.amazonaws.com**
+🔗 **https://y181ertste.execute-api.ap-south-1.amazonaws.com/health**
 
 ---
 
