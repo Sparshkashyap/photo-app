@@ -122,6 +122,8 @@ export function Navbar({
 
   const [scrolled, setScrolled] = useState(false);
 
+  const [searchFocused, setSearchFocused] = useState(false);
+
   const search = controlledSearch ?? localSearch;
 
   const sort = controlledSort ?? localSort;
@@ -297,6 +299,7 @@ export function Navbar({
             type="button"
             variant="ghost"
             size="icon"
+            className="rounded-lg transition-transform active:scale-90"
             onClick={() => {
               onMobileMenuClick?.();
             }}
@@ -322,7 +325,11 @@ export function Navbar({
         <div className="hidden min-w-0 flex-1 items-center gap-2 md:flex">
           {/* SEARCH */}
 
-          <div className="relative min-w-0 max-w-2xl flex-1">
+          <div
+            className={`relative min-w-0 max-w-2xl flex-1 rounded-md transition-shadow duration-150 ${
+              searchFocused ? "ring-2 ring-ring/25" : ""
+            }`}
+          >
             <Search
               className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground"
               aria-hidden="true"
@@ -332,6 +339,8 @@ export function Navbar({
               ref={desktopSearchRef}
               value={searchDraft}
               onChange={(event) => setSearchDraft(event.target.value)}
+              onFocus={() => setSearchFocused(true)}
+              onBlur={() => setSearchFocused(false)}
               onKeyDown={(event) => {
                 if (event.key === "Escape") {
                   commitSearchImmediately("");
@@ -339,7 +348,7 @@ export function Navbar({
                 }
               }}
               placeholder="Search your photos..."
-              className="h-10 border-border bg-card pl-9 pr-9 transition-shadow focus-visible:shadow-sm"
+              className="h-10 border-border bg-card pl-9 pr-9 transition-shadow focus-visible:shadow-sm focus-visible:ring-0"
               aria-label="Search photos"
             />
 
@@ -364,7 +373,7 @@ export function Navbar({
           <select
             value={sort}
             onChange={(event) => handleSortChange(event.target.value as PhotoSort)}
-            className="h-10 rounded-md border border-input bg-card px-3 text-sm outline-none transition focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/20"
+            className="h-10 cursor-pointer rounded-md border border-input bg-card px-3 text-sm outline-none transition hover:border-foreground/20 focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/20"
             aria-label="Sort photos"
           >
             {SORT_OPTIONS.map((option) => (
@@ -378,7 +387,7 @@ export function Navbar({
 
           <div
             className={`flex h-10 items-center gap-2 rounded-md border px-2.5 transition-colors ${
-              type !== "all" ? "border-primary/40 bg-primary/5" : "border-input bg-card"
+              type !== "all" ? "border-primary/40 bg-primary/5" : "border-input bg-card hover:border-foreground/20"
             }`}
           >
             <Filter
@@ -389,7 +398,7 @@ export function Navbar({
             <select
               value={type}
               onChange={(event) => handleTypeChange(event.target.value as PhotoType)}
-              className="bg-transparent text-sm outline-none"
+              className="cursor-pointer bg-transparent text-sm outline-none"
               aria-label="Filter photos by type"
             >
               {TYPE_OPTIONS.map((option) => (
@@ -411,7 +420,7 @@ export function Navbar({
             variant="ghost"
             size="icon"
             onClick={() => setMobileSearchOpen((open) => !open)}
-            className="relative"
+            className="relative transition-transform active:scale-90"
             aria-label={mobileSearchOpen ? "Close search" : "Search photos"}
             title={mobileSearchOpen ? "Close search" : "Search photos"}
           >
@@ -440,11 +449,11 @@ export function Navbar({
                 type="button"
                 variant="ghost"
                 size="icon"
-                className="rounded-full"
+                className="rounded-full transition-transform active:scale-90"
                 aria-label="Open account menu"
                 title="Account menu"
               >
-                <Avatar className="size-8">
+                <Avatar className="size-8 ring-1 ring-border">
                   {avatarUrl ? <AvatarImage src={avatarUrl} alt={userName} /> : null}
 
                   <AvatarFallback className="text-xs font-semibold">{userInitials}</AvatarFallback>
@@ -471,10 +480,10 @@ export function Navbar({
               <Button
                 type="button"
                 variant="ghost"
-                className="gap-2 rounded-full pl-1.5 pr-2.5"
+                className="gap-2 rounded-full pl-1.5 pr-2.5 transition-colors hover:bg-muted"
                 aria-label="Open account menu"
               >
-                <Avatar className="size-7">
+                <Avatar className="size-7 ring-1 ring-border">
                   {avatarUrl ? <AvatarImage src={avatarUrl} alt={userName} /> : null}
 
                   <AvatarFallback className="text-xs font-semibold">{userInitials}</AvatarFallback>
@@ -484,7 +493,7 @@ export function Navbar({
                   {userName}
                 </span>
 
-                <ChevronDown className="size-4 text-muted-foreground" />
+                <ChevronDown className="size-4 text-muted-foreground transition-transform group-data-[state=open]:rotate-180" />
               </Button>
             }
           />

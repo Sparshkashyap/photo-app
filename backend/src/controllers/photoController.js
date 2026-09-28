@@ -3,6 +3,7 @@ const {
   PutObjectCommand,
   GetObjectCommand,
   HeadObjectCommand,
+  DeleteObjectCommand,
 } = require("@aws-sdk/client-s3");
 
 const { DynamoDBClient } = require("@aws-sdk/client-dynamodb");
@@ -13,11 +14,10 @@ const {
   QueryCommand,
   GetCommand,
   UpdateCommand,
+  DeleteCommand,
 } = require("@aws-sdk/lib-dynamodb");
 
-const {
-  getSignedUrl,
-} = require("@aws-sdk/s3-request-presigner");
+const { getSignedUrl } = require("@aws-sdk/s3-request-presigner");
 
 const crypto = require("crypto");
 const path = require("path");
@@ -34,9 +34,15 @@ const ALLOWED_CONTENT_TYPES = new Set([
   "audio/mp3",
 ]);
 
+// IMPORTANT:
+// This MUST exactly match the DynamoDB GSI name.
+const PHOTO_USER_INDEX_NAME = "userId-index";
+
 const isAllowedContentType = (contentType) =>
   ALLOWED_CONTENT_TYPES.has(
-    String(contentType || "").toLowerCase().trim(),
+    String(contentType || "")
+      .toLowerCase()
+      .trim(),
   );
 
 // --------------------------------------------------
@@ -67,7 +73,7 @@ const getBucketName = () => {
 
   if (!bucketName) {
     throw new Error(
-      "S3_BUCKET_NAME is not configured"
+      "S3_BUCKET_NAME is not configured",
     );
   }
 
@@ -80,7 +86,7 @@ const getTableName = () => {
 
   if (!tableName) {
     throw new Error(
-      "DYNAMODB_TABLE is not configured"
+      "DYNAMODB_TABLE is not configured",
     );
   }
 
@@ -94,7 +100,7 @@ const getFolderTableName = () => {
 
   if (!tableName) {
     throw new Error(
-      "FOLDER_TABLE is not configured"
+      "FOLDER_TABLE is not configured",
     );
   }
 
@@ -108,11 +114,11 @@ const sanitizeFileName = (fileName) => {
   return originalName
     .replace(
       /[^a-zA-Z0-9._-]/g,
-      "-"
+      "-",
     )
     .replace(
       /-+/g,
-      "-"
+      "-",
     );
 };
 
@@ -124,7 +130,7 @@ const sanitizeFileName = (fileName) => {
 const uploadUrl = async (
   req,
   res,
-  next
+  next,
 ) => {
   try {
     const {
@@ -144,9 +150,15 @@ const uploadUrl = async (
     }
 
     const normalizedContentType =
-      String(contentType).toLowerCase().trim();
+      String(contentType)
+        .toLowerCase()
+        .trim();
 
-    if (!isAllowedContentType(normalizedContentType)) {
+    if (
+      !isAllowedContentType(
+        normalizedContentType,
+      )
+    ) {
       return res.status(400).json({
         success: false,
         message:
@@ -183,7 +195,7 @@ const uploadUrl = async (
         command,
         {
           expiresIn: 300,
-        }
+        },
       );
 
     return res.status(200).json({
@@ -195,7 +207,7 @@ const uploadUrl = async (
   } catch (error) {
     console.error(
       "Generate upload URL error:",
-      error
+      error,
     );
 
     next(error);
@@ -210,7 +222,7 @@ const uploadUrl = async (
 const confirmUpload = async (
   req,
   res,
-  next
+  next,
 ) => {
   try {
     const {
@@ -273,7 +285,7 @@ const confirmUpload = async (
 
     if (
       !key.startsWith(
-        expectedPrefix
+        expectedPrefix,
       )
     ) {
       return res.status(403).json({
@@ -301,7 +313,7 @@ const confirmUpload = async (
             Key: {
               folderId,
             },
-          })
+          }),
         );
 
       const folder =
@@ -340,35 +352,53 @@ const confirmUpload = async (
 
     const s3Object =
       await s3.send(
-        headCommand
+        headCommand,
       );
 
     const actualContentType =
       String(
-        s3Object.ContentType || contentType || "",
-      ).toLowerCase().trim();
+        s3Object.ContentType ||
+          contentType ||
+          "",
+      )
+        .toLowerCase()
+        .trim();
 
     const actualFileSize =
-      Number(s3Object.ContentLength || 0);
+      Number(
+        s3Object.ContentLength || 0,
+      );
 
-    if (!isAllowedContentType(actualContentType)) {
+    if (
+      !isAllowedContentType(
+        actualContentType,
+      )
+    ) {
       return res.status(400).json({
         success: false,
-        message: "Uploaded file type is not supported",
+        message:
+          "Uploaded file type is not supported",
       });
     }
 
-    if (actualFileSize <= 0) {
+    if (
+      actualFileSize <= 0
+    ) {
       return res.status(400).json({
         success: false,
-        message: "Uploaded file is empty or invalid",
+        message:
+          "Uploaded file is empty or invalid",
       });
     }
 
-    if (actualFileSize > MAX_UPLOAD_SIZE_BYTES) {
+    if (
+      actualFileSize >
+      MAX_UPLOAD_SIZE_BYTES
+    ) {
       return res.status(400).json({
         success: false,
-        message: "File size cannot exceed 100 MB",
+        message:
+          "File size cannot exceed 100 MB",
       });
     }
 
@@ -404,11 +434,9 @@ const confirmUpload = async (
       folderId:
         folderId || null,
 
-      // Trash state
       isTrashed:
         false,
 
-      // Favorite state
       isFavorite:
         false,
 
@@ -426,7 +454,7 @@ const confirmUpload = async (
 
         Item:
           item,
-      })
+      }),
     );
 
     return res.status(201).json({
@@ -441,7 +469,7 @@ const confirmUpload = async (
   } catch (error) {
     console.error(
       "Confirm upload error:",
-      error
+      error,
     );
 
     next(error);
@@ -456,7 +484,7 @@ const confirmUpload = async (
 const getPhotos = async (
   req,
   res,
-  next
+  next,
 ) => {
   try {
     const userId =
@@ -539,7 +567,7 @@ const getPhotos = async (
             Key: {
               folderId,
             },
-          })
+          }),
         );
 
       const folder =
@@ -574,8 +602,10 @@ const getPhotos = async (
           TableName:
             getTableName(),
 
+          // IMPORTANT:
+          // Must exactly match the GSI name in DynamoDB.
           IndexName:
-            "UserIdIndex",
+            PHOTO_USER_INDEX_NAME,
 
           KeyConditionExpression:
             "userId = :userId",
@@ -584,7 +614,7 @@ const getPhotos = async (
             ":userId":
               userId,
           },
-        })
+        }),
       );
 
     let photos =
@@ -597,7 +627,7 @@ const getPhotos = async (
     photos =
       photos.filter(
         (photo) =>
-          photo.isTrashed !== true
+          photo.isTrashed !== true,
       );
 
     // ------------------------------------------------
@@ -605,18 +635,20 @@ const getPhotos = async (
     // ------------------------------------------------
 
     if (folderId) {
-      if (folderId === "root") {
+      if (
+        folderId === "root"
+      ) {
         photos =
           photos.filter(
             (photo) =>
-              !photo.folderId
+              !photo.folderId,
           );
       } else {
         photos =
           photos.filter(
             (photo) =>
               photo.folderId ===
-              folderId
+              folderId,
           );
       }
     }
@@ -631,18 +663,18 @@ const getPhotos = async (
           (photo) => {
             const name =
               String(
-                photo.name || ""
+                photo.name || "",
               ).toLowerCase();
 
             const originalFileName =
               String(
                 photo.originalFileName ||
-                  ""
+                  "",
               ).toLowerCase();
 
             const fileName =
               String(
-                photo.fileName || ""
+                photo.fileName || "",
               ).toLowerCase();
 
             return (
@@ -650,7 +682,7 @@ const getPhotos = async (
               originalFileName.includes(search) ||
               fileName.includes(search)
             );
-          }
+          },
         );
     }
 
@@ -663,10 +695,10 @@ const getPhotos = async (
         photos.filter(
           (photo) =>
             String(
-              photo.contentType || ""
+              photo.contentType || "",
             ).startsWith(
-              `${type}/`
-            )
+              `${type}/`,
+            ),
         );
     }
 
@@ -680,11 +712,11 @@ const getPhotos = async (
           sort === "name_asc"
         ) {
           return String(
-            a.name || ""
+            a.name || "",
           ).localeCompare(
             String(
-              b.name || ""
-            )
+              b.name || "",
+            ),
           );
         }
 
@@ -692,22 +724,22 @@ const getPhotos = async (
           sort === "name_desc"
         ) {
           return String(
-            b.name || ""
+            b.name || "",
           ).localeCompare(
             String(
-              a.name || ""
-            )
+              a.name || "",
+            ),
           );
         }
 
         const aTime =
           new Date(
-            a.createdAt || 0
+            a.createdAt || 0,
           ).getTime();
 
         const bTime =
           new Date(
-            b.createdAt || 0
+            b.createdAt || 0,
           ).getTime();
 
         if (
@@ -717,7 +749,7 @@ const getPhotos = async (
         }
 
         return bTime - aTime;
-      }
+      },
     );
 
     // ------------------------------------------------
@@ -744,15 +776,15 @@ const getPhotos = async (
                 {
                   expiresIn:
                     3600,
-                }
+                },
               );
 
             return {
               ...photo,
               downloadUrl,
             };
-          }
-        )
+          },
+        ),
       );
 
     return res.status(200).json({
@@ -767,7 +799,7 @@ const getPhotos = async (
   } catch (error) {
     console.error(
       "Get photos error:",
-      error
+      error,
     );
 
     next(error);
@@ -782,7 +814,7 @@ const getPhotos = async (
 const getPhoto = async (
   req,
   res,
-  next
+  next,
 ) => {
   try {
     const {
@@ -809,7 +841,7 @@ const getPhoto = async (
           Key: {
             photoId,
           },
-        })
+        }),
       );
 
     const photo =
@@ -859,7 +891,7 @@ const getPhoto = async (
         {
           expiresIn:
             3600,
-        }
+        },
       );
 
     return res.status(200).json({
@@ -873,7 +905,7 @@ const getPhoto = async (
   } catch (error) {
     console.error(
       "Get photo error:",
-      error
+      error,
     );
 
     next(error);
@@ -888,7 +920,7 @@ const getPhoto = async (
 const renamePhoto = async (
   req,
   res,
-  next
+  next,
 ) => {
   try {
     const {
@@ -902,7 +934,10 @@ const renamePhoto = async (
     const userId =
       req.user.userId;
 
-    if (!photoId || !name) {
+    if (
+      !photoId ||
+      !name
+    ) {
       return res.status(400).json({
         success: false,
         message:
@@ -940,7 +975,7 @@ const renamePhoto = async (
           Key: {
             photoId,
           },
-        })
+        }),
       );
 
     const photo =
@@ -995,7 +1030,7 @@ const renamePhoto = async (
 
           ReturnValues:
             "ALL_NEW",
-        })
+        }),
       );
 
     return res.status(200).json({
@@ -1010,7 +1045,7 @@ const renamePhoto = async (
   } catch (error) {
     console.error(
       "Rename photo error:",
-      error
+      error,
     );
 
     next(error);
@@ -1019,13 +1054,13 @@ const renamePhoto = async (
 
 // --------------------------------------------------
 // Move Photo
-// PATCH /photos/:photoId/move
+// PATCH /photos/:photoId/folder
 // --------------------------------------------------
 
 const movePhoto = async (
   req,
   res,
-  next
+  next,
 ) => {
   try {
     const {
@@ -1048,7 +1083,7 @@ const movePhoto = async (
           Key: {
             photoId,
           },
-        })
+        }),
       );
 
     const photo =
@@ -1088,7 +1123,7 @@ const movePhoto = async (
               folderId:
                 normalizedFolderId,
             },
-          })
+          }),
         );
 
       const folder =
@@ -1139,7 +1174,7 @@ const movePhoto = async (
 
           ReturnValues:
             "ALL_NEW",
-        })
+        }),
       );
 
     return res.status(200).json({
@@ -1154,7 +1189,7 @@ const movePhoto = async (
   } catch (error) {
     console.error(
       "Move photo error:",
-      error
+      error,
     );
 
     next(error);
@@ -1169,7 +1204,7 @@ const movePhoto = async (
 const downloadPhoto = async (
   req,
   res,
-  next
+  next,
 ) => {
   try {
     const {
@@ -1188,7 +1223,7 @@ const downloadPhoto = async (
           Key: {
             photoId,
           },
-        })
+        }),
       );
 
     const photo =
@@ -1235,7 +1270,7 @@ const downloadPhoto = async (
 
         ResponseContentDisposition:
           `attachment; filename="${encodeURIComponent(
-            photo.fileName || "download"
+            photo.fileName || "download",
           )}"`,
       });
 
@@ -1244,9 +1279,8 @@ const downloadPhoto = async (
         s3,
         command,
         {
-          expiresIn:
-            300,
-        }
+          expiresIn: 300,
+        },
       );
 
     return res.status(200).json({
@@ -1257,7 +1291,7 @@ const downloadPhoto = async (
   } catch (error) {
     console.error(
       "Download photo error:",
-      error
+      error,
     );
 
     next(error);
@@ -1272,7 +1306,7 @@ const downloadPhoto = async (
 const trashPhoto = async (
   req,
   res,
-  next
+  next,
 ) => {
   try {
     const {
@@ -1291,7 +1325,7 @@ const trashPhoto = async (
           Key: {
             photoId,
           },
-        })
+        }),
       );
 
     const photo =
@@ -1344,7 +1378,7 @@ const trashPhoto = async (
 
           ReturnValues:
             "ALL_NEW",
-        })
+        }),
       );
 
     return res.status(200).json({
@@ -1359,7 +1393,7 @@ const trashPhoto = async (
   } catch (error) {
     console.error(
       "Trash photo error:",
-      error
+      error,
     );
 
     next(error);
@@ -1374,7 +1408,7 @@ const trashPhoto = async (
 const restorePhoto = async (
   req,
   res,
-  next
+  next,
 ) => {
   try {
     const {
@@ -1393,7 +1427,7 @@ const restorePhoto = async (
           Key: {
             photoId,
           },
-        })
+        }),
       );
 
     const photo =
@@ -1443,7 +1477,7 @@ const restorePhoto = async (
 
           ReturnValues:
             "ALL_NEW",
-        })
+        }),
       );
 
     return res.status(200).json({
@@ -1458,7 +1492,7 @@ const restorePhoto = async (
   } catch (error) {
     console.error(
       "Restore photo error:",
-      error
+      error,
     );
 
     next(error);
@@ -1473,7 +1507,7 @@ const restorePhoto = async (
 const deletePhoto = async (
   req,
   res,
-  next
+  next,
 ) => {
   try {
     const {
@@ -1492,7 +1526,7 @@ const deletePhoto = async (
           Key: {
             photoId,
           },
-        })
+        }),
       );
 
     const photo =
@@ -1516,9 +1550,7 @@ const deletePhoto = async (
       });
     }
 
-    const { DeleteObjectCommand } =
-      require("@aws-sdk/client-s3");
-
+    // Delete from S3
     await s3.send(
       new DeleteObjectCommand({
         Bucket:
@@ -1526,14 +1558,10 @@ const deletePhoto = async (
 
         Key:
           photo.s3Key,
-      })
+      }),
     );
 
-    const {
-      DeleteCommand,
-    } =
-      require("@aws-sdk/lib-dynamodb");
-
+    // Delete metadata from DynamoDB
     await dynamoDb.send(
       new DeleteCommand({
         TableName:
@@ -1542,7 +1570,7 @@ const deletePhoto = async (
         Key: {
           photoId,
         },
-      })
+      }),
     );
 
     return res.status(200).json({
@@ -1554,7 +1582,7 @@ const deletePhoto = async (
   } catch (error) {
     console.error(
       "Delete photo error:",
-      error
+      error,
     );
 
     next(error);
@@ -1569,7 +1597,7 @@ const deletePhoto = async (
 const toggleFavorite = async (
   req,
   res,
-  next
+  next,
 ) => {
   try {
     const {
@@ -1588,7 +1616,7 @@ const toggleFavorite = async (
           Key: {
             photoId,
           },
-        })
+        }),
       );
 
     const photo =
@@ -1641,7 +1669,7 @@ const toggleFavorite = async (
 
           ReturnValues:
             "ALL_NEW",
-        })
+        }),
       );
 
     return res.status(200).json({
@@ -1658,7 +1686,7 @@ const toggleFavorite = async (
   } catch (error) {
     console.error(
       "Toggle favorite error:",
-      error
+      error,
     );
 
     next(error);
@@ -1673,7 +1701,7 @@ const toggleFavorite = async (
 const getFavoritePhotos = async (
   req,
   res,
-  next
+  next,
 ) => {
   try {
     const userId =
@@ -1685,8 +1713,10 @@ const getFavoritePhotos = async (
           TableName:
             getTableName(),
 
+          // IMPORTANT:
+          // Must exactly match the DynamoDB GSI.
           IndexName:
-            "UserIdIndex",
+            PHOTO_USER_INDEX_NAME,
 
           KeyConditionExpression:
             "userId = :userId",
@@ -1695,7 +1725,7 @@ const getFavoritePhotos = async (
             ":userId":
               userId,
           },
-        })
+        }),
       );
 
     let photos =
@@ -1705,17 +1735,17 @@ const getFavoritePhotos = async (
       photos.filter(
         (photo) =>
           photo.isTrashed !== true &&
-          photo.isFavorite === true
+          photo.isFavorite === true,
       );
 
     photos.sort(
       (a, b) =>
         new Date(
-          b.createdAt || 0
+          b.createdAt || 0,
         ).getTime() -
         new Date(
-          a.createdAt || 0
-        ).getTime()
+          a.createdAt || 0,
+        ).getTime(),
     );
 
     const photosWithUrls =
@@ -1738,15 +1768,15 @@ const getFavoritePhotos = async (
                 {
                   expiresIn:
                     3600,
-                }
+                },
               );
 
             return {
               ...photo,
               downloadUrl,
             };
-          }
-        )
+          },
+        ),
       );
 
     return res.status(200).json({
@@ -1761,7 +1791,7 @@ const getFavoritePhotos = async (
   } catch (error) {
     console.error(
       "Get favorite photos error:",
-      error
+      error,
     );
 
     next(error);

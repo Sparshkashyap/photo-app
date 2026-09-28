@@ -1,17 +1,26 @@
 import {
+  CalendarDays,
   Check,
+  Clock3,
   Copy,
   Download,
+  FileText,
   FolderInput,
+  FolderOpen,
+  HardDrive,
   Heart,
+  ImageIcon,
+  Info,
   Loader2,
   MoreVertical,
   Pencil,
+  Ruler,
   Share2,
   Trash2,
+  Video,
 } from "lucide-react";
 
-import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 
 import { createPortal } from "react-dom";
 
@@ -58,6 +67,82 @@ const MENU_GAP = 8;
 const VIEWPORT_GAP = 8;
 const MENU_ITEM_SELECTOR = '[role="menuitem"]:not(:disabled)';
 
+function formatFileSize(bytes?: number) {
+  if (!bytes || bytes <= 0) {
+    return "Unknown";
+  }
+
+  const units = ["B", "KB", "MB", "GB", "TB"];
+  const exponent = Math.min(Math.floor(Math.log(bytes) / Math.log(1024)), units.length - 1);
+  const value = bytes / 1024 ** exponent;
+
+  return `${value >= 10 || exponent === 0 ? value.toFixed(0) : value.toFixed(2)} ${units[exponent]}`;
+}
+
+function formatDateTime(value?: string) {
+  if (!value) {
+    return "Unknown";
+  }
+
+  const date = new Date(value);
+
+  if (Number.isNaN(date.getTime())) {
+    return "Unknown";
+  }
+
+  return new Intl.DateTimeFormat(undefined, {
+    dateStyle: "medium",
+    timeStyle: "short",
+  }).format(date);
+}
+
+function formatDuration(seconds: number) {
+  if (!Number.isFinite(seconds) || seconds < 0) {
+    return "Unknown";
+  }
+
+  const total = Math.round(seconds);
+  const hours = Math.floor(total / 3600);
+  const minutes = Math.floor((total % 3600) / 60);
+  const remainingSeconds = total % 60;
+
+  if (hours > 0) {
+    return `${hours}:${String(minutes).padStart(2, "0")}:${String(remainingSeconds).padStart(2, "0")}`;
+  }
+
+  return `${minutes}:${String(remainingSeconds).padStart(2, "0")}`;
+}
+
+function getFolderName(photo: Photo, folders: Folder[]) {
+  if (!photo.folderId) {
+    return "My Photos / Root";
+  }
+
+  return folders.find((folder) => folder.folderId === photo.folderId)?.name || `Folder (${photo.folderId})`;
+}
+
+function PropertyRow({
+  icon,
+  label,
+  value,
+}: {
+  icon: ReactNode;
+  label: string;
+  value: string;
+}) {
+  return (
+    <div className="flex items-start gap-3 rounded-xl border border-border/70 bg-background/50 px-3 py-2.5 transition-colors hover:bg-background/80">
+      <span className="mt-0.5 flex size-7 shrink-0 items-center justify-center rounded-lg bg-muted text-muted-foreground">
+        {icon}
+      </span>
+      <div className="min-w-0 flex-1">
+        <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">{label}</p>
+        <p className="mt-0.5 break-words text-sm font-medium text-foreground">{value}</p>
+      </div>
+    </div>
+  );
+}
+
 export function PhotoMenu({
   photo,
   folders,
@@ -72,6 +157,7 @@ export function PhotoMenu({
   const [moveOpen, setMoveOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [shareOpen, setShareOpen] = useState(false);
+  const [propertiesOpen, setPropertiesOpen] = useState(false);
 
   const [shareUrl, setShareUrl] = useState("");
   const [newName, setNewName] = useState(photo.name);
@@ -85,6 +171,8 @@ export function PhotoMenu({
   const [copied, setCopied] = useState(false);
 
   const [isFavorite, setIsFavorite] = useState(photo.isFavorite === true);
+  const [dimensions, setDimensions] = useState<{ width: number; height: number } | null>(null);
+  const [durationSeconds, setDurationSeconds] = useState<number | null>(null);
 
   const [menuPosition, setMenuPosition] = useState<MenuPosition>({
     top: 0,
@@ -512,6 +600,86 @@ export function PhotoMenu({
     setMoveOpen(true);
   }
 
+  function openProperties() {
+    closeMenu();
+    setDimensions(null);
+    setDurationSeconds(null);
+    setPropertiesOpen(true);
+  }
+
+  useEffect(() => {
+    if (!propertiesOpen) {
+      return;
+    }
+
+    const mediaUrl = photo.url || photo.downloadUrl;
+
+    if (!mediaUrl) {
+      return;
+    }
+
+    let disposed = false;
+
+    if (photo.contentType.startsWith("video/")) {
+      const video = document.createElement("video");
+      video.preload = "metadata";
+
+      video.onloadedmetadata = () => {
+        if (disposed) {
+          return;
+        }
+
+        setDimensions({
+          width: video.videoWidth,
+          height: video.videoHeight,
+        });
+        setDurationSeconds(Number.isFinite(video.duration) ? video.duration : null);
+      };
+
+      video.onerror = () => {
+        if (!disposed) {
+          setDimensions(null);
+          setDurationSeconds(null);
+        }
+      };
+
+      video.src = mediaUrl;
+      video.load();
+
+      return () => {
+        disposed = true;
+        video.pause();
+        video.removeAttribute("src");
+        video.load();
+      };
+    }
+
+    if (photo.contentType.startsWith("image/")) {
+      const image = new Image();
+
+      image.onload = () => {
+        if (!disposed) {
+          setDimensions({
+            width: image.naturalWidth,
+            height: image.naturalHeight,
+          });
+        }
+      };
+
+      image.onerror = () => {
+        if (!disposed) {
+          setDimensions(null);
+        }
+      };
+
+      image.src = mediaUrl;
+    }
+
+    return () => {
+      disposed = true;
+    };
+  }, [propertiesOpen, photo.contentType, photo.downloadUrl, photo.url]);
+
   const menu = menuOpen
     ? createPortal(
         <div
@@ -532,9 +700,9 @@ export function PhotoMenu({
             role="menuitem"
             tabIndex={-1}
             onClick={openRename}
-            className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm transition-colors hover:bg-accent focus:bg-accent focus:outline-none"
+            className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm transition-colors duration-100 hover:bg-accent focus:bg-accent focus:outline-none"
           >
-            <Pencil className="size-4 shrink-0" />
+            <Pencil className="size-4 shrink-0 text-muted-foreground" />
             <span>Rename</span>
           </button>
 
@@ -543,9 +711,9 @@ export function PhotoMenu({
             role="menuitem"
             tabIndex={-1}
             onClick={openMove}
-            className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm transition-colors hover:bg-accent focus:bg-accent focus:outline-none"
+            className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm transition-colors duration-100 hover:bg-accent focus:bg-accent focus:outline-none"
           >
-            <FolderInput className="size-4 shrink-0" />
+            <FolderInput className="size-4 shrink-0 text-muted-foreground" />
             <span>Move to folder</span>
           </button>
 
@@ -557,9 +725,9 @@ export function PhotoMenu({
               closeMenu();
               onDownload?.();
             }}
-            className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm transition-colors hover:bg-accent focus:bg-accent focus:outline-none"
+            className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm transition-colors duration-100 hover:bg-accent focus:bg-accent focus:outline-none"
           >
-            <Download className="size-4 shrink-0" />
+            <Download className="size-4 shrink-0 text-muted-foreground" />
             <span>Download</span>
           </button>
 
@@ -571,13 +739,13 @@ export function PhotoMenu({
               void handleFavorite();
             }}
             disabled={favoriting}
-            className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm transition-colors hover:bg-accent focus:bg-accent focus:outline-none disabled:cursor-not-allowed disabled:opacity-60"
+            className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm transition-colors duration-100 hover:bg-accent focus:bg-accent focus:outline-none disabled:cursor-not-allowed disabled:opacity-60"
           >
             {favoriting ? (
-              <Loader2 className="size-4 shrink-0 animate-spin" />
+              <Loader2 className="size-4 shrink-0 animate-spin text-muted-foreground" />
             ) : (
               <Heart
-                className={`size-4 shrink-0 ${isFavorite ? "fill-current text-rose-500" : ""}`}
+                className={`size-4 shrink-0 transition-colors ${isFavorite ? "fill-current text-rose-500" : "text-muted-foreground"}`}
               />
             )}
             <span>{isFavorite ? "Remove from Favorites" : "Add to Favorites"}</span>
@@ -591,14 +759,25 @@ export function PhotoMenu({
               void handleShare();
             }}
             disabled={sharing}
-            className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm transition-colors hover:bg-accent focus:bg-accent focus:outline-none disabled:cursor-not-allowed disabled:opacity-60"
+            className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm transition-colors duration-100 hover:bg-accent focus:bg-accent focus:outline-none disabled:cursor-not-allowed disabled:opacity-60"
           >
             {sharing ? (
-              <Loader2 className="size-4 shrink-0 animate-spin" />
+              <Loader2 className="size-4 shrink-0 animate-spin text-muted-foreground" />
             ) : (
-              <Share2 className="size-4 shrink-0" />
+              <Share2 className="size-4 shrink-0 text-muted-foreground" />
             )}
             <span>{sharing ? "Preparing..." : "Share"}</span>
+          </button>
+
+          <button
+            type="button"
+            role="menuitem"
+            tabIndex={-1}
+            onClick={openProperties}
+            className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm transition-colors duration-100 hover:bg-accent focus:bg-accent focus:outline-none"
+          >
+            <Info className="size-4 shrink-0 text-muted-foreground" />
+            <span>Properties</span>
           </button>
 
           <div className="my-1.5 h-px bg-border" />
@@ -611,7 +790,7 @@ export function PhotoMenu({
               closeMenu();
               setDeleteOpen(true);
             }}
-            className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm text-destructive transition-colors hover:bg-destructive/10 focus:bg-destructive/10 focus:outline-none"
+            className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm text-destructive transition-colors duration-100 hover:bg-destructive/10 focus:bg-destructive/10 focus:outline-none"
           >
             <Trash2 className="size-4 shrink-0" />
             <span>Move to Trash</span>
@@ -636,7 +815,7 @@ export function PhotoMenu({
           aria-haspopup="menu"
           aria-label={`Options for ${photo.name}`}
           title="Photo options"
-          className="border-border bg-background/95 shadow-sm sm:opacity-0 sm:transition-opacity sm:group-hover:opacity-100 sm:group-focus-within:opacity-100"
+          className="border-border bg-background/95 shadow-sm transition-transform active:scale-90 sm:opacity-0 sm:transition-opacity sm:group-hover:opacity-100 sm:group-focus-within:opacity-100"
         >
           <MoreVertical className="size-4" />
         </Button>
@@ -677,7 +856,7 @@ export function PhotoMenu({
                   void handleRename();
                 }
               }}
-              className="flex h-10 w-full rounded-md border border-border bg-background px-3 text-sm outline-none focus:border-primary focus:ring-2 focus:ring-primary/20"
+              className="flex h-10 w-full rounded-md border border-border bg-background px-3 text-sm outline-none transition-shadow focus:border-primary focus:ring-2 focus:ring-primary/20"
             />
 
             <p
@@ -690,11 +869,20 @@ export function PhotoMenu({
           </div>
 
           <DialogFooter>
-            <Button variant="outline" onClick={() => setRenameOpen(false)} disabled={renaming}>
+            <Button
+              variant="outline"
+              onClick={() => setRenameOpen(false)}
+              disabled={renaming}
+              className="transition-transform active:scale-95"
+            >
               Cancel
             </Button>
 
-            <Button onClick={() => void handleRename()} disabled={renaming || !newName.trim()}>
+            <Button
+              onClick={() => void handleRename()}
+              disabled={renaming || !newName.trim()}
+              className="transition-transform active:scale-95"
+            >
               {renaming ? (
                 <Loader2 className="size-4 animate-spin" />
               ) : (
@@ -730,7 +918,7 @@ export function PhotoMenu({
               value={selectedFolderId}
               disabled={moving}
               onChange={(event) => setSelectedFolderId(event.target.value)}
-              className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm outline-none focus:border-ring focus:ring-2 focus:ring-ring/20"
+              className="h-10 w-full cursor-pointer rounded-md border border-input bg-background px-3 text-sm outline-none transition focus:border-ring focus:ring-2 focus:ring-ring/20"
             >
               <option value="">Root / My Photos</option>
               {folders.map((folder) => (
@@ -742,11 +930,20 @@ export function PhotoMenu({
           </div>
 
           <DialogFooter>
-            <Button variant="outline" onClick={() => setMoveOpen(false)} disabled={moving}>
+            <Button
+              variant="outline"
+              onClick={() => setMoveOpen(false)}
+              disabled={moving}
+              className="transition-transform active:scale-95"
+            >
               Cancel
             </Button>
 
-            <Button onClick={() => void handleMove()} disabled={moving}>
+            <Button
+              onClick={() => void handleMove()}
+              disabled={moving}
+              className="transition-transform active:scale-95"
+            >
               {moving ? (
                 <Loader2 className="size-4 animate-spin" />
               ) : (
@@ -794,7 +991,7 @@ export function PhotoMenu({
                   readOnly
                   onFocus={(event) => event.currentTarget.select()}
                   aria-label="Share link"
-                  className="h-10 min-w-0 flex-1 rounded-md border border-border bg-muted/30 px-3 text-sm outline-none focus:border-primary focus:ring-2 focus:ring-primary/20"
+                  className="h-10 min-w-0 flex-1 rounded-md border border-border bg-muted/30 px-3 text-sm outline-none transition-shadow focus:border-primary focus:ring-2 focus:ring-primary/20"
                 />
 
                 <Button
@@ -804,6 +1001,7 @@ export function PhotoMenu({
                   onClick={() => void handleCopyShareUrl()}
                   aria-label="Copy share link"
                   title="Copy link"
+                  className={`transition-all active:scale-90 ${copied ? "border-emerald-500/50 text-emerald-500" : ""}`}
                 >
                   {copied ? <Check className="size-4" /> : <Copy className="size-4" />}
                 </Button>
@@ -812,17 +1010,105 @@ export function PhotoMenu({
           </div>
 
           <DialogFooter className="flex-col-reverse gap-2 sm:flex-row">
-            <Button variant="outline" onClick={() => setShareOpen(false)}>
+            <Button variant="outline" onClick={() => setShareOpen(false)} className="transition-transform active:scale-95">
               Close
             </Button>
 
-            <Button variant="outline" onClick={() => void handleNativeShare()}>
+            <Button variant="outline" onClick={() => void handleNativeShare()} className="transition-transform active:scale-95">
               <Share2 className="size-4" />
               Share
             </Button>
 
-            <Button onClick={() => void handleCopyShareUrl()}>
+            <Button onClick={() => void handleCopyShareUrl()} className="transition-transform active:scale-95">
               {copied ? "Copied" : "Copy link"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={propertiesOpen}
+        onOpenChange={setPropertiesOpen}
+      >
+        <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Info className="size-5" />
+              Properties
+            </DialogTitle>
+            <DialogDescription>
+              Complete information about this {photo.contentType.startsWith("video/") ? "video" : photo.contentType.startsWith("audio/") ? "audio file" : "photo"}.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-2">
+            <PropertyRow
+              icon={<FileText className="size-4" />}
+              label="Name"
+              value={photo.name || photo.fileName || "Untitled"}
+            />
+            <PropertyRow
+              icon={<FileText className="size-4" />}
+              label="Original filename"
+              value={photo.originalFileName || photo.fileName || "Not available"}
+            />
+            <PropertyRow
+              icon={photo.contentType.startsWith("video/") ? <Video className="size-4" /> : <ImageIcon className="size-4" />}
+              label="Type"
+              value={photo.contentType || "Unknown"}
+            />
+            <PropertyRow
+              icon={<HardDrive className="size-4" />}
+              label="File size"
+              value={formatFileSize(photo.fileSize)}
+            />
+            <PropertyRow
+              icon={<Ruler className="size-4" />}
+              label="Dimensions"
+              value={dimensions ? `${dimensions.width} × ${dimensions.height} px` : "Not available"}
+            />
+            {photo.contentType.startsWith("video/") ? (
+              <PropertyRow
+                icon={<Clock3 className="size-4" />}
+                label="Duration"
+                value={durationSeconds !== null ? formatDuration(durationSeconds) : "Not available"}
+              />
+            ) : null}
+            <PropertyRow
+              icon={<CalendarDays className="size-4" />}
+              label="Uploaded"
+              value={formatDateTime(photo.createdAt || photo.uploadedAt)}
+            />
+            <PropertyRow
+              icon={<CalendarDays className="size-4" />}
+              label="Last modified"
+              value={formatDateTime(photo.updatedAt)}
+            />
+            <PropertyRow
+              icon={<FolderOpen className="size-4" />}
+              label="Folder"
+              value={getFolderName(photo, folders)}
+            />
+            <PropertyRow
+              icon={<Heart className="size-4" />}
+              label="Favorite"
+              value={photo.isFavorite ? "Yes" : "No"}
+            />
+            <PropertyRow
+              icon={<Info className="size-4" />}
+              label="Status"
+              value={photo.isTrashed ? "In Trash" : "Active"}
+            />
+          </div>
+
+          <div className="mt-4 rounded-xl border border-border bg-muted/30 p-3">
+            <p className="text-xs font-medium text-muted-foreground">Photo ID</p>
+            <p className="mt-1 break-all font-mono text-xs text-foreground">{photo.photoId}</p>
+          </div>
+
+          <DialogFooter>
+            <Button onClick={() => setPropertiesOpen(false)} className="transition-transform active:scale-95">
+              Close
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -846,11 +1132,21 @@ export function PhotoMenu({
           </DialogHeader>
 
           <DialogFooter>
-            <Button variant="outline" onClick={() => setDeleteOpen(false)} disabled={deleting}>
+            <Button
+              variant="outline"
+              onClick={() => setDeleteOpen(false)}
+              disabled={deleting}
+              className="transition-transform active:scale-95"
+            >
               Cancel
             </Button>
 
-            <Button variant="destructive" onClick={() => void handleTrash()} disabled={deleting}>
+            <Button
+              variant="destructive"
+              onClick={() => void handleTrash()}
+              disabled={deleting}
+              className="transition-transform active:scale-95"
+            >
               {deleting ? (
                 <Loader2 className="size-4 animate-spin" />
               ) : (

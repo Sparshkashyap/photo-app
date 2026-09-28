@@ -443,6 +443,9 @@ export function UploadPhoto({
             bg-black
             ring-1
             ring-border
+            motion-safe:animate-in
+            motion-safe:fade-in
+            motion-safe:duration-300
           "
         >
           <video
@@ -485,6 +488,9 @@ export function UploadPhoto({
             ring-1
             ring-border
             sm:min-h-[210px]
+            motion-safe:animate-in
+            motion-safe:fade-in
+            motion-safe:duration-300
           "
         >
           <div
@@ -584,6 +590,9 @@ export function UploadPhoto({
           bg-muted
           ring-1
           ring-border
+          motion-safe:animate-in
+          motion-safe:fade-in
+          motion-safe:duration-300
         "
       >
         <img
@@ -812,17 +821,18 @@ export function UploadPhoto({
                   px-6
                   py-10
                   text-center
-                  transition
+                  transition-all
+                  duration-200
                   sm:min-h-[300px]
                   ${
                     dragging
-                      ? "border-primary bg-accent"
+                      ? "scale-[1.01] border-primary bg-accent shadow-inner"
                       : "border-border bg-surface-muted hover:border-primary/50 hover:bg-accent/50"
                   }
                 `}
               >
                 <span
-                  className="
+                  className={`
                     mb-4
                     flex
                     size-14
@@ -832,7 +842,14 @@ export function UploadPhoto({
                     bg-background
                     text-primary
                     shadow-soft
-                  "
+                    transition-transform
+                    duration-200
+                    ${
+                      dragging
+                        ? "scale-110 -translate-y-1"
+                        : ""
+                    }
+                  `}
                 >
                   <UploadCloud
                     className="size-7"
@@ -846,8 +863,9 @@ export function UploadPhoto({
                     font-semibold
                   "
                 >
-                  Drag &amp; drop your media
-                  here
+                  {dragging
+                    ? "Drop it right here"
+                    : "Drag & drop your media here"}
                 </span>
 
                 <span
@@ -957,7 +975,7 @@ export function UploadPhoto({
                       onClick={
                         openFilePicker
                       }
-                      className="shrink-0"
+                      className="shrink-0 transition-transform active:scale-95"
                     >
                       Change
                     </Button>
@@ -972,6 +990,8 @@ export function UploadPhoto({
                       className="
                         size-9
                         shrink-0
+                        transition-transform
+                        active:scale-90
                       "
                       aria-label="Remove file"
                     >
@@ -1076,6 +1096,9 @@ export function UploadPhoto({
                       border-border
                       bg-surface-muted
                       p-3.5
+                      motion-safe:animate-in
+                      motion-safe:fade-in
+                      motion-safe:duration-200
                     "
                     aria-live="polite"
                   >
@@ -1124,7 +1147,7 @@ export function UploadPhoto({
 
                     <Progress
                       value={progress}
-                      className="h-2"
+                      className="h-2 transition-[width] duration-300"
                     />
                   </div>
                 ) : null}
@@ -1147,6 +1170,10 @@ export function UploadPhoto({
                       text-sm
                       font-medium
                       text-primary
+                      motion-safe:animate-in
+                      motion-safe:zoom-in-95
+                      motion-safe:fade-in
+                      motion-safe:duration-200
                     "
                     aria-live="polite"
                   >
@@ -1181,6 +1208,10 @@ export function UploadPhoto({
                   font-medium
                   leading-5
                   text-destructive
+                  motion-safe:animate-in
+                  motion-safe:fade-in
+                  motion-safe:slide-in-from-top-1
+                  motion-safe:duration-200
                 "
               >
                 {error}
@@ -1225,6 +1256,8 @@ export function UploadPhoto({
                 }
                 className="
                   w-full
+                  transition-transform
+                  active:scale-95
                   sm:w-auto
                 "
               >
@@ -1243,6 +1276,8 @@ export function UploadPhoto({
                 }
                 className="
                   w-full
+                  transition-transform
+                  active:scale-95
                   sm:w-auto
                 "
               >

@@ -28,14 +28,14 @@ const router = express.Router();
 router.post(
   "/upload-url",
   authMiddleware,
-  uploadUrl
+  uploadUrl,
 );
 
 // POST /photos/confirm
 router.post(
   "/confirm",
   authMiddleware,
-  confirmUpload
+  confirmUpload,
 );
 
 // ==================================================
@@ -46,122 +46,113 @@ router.post(
 router.get(
   "/",
   authMiddleware,
-  getPhotos
+  getPhotos,
 );
+
+// ==================================================
+// Favorites
+// ==================================================
 
 // GET /photos/favorites
 //
 // IMPORTANT:
-// Keep this BEFORE /:photoId
-// ==================================================
-
+// This MUST be before /:photoId
+// so "favorites" is not treated as a photoId.
 router.get(
   "/favorites",
   authMiddleware,
-  getFavoritePhotos
-);
-
-// ==================================================
-// Get single photo
-//
-// GET /photos/:photoId
-//
-// IMPORTANT:
-// Dynamic /:photoId routes should come AFTER
-// fixed routes like /favorites.
-// ==================================================
-
-router.get(
-  "/:photoId",
-  authMiddleware,
-  getPhoto
+  getFavoritePhotos,
 );
 
 // ==================================================
 // Download photo
-//
+// ==================================================
+
 // GET /photos/:photoId/download
 //
 // IMPORTANT:
-// This route must be BEFORE /:photoId
-// ==================================================
-
+// This MUST be before /:photoId.
 router.get(
   "/:photoId/download",
   authMiddleware,
-  downloadPhoto
+  downloadPhoto,
+);
+
+// ==================================================
+// Get single photo
+// ==================================================
+
+// GET /photos/:photoId
+router.get(
+  "/:photoId",
+  authMiddleware,
+  getPhoto,
 );
 
 // ==================================================
 // Rename photo
-//
-// PATCH /photos/:photoId
 // ==================================================
 
+// PATCH /photos/:photoId
 router.patch(
   "/:photoId",
   authMiddleware,
-  renamePhoto
+  renamePhoto,
 );
 
 // ==================================================
 // Move photo to folder
-//
-// PATCH /photos/:photoId/folder
 // ==================================================
 
+// PATCH /photos/:photoId/folder
 router.patch(
   "/:photoId/folder",
   authMiddleware,
-  movePhoto
+  movePhoto,
 );
 
 // ==================================================
 // Move photo to trash
-//
-// PATCH /photos/:photoId/trash
 // ==================================================
 
+// PATCH /photos/:photoId/trash
 router.patch(
   "/:photoId/trash",
   authMiddleware,
-  trashPhoto
+  trashPhoto,
 );
 
 // ==================================================
 // Restore photo from trash
-//
-// PATCH /photos/:photoId/restore
 // ==================================================
 
+// PATCH /photos/:photoId/restore
 router.patch(
   "/:photoId/restore",
   authMiddleware,
-  restorePhoto
+  restorePhoto,
 );
 
 // ==================================================
 // Toggle favorite
-//
-// PATCH /photos/:photoId/favorite
 // ==================================================
 
+// PATCH /photos/:photoId/favorite
 router.patch(
   "/:photoId/favorite",
   authMiddleware,
-  toggleFavorite
+  toggleFavorite,
 );
 
 // ==================================================
 // Permanently delete photo
-//
-// DELETE /photos/:photoId
 // ==================================================
 
+// DELETE /photos/:photoId
 router.delete(
   "/:photoId",
   authMiddleware,
-  deletePhoto
+  deletePhoto,
 );
 
 // ==================================================

@@ -121,7 +121,13 @@ export function PhotoGallery({
         {Array.from({
           length: 10,
         }).map((_, index) => (
-          <Skeleton key={index} className="aspect-square w-full rounded-xl" />
+          <Skeleton
+            key={index}
+            className="aspect-square w-full rounded-2xl motion-safe:animate-in motion-safe:fade-in motion-safe:duration-300 motion-safe:fill-mode-both"
+            style={{
+              animationDelay: `${Math.min(index, 10) * 30}ms`,
+            }}
+          />
         ))}
       </div>
     );
@@ -133,7 +139,7 @@ export function PhotoGallery({
 
   if (error) {
     return (
-      <div className="flex min-h-[300px] flex-col items-center justify-center gap-4 rounded-xl border border-border bg-surface px-6 py-12 text-center">
+      <div className="flex min-h-[300px] flex-col items-center justify-center gap-4 rounded-2xl border border-border bg-surface px-6 py-12 text-center shadow-sm motion-safe:animate-in motion-safe:fade-in motion-safe:duration-200">
         <div className="flex size-14 items-center justify-center rounded-full bg-destructive/10">
           <AlertTriangle className="size-6 text-destructive" />
         </div>
@@ -145,7 +151,12 @@ export function PhotoGallery({
         </div>
 
         {onRetry ? (
-          <Button type="button" variant="outline" onClick={onRetry}>
+          <Button
+            type="button"
+            variant="outline"
+            onClick={onRetry}
+            className="rounded-xl transition-transform active:scale-95"
+          >
             Try Again
           </Button>
         ) : null}
@@ -159,8 +170,8 @@ export function PhotoGallery({
 
   if (photos.length === 0) {
     return (
-      <div className="panel flex min-h-[300px] flex-col items-center justify-center px-6 py-16 text-center">
-        <span className="mb-5 inline-flex size-14 items-center justify-center rounded-2xl bg-accent text-accent-foreground">
+      <div className="panel flex min-h-[300px] flex-col items-center justify-center px-6 py-16 text-center motion-safe:animate-in motion-safe:fade-in motion-safe:duration-200">
+        <span className="mb-5 inline-flex size-14 items-center justify-center rounded-2xl bg-accent text-accent-foreground transition-transform duration-300 hover:scale-105">
           <ImagePlus className="size-6" aria-hidden="true" />
         </span>
 
@@ -170,7 +181,10 @@ export function PhotoGallery({
           Upload your first memory to get started.
         </p>
 
-        <Button className="mt-6" onClick={onUploadClick}>
+        <Button
+          className="mt-6 rounded-xl shadow-sm transition-all hover:shadow active:scale-95"
+          onClick={onUploadClick}
+        >
           Upload photo
         </Button>
       </div>
@@ -218,7 +232,7 @@ export function PhotoGallery({
               ================================================== */}
 
             {isDeleting ? (
-              <div className="absolute inset-0 z-30 flex items-center justify-center rounded-xl bg-black/30 backdrop-blur-[1px]">
+              <div className="absolute inset-0 z-30 flex items-center justify-center rounded-2xl bg-black/30 backdrop-blur-[1px] motion-safe:animate-in motion-safe:fade-in motion-safe:duration-150">
                 <div className="flex items-center gap-2 rounded-full bg-background/95 px-4 py-2 text-sm font-medium shadow-lg">
                   <Loader2 className="size-4 animate-spin" />
 
