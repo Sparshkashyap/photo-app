@@ -387,7 +387,9 @@ export function Navbar({
 
           <div
             className={`flex h-10 items-center gap-2 rounded-md border px-2.5 transition-colors ${
-              type !== "all" ? "border-primary/40 bg-primary/5" : "border-input bg-card hover:border-foreground/20"
+              type !== "all"
+                ? "border-primary/40 bg-primary/5"
+                : "border-input bg-card hover:border-foreground/20"
             }`}
           >
             <Filter

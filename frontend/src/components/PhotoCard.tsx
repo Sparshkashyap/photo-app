@@ -1,19 +1,6 @@
-import {
-  FileAudio,
-  Heart,
-  ImageOff,
-  Loader2,
-  Play,
-  RotateCw,
-  Video,
-  X,
-} from "lucide-react";
+import { FileAudio, Heart, ImageOff, Loader2, Play, RotateCw, Video, X } from "lucide-react";
 
-import {
-  useEffect,
-  useState,
-  type KeyboardEvent as ReactKeyboardEvent,
-} from "react";
+import { useEffect, useState, type KeyboardEvent as ReactKeyboardEvent } from "react";
 
 import { toast } from "sonner";
 
@@ -29,10 +16,7 @@ type PhotoCardProps = {
 
   onRenamed?: (photo: Photo) => void;
 
-  onMoved?: (
-    photo: Photo,
-    folderId: string | null,
-  ) => void;
+  onMoved?: (photo: Photo, folderId: string | null) => void;
 
   onTrashed?: (photo: Photo) => void;
 
@@ -49,8 +33,7 @@ type PhotoAppSettings = {
 
 const SETTINGS_KEY = "photo-app-settings";
 
-const SETTINGS_CHANGED_EVENT =
-  "photo-app-settings-changed";
+const SETTINGS_CHANGED_EVENT = "photo-app-settings-changed";
 
 function getSettings(): PhotoAppSettings {
   if (typeof window === "undefined") {
@@ -58,16 +41,13 @@ function getSettings(): PhotoAppSettings {
   }
 
   try {
-    const stored =
-      localStorage.getItem(SETTINGS_KEY);
+    const stored = localStorage.getItem(SETTINGS_KEY);
 
     if (!stored) {
       return {};
     }
 
-    return JSON.parse(
-      stored,
-    ) as PhotoAppSettings;
+    return JSON.parse(stored) as PhotoAppSettings;
   } catch {
     return {};
   }
@@ -81,27 +61,17 @@ export function PhotoCard({
   onTrashed,
   onFavorite,
 }: PhotoCardProps) {
-  const [downloading, setDownloading] =
-    useState(false);
+  const [downloading, setDownloading] = useState(false);
 
-  const [previewOpen, setPreviewOpen] =
-    useState(false);
+  const [previewOpen, setPreviewOpen] = useState(false);
 
-  const [settings, setSettings] =
-    useState<PhotoAppSettings>(
-      getSettings,
-    );
+  const [settings, setSettings] = useState<PhotoAppSettings>(getSettings);
 
-  const [mediaError, setMediaError] =
-    useState(false);
+  const [mediaError, setMediaError] = useState(false);
 
-  const [mediaLoaded, setMediaLoaded] =
-    useState(false);
+  const [mediaLoaded, setMediaLoaded] = useState(false);
 
-  const [isFavorite, setIsFavorite] =
-    useState(
-      photo.isFavorite === true,
-    );
+  const [isFavorite, setIsFavorite] = useState(photo.isFavorite === true);
 
   // ==================================================
   // SETTINGS
@@ -112,26 +82,14 @@ export function PhotoCard({
       setSettings(getSettings());
     };
 
-    window.addEventListener(
-      "storage",
-      refreshSettings,
-    );
+    window.addEventListener("storage", refreshSettings);
 
-    window.addEventListener(
-      SETTINGS_CHANGED_EVENT,
-      refreshSettings,
-    );
+    window.addEventListener(SETTINGS_CHANGED_EVENT, refreshSettings);
 
     return () => {
-      window.removeEventListener(
-        "storage",
-        refreshSettings,
-      );
+      window.removeEventListener("storage", refreshSettings);
 
-      window.removeEventListener(
-        SETTINGS_CHANGED_EVENT,
-        refreshSettings,
-      );
+      window.removeEventListener(SETTINGS_CHANGED_EVENT, refreshSettings);
     };
   }, []);
 
@@ -140,9 +98,7 @@ export function PhotoCard({
   // ==================================================
 
   useEffect(() => {
-    setIsFavorite(
-      photo.isFavorite === true,
-    );
+    setIsFavorite(photo.isFavorite === true);
   }, [photo.isFavorite]);
 
   // ==================================================
@@ -163,24 +119,16 @@ export function PhotoCard({
       return;
     }
 
-    const handleEscape = (
-      event: KeyboardEvent,
-    ) => {
+    const handleEscape = (event: KeyboardEvent) => {
       if (event.key === "Escape") {
         setPreviewOpen(false);
       }
     };
 
-    document.addEventListener(
-      "keydown",
-      handleEscape,
-    );
+    document.addEventListener("keydown", handleEscape);
 
     return () => {
-      document.removeEventListener(
-        "keydown",
-        handleEscape,
-      );
+      document.removeEventListener("keydown", handleEscape);
     };
   }, [previewOpen]);
 
@@ -193,15 +141,12 @@ export function PhotoCard({
       return;
     }
 
-    const previousOverflow =
-      document.body.style.overflow;
+    const previousOverflow = document.body.style.overflow;
 
-    document.body.style.overflow =
-      "hidden";
+    document.body.style.overflow = "hidden";
 
     return () => {
-      document.body.style.overflow =
-        previousOverflow;
+      document.body.style.overflow = previousOverflow;
     };
   }, [previewOpen]);
 
@@ -209,32 +154,17 @@ export function PhotoCard({
   // DATA
   // ==================================================
 
-  const isVideo =
-    photo.contentType?.startsWith(
-      "video/",
-    ) ?? false;
+  const isVideo = photo.contentType?.startsWith("video/") ?? false;
 
-  const isAudio =
-    photo.contentType?.startsWith(
-      "audio/",
-    ) ?? false;
+  const isAudio = photo.contentType?.startsWith("audio/") ?? false;
 
-  const mediaUrl =
-    photo.url ||
-    photo.downloadUrl ||
-    "";
+  const mediaUrl = photo.url || photo.downloadUrl || "";
 
-  const displayName =
-    photo.name ||
-    photo.fileName ||
-    photo.originalFileName ||
-    "Untitled";
+  const displayName = photo.name || photo.fileName || photo.originalFileName || "Untitled";
 
-  const autoplayVideos =
-    settings.autoplayVideos === true;
+  const autoplayVideos = settings.autoplayVideos === true;
 
-  const showFileNames =
-    settings.showFileNames !== false;
+  const showFileNames = settings.showFileNames !== false;
 
   // ==================================================
   // DOWNLOAD
@@ -248,59 +178,33 @@ export function PhotoCard({
     setDownloading(true);
 
     try {
-      const response =
-        await requestDownloadUrl(
-          photo.photoId,
-        );
+      const response = await requestDownloadUrl(photo.photoId);
 
-      const link =
-        document.createElement("a");
+      const link = document.createElement("a");
 
-      link.href =
-        response.downloadUrl;
+      link.href = response.downloadUrl;
 
-      link.download =
-        photo.name ||
-        photo.fileName ||
-        "photo";
+      link.download = photo.name || photo.fileName || "photo";
 
       link.target = "_blank";
 
-      link.rel =
-        "noopener noreferrer";
+      link.rel = "noopener noreferrer";
 
-      document.body.appendChild(
-        link,
-      );
+      document.body.appendChild(link);
 
       link.click();
 
       link.remove();
 
-      toast.success(
-        "Download started",
-        {
-          description:
-            photo.name ||
-            photo.fileName ||
-            "Your file",
-        },
-      );
+      toast.success("Download started", {
+        description: photo.name || photo.fileName || "Your file",
+      });
     } catch (error) {
-      console.error(
-        "Download failed:",
-        error,
-      );
+      console.error("Download failed:", error);
 
-      toast.error(
-        "Download failed",
-        {
-          description:
-            error instanceof Error
-              ? error.message
-              : "Please try again.",
-        },
-      );
+      toast.error("Download failed", {
+        description: error instanceof Error ? error.message : "Please try again.",
+      });
     } finally {
       setDownloading(false);
     }
@@ -326,9 +230,7 @@ export function PhotoCard({
   // never be interpreted as card keyboard shortcuts.
   // ==================================================
 
-  function isInteractiveTarget(
-    target: EventTarget | null,
-  ) {
+  function isInteractiveTarget(target: EventTarget | null) {
     if (!(target instanceof HTMLElement)) {
       return false;
     }
@@ -344,16 +246,12 @@ export function PhotoCard({
       return true;
     }
 
-    if (
-      target.isContentEditable
-    ) {
+    if (target.isContentEditable) {
       return true;
     }
 
     return Boolean(
-      target.closest(
-        "input, textarea, select, button, video, audio, [contenteditable='true']",
-      ),
+      target.closest("input, textarea, select, button, video, audio, [contenteditable='true']"),
     );
   }
 
@@ -366,14 +264,8 @@ export function PhotoCard({
   // Only Enter opens the preview.
   // ==================================================
 
-  function handlePreviewKeyDown(
-    event: ReactKeyboardEvent<HTMLElement>,
-  ) {
-    if (
-      isInteractiveTarget(
-        event.target,
-      )
-    ) {
+  function handlePreviewKeyDown(event: ReactKeyboardEvent<HTMLElement>) {
+    if (isInteractiveTarget(event.target)) {
       return;
     }
 
@@ -398,22 +290,12 @@ export function PhotoCard({
   // Video controls remain native.
   // ==================================================
 
-  function handleCardKeyDownCapture(
-    event: ReactKeyboardEvent<HTMLElement>,
-  ) {
-    if (
-      !isInteractiveTarget(
-        event.target,
-      )
-    ) {
+  function handleCardKeyDownCapture(event: ReactKeyboardEvent<HTMLElement>) {
+    if (!isInteractiveTarget(event.target)) {
       return;
     }
 
-    if (
-      event.key === " " ||
-      event.key === "Spacebar" ||
-      event.key === "Enter"
-    ) {
+    if (event.key === " " || event.key === "Spacebar" || event.key === "Enter") {
       event.stopPropagation();
     }
   }
@@ -448,29 +330,18 @@ export function PhotoCard({
      * Adding a cache-busting query forces the browser
      * to request the signed URL again when necessary.
      */
-    const separator =
-      mediaUrl.includes("?")
-        ? "&"
-        : "?";
+    const separator = mediaUrl.includes("?") ? "&" : "?";
 
-    const retryUrl =
-      `${mediaUrl}${separator}retry=${Date.now()}`;
+    const retryUrl = `${mediaUrl}${separator}retry=${Date.now()}`;
 
-    const mediaElement =
-      document.querySelector(
-        `[data-photo-id="${photo.photoId}"] img, [data-photo-id="${photo.photoId}"] video`,
-      ) as
-        | HTMLImageElement
-        | HTMLVideoElement
-        | null;
+    const mediaElement = document.querySelector(
+      `[data-photo-id="${photo.photoId}"] img, [data-photo-id="${photo.photoId}"] video`,
+    ) as HTMLImageElement | HTMLVideoElement | null;
 
     if (mediaElement) {
       mediaElement.src = retryUrl;
 
-      if (
-        mediaElement instanceof
-        HTMLVideoElement
-      ) {
+      if (mediaElement instanceof HTMLVideoElement) {
         mediaElement.load();
       }
     }
@@ -480,12 +351,8 @@ export function PhotoCard({
   // FAVORITE
   // ==================================================
 
-  function handleFavorite(
-    updatedPhoto: Photo,
-  ) {
-    setIsFavorite(
-      updatedPhoto.isFavorite === true,
-    );
+  function handleFavorite(updatedPhoto: Photo) {
+    setIsFavorite(updatedPhoto.isFavorite === true);
 
     onFavorite?.(updatedPhoto);
   }
@@ -537,12 +404,8 @@ export function PhotoCard({
         <div
           data-photo-id={photo.photoId}
           onDoubleClick={handlePreviewOpen}
-          onKeyDownCapture={
-            handleCardKeyDownCapture
-          }
-          onKeyDown={
-            handlePreviewKeyDown
-          }
+          onKeyDownCapture={handleCardKeyDownCapture}
+          onKeyDown={handlePreviewKeyDown}
           role="button"
           tabIndex={0}
           aria-label={`Open ${displayName} preview`}
@@ -568,10 +431,7 @@ export function PhotoCard({
               It does NOT affect the actual media.
           ================================================== */}
 
-          {!isVideo &&
-          !isAudio &&
-          mediaUrl &&
-          !mediaError ? (
+          {!isVideo && !isAudio && mediaUrl && !mediaError ? (
             <img
               src={mediaUrl}
               alt=""
@@ -620,9 +480,7 @@ export function PhotoCard({
               LOADING
           ================================================== */}
 
-          {mediaUrl &&
-          !mediaError &&
-          !mediaLoaded ? (
+          {mediaUrl && !mediaError && !mediaLoaded ? (
             <div
               className="
                 absolute
@@ -684,9 +542,7 @@ export function PhotoCard({
                   text-muted-foreground
                 "
               >
-                {mediaError
-                  ? "Unable to load media"
-                  : "Preview unavailable"}
+                {mediaError ? "Unable to load media" : "Preview unavailable"}
               </span>
 
               {mediaError ? (
@@ -717,7 +573,6 @@ export function PhotoCard({
                   "
                 >
                   <RotateCw className="size-3" />
-
                   Retry
                 </button>
               ) : null}
@@ -742,9 +597,7 @@ export function PhotoCard({
               but the video is not forced into a square.
           ================================================== */}
 
-          {!mediaError &&
-          mediaUrl &&
-          isVideo ? (
+          {!mediaError && mediaUrl && isVideo ? (
             <div
               className="
                 relative
@@ -772,15 +625,9 @@ export function PhotoCard({
                 muted={autoplayVideos}
                 loop={autoplayVideos}
                 playsInline
-                onLoadedMetadata={
-                  handleMediaLoaded
-                }
-                onLoadedData={
-                  handleMediaLoaded
-                }
-                onError={
-                  handleMediaError
-                }
+                onLoadedMetadata={handleMediaLoaded}
+                onLoadedData={handleMediaLoaded}
+                onError={handleMediaError}
                 className={`
                   block
                   h-auto
@@ -790,11 +637,7 @@ export function PhotoCard({
                   object-contain
                   transition-opacity
                   duration-300
-                  ${
-                    mediaLoaded
-                      ? "opacity-100"
-                      : "opacity-0"
-                  }
+                  ${mediaLoaded ? "opacity-100" : "opacity-0"}
                 `}
               />
 
@@ -862,9 +705,7 @@ export function PhotoCard({
               AUDIO
           ================================================== */}
 
-          {!mediaError &&
-          mediaUrl &&
-          isAudio ? (
+          {!mediaError && mediaUrl && isAudio ? (
             <div
               className="
                 relative
@@ -888,26 +729,16 @@ export function PhotoCard({
 
               <div
                 className="w-full"
-                onClick={(event) =>
-                  event.stopPropagation()
-                }
-                onDoubleClick={(event) =>
-                  event.stopPropagation()
-                }
-                onKeyDown={(event) =>
-                  event.stopPropagation()
-                }
+                onClick={(event) => event.stopPropagation()}
+                onDoubleClick={(event) => event.stopPropagation()}
+                onKeyDown={(event) => event.stopPropagation()}
               >
                 <audio
                   src={mediaUrl}
                   controls
                   preload="metadata"
-                  onLoadedData={
-                    handleMediaLoaded
-                  }
-                  onError={
-                    handleMediaError
-                  }
+                  onLoadedData={handleMediaLoaded}
+                  onError={handleMediaError}
                   className="w-full"
                 />
               </div>
@@ -920,22 +751,15 @@ export function PhotoCard({
               Original aspect ratio preserved.
           ================================================== */}
 
-          {!mediaError &&
-          mediaUrl &&
-          !isVideo &&
-          !isAudio ? (
+          {!mediaError && mediaUrl && !isVideo && !isAudio ? (
             <img
               key={mediaUrl}
               src={mediaUrl}
               alt={displayName}
               loading="lazy"
               decoding="async"
-              onLoad={
-                handleMediaLoaded
-              }
-              onError={
-                handleMediaError
-              }
+              onLoad={handleMediaLoaded}
+              onError={handleMediaError}
               className={`
                 relative
                 z-[3]
@@ -947,11 +771,7 @@ export function PhotoCard({
                 object-contain
                 transition-opacity
                 duration-300
-                ${
-                  mediaLoaded
-                    ? "opacity-100"
-                    : "opacity-0"
-                }
+                ${mediaLoaded ? "opacity-100" : "opacity-0"}
               `}
             />
           ) : null}
@@ -1051,37 +871,20 @@ export function PhotoCard({
               top-2
               z-20
             "
-            onClick={(event) =>
-              event.stopPropagation()
-            }
-            onDoubleClick={(event) =>
-              event.stopPropagation()
-            }
-            onKeyDown={(event) =>
-              event.stopPropagation()
-            }
+            onClick={(event) => event.stopPropagation()}
+            onDoubleClick={(event) => event.stopPropagation()}
+            onKeyDown={(event) => event.stopPropagation()}
           >
             <PhotoMenu
               photo={photo}
               folders={folders}
-              onRenamed={
-                onRenamed ??
-                (() => {})
-              }
-              onMoved={
-                onMoved ??
-                (() => {})
-              }
+              onRenamed={onRenamed ?? (() => {})}
+              onMoved={onMoved ?? (() => {})}
               onDownload={() => {
                 void handleDownload();
               }}
-              onTrashed={
-                onTrashed ??
-                (() => {})
-              }
-              onFavorite={
-                handleFavorite
-              }
+              onTrashed={onTrashed ?? (() => {})}
+              onFavorite={handleFavorite}
             />
           </div>
 
@@ -1169,9 +972,7 @@ export function PhotoCard({
           role="dialog"
           aria-modal="true"
           aria-label={`Preview of ${displayName}`}
-          onClick={() =>
-            setPreviewOpen(false)
-          }
+          onClick={() => setPreviewOpen(false)}
         >
           {/* ==================================================
               CLOSE BUTTON
@@ -1179,9 +980,7 @@ export function PhotoCard({
 
           <button
             type="button"
-            onClick={() =>
-              setPreviewOpen(false)
-            }
+            onClick={() => setPreviewOpen(false)}
             aria-label="Close preview"
             title="Close preview"
             className="
@@ -1229,9 +1028,7 @@ export function PhotoCard({
               motion-safe:zoom-in-95
               motion-safe:duration-200
             "
-            onClick={(event) =>
-              event.stopPropagation()
-            }
+            onClick={(event) => event.stopPropagation()}
           >
             {/* ==================================================
                 FULLSCREEN VIDEO
@@ -1299,12 +1096,7 @@ export function PhotoCard({
                   {displayName}
                 </p>
 
-                <audio
-                  src={mediaUrl}
-                  controls
-                  autoPlay
-                  className="w-full"
-                />
+                <audio src={mediaUrl} controls autoPlay className="w-full" />
               </div>
             ) : (
               <img

@@ -1,18 +1,6 @@
-import {
-  CheckCircle2,
-  FileAudio,
-  FileVideo,
-  ImageUp,
-  Loader2,
-  UploadCloud,
-  X,
-} from "lucide-react";
+import { CheckCircle2, FileAudio, FileVideo, ImageUp, Loader2, UploadCloud, X } from "lucide-react";
 
-import {
-  useEffect,
-  useRef,
-  useState,
-} from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { toast } from "sonner";
 
@@ -37,18 +25,11 @@ import {
   formatFileSize,
 } from "@/lib/constants";
 
-import {
-  confirmUpload,
-  requestUploadUrl,
-  uploadToPresignedUrl,
-} from "@/services/api";
+import { confirmUpload, requestUploadUrl, uploadToPresignedUrl } from "@/services/api";
 
 import type { Photo } from "@/types/photo";
 
-type Status =
-  | "idle"
-  | "uploading"
-  | "success";
+type Status = "idle" | "uploading" | "success";
 
 export function UploadPhoto({
   open,
@@ -59,33 +40,23 @@ export function UploadPhoto({
   onOpenChange: (open: boolean) => void;
   onUploaded: (photo: Photo) => void;
 }) {
-  const inputRef =
-    useRef<HTMLInputElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
 
-  const [file, setFile] =
-    useState<File | null>(null);
+  const [file, setFile] = useState<File | null>(null);
 
-  const [photoName, setPhotoName] =
-    useState("");
+  const [photoName, setPhotoName] = useState("");
 
-  const [previewUrl, setPreviewUrl] =
-    useState<string | null>(null);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
 
-  const [dragging, setDragging] =
-    useState(false);
+  const [dragging, setDragging] = useState(false);
 
-  const [status, setStatus] =
-    useState<Status>("idle");
+  const [status, setStatus] = useState<Status>("idle");
 
-  const [progress, setProgress] =
-    useState(0);
+  const [progress, setProgress] = useState(0);
 
-  const [error, setError] =
-    useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
-  const mediaType = file
-    ? getMediaType(file.type)
-    : null;
+  const mediaType = file ? getMediaType(file.type) : null;
 
   // ==================================================
   // PREVIEW URL
@@ -97,8 +68,7 @@ export function UploadPhoto({
       return;
     }
 
-    const url =
-      URL.createObjectURL(file);
+    const url = URL.createObjectURL(file);
 
     setPreviewUrl(url);
 
@@ -129,37 +99,25 @@ export function UploadPhoto({
   // SELECT FILE
   // ==================================================
 
-  function selectFile(
-    candidate?: File,
-  ) {
+  function selectFile(candidate?: File) {
     if (!candidate) {
       return;
     }
 
-    const supported =
-      (
-        ALLOWED_MIME_TYPES as readonly string[]
-      ).includes(candidate.type);
+    const supported = (ALLOWED_MIME_TYPES as readonly string[]).includes(candidate.type);
 
     if (!supported) {
       setFile(null);
 
-      setError(
-        `Unsupported file type. Choose ${ALLOWED_EXTENSIONS_LABEL}.`,
-      );
+      setError(`Unsupported file type. Choose ${ALLOWED_EXTENSIONS_LABEL}.`);
 
       return;
     }
 
-    if (
-      candidate.size >
-      MAX_FILE_SIZE_BYTES
-    ) {
+    if (candidate.size > MAX_FILE_SIZE_BYTES) {
       setFile(null);
 
-      setError(
-        `This file is larger than ${MAX_FILE_SIZE_MB} MB.`,
-      );
+      setError(`This file is larger than ${MAX_FILE_SIZE_MB} MB.`);
 
       return;
     }
@@ -169,12 +127,11 @@ export function UploadPhoto({
     setProgress(0);
     setFile(candidate);
 
-    const defaultName =
-      candidate.name
-        .replace(/\.[^/.]+$/, "")
-        .replace(/\s+/g, " ")
-        .trim()
-        .slice(0, 120);
+    const defaultName = candidate.name
+      .replace(/\.[^/.]+$/, "")
+      .replace(/\s+/g, " ")
+      .trim()
+      .slice(0, 120);
 
     setPhotoName(defaultName);
   }
@@ -184,9 +141,7 @@ export function UploadPhoto({
   // ==================================================
 
   function openFilePicker() {
-    if (
-      status === "uploading"
-    ) {
+    if (status === "uploading") {
       return;
     }
 
@@ -202,23 +157,16 @@ export function UploadPhoto({
       return;
     }
 
-    const cleanName =
-      photoName.trim();
+    const cleanName = photoName.trim();
 
     if (!cleanName) {
-      setError(
-        "Please enter a name for your media.",
-      );
+      setError("Please enter a name for your media.");
 
       return;
     }
 
-    if (
-      cleanName.length > 120
-    ) {
-      setError(
-        "Media name cannot exceed 120 characters.",
-      );
+    if (cleanName.length > 120) {
+      setError("Media name cannot exceed 120 characters.");
 
       return;
     }
@@ -232,183 +180,122 @@ export function UploadPhoto({
       // 1. Get presigned S3 URL
       // ------------------------------------------------
 
-      const {
-        uploadUrl,
-        key,
-        photoId,
-      } =
-        await requestUploadUrl({
-          fileName:
-            file.name,
+      const { uploadUrl, key, photoId } = await requestUploadUrl({
+        fileName: file.name,
 
-          contentType:
-            file.type,
-        });
+        contentType: file.type,
+      });
 
       // ------------------------------------------------
       // 2. Upload directly to S3
       // ------------------------------------------------
 
-      await uploadToPresignedUrl(
-        uploadUrl,
-        file,
-        setProgress,
-      );
+      await uploadToPresignedUrl(uploadUrl, file, setProgress);
 
       // ------------------------------------------------
       // 3. Save DynamoDB metadata
       // ------------------------------------------------
 
-      const response =
-        await confirmUpload({
-          photoId,
+      const response = await confirmUpload({
+        photoId,
 
-          key,
+        key,
 
-          name:
-            cleanName,
+        name: cleanName,
 
-          fileName:
-            file.name,
+        fileName: file.name,
 
-          contentType:
-            file.type,
+        contentType: file.type,
 
-          fileSize:
-            file.size,
-        });
+        fileSize: file.size,
+      });
 
       // ------------------------------------------------
       // 4. Add uploaded media immediately
       // ------------------------------------------------
 
-      const savedPhoto =
-        response.photo;
+      const savedPhoto = response.photo;
 
       const uploadedPhoto: Photo = {
-        id:
-          savedPhoto.photoId,
+        id: savedPhoto.photoId,
 
-        photoId:
-          savedPhoto.photoId,
+        photoId: savedPhoto.photoId,
 
-        userId:
-          savedPhoto.userId,
+        userId: savedPhoto.userId,
 
-        key:
-          savedPhoto.s3Key,
+        key: savedPhoto.s3Key,
 
-        s3Key:
-          savedPhoto.s3Key,
+        s3Key: savedPhoto.s3Key,
 
-        name:
-          savedPhoto.name,
+        name: savedPhoto.name,
 
-        fileName:
-          savedPhoto.fileName,
+        fileName: savedPhoto.fileName,
 
-        url:
-          previewUrl ?? "",
+        url: previewUrl ?? "",
 
-        contentType:
-          savedPhoto.contentType,
+        contentType: savedPhoto.contentType,
 
-        mediaType:
-          savedPhoto.mediaType ??
-          mediaType ??
-          "image",
+        mediaType: savedPhoto.mediaType ?? mediaType ?? "image",
 
-        fileSize:
-          savedPhoto.fileSize ??
-          file.size,
+        fileSize: savedPhoto.fileSize ?? file.size,
 
-        ...(savedPhoto.originalFileName !==
-        undefined
+        ...(savedPhoto.originalFileName !== undefined
           ? {
-              originalFileName:
-                savedPhoto.originalFileName,
+              originalFileName: savedPhoto.originalFileName,
             }
           : {}),
 
-        ...(savedPhoto.downloadUrl !==
-        undefined
+        ...(savedPhoto.downloadUrl !== undefined
           ? {
-              downloadUrl:
-                savedPhoto.downloadUrl,
+              downloadUrl: savedPhoto.downloadUrl,
             }
           : {}),
 
-        ...(savedPhoto.folderId !==
-        undefined
+        ...(savedPhoto.folderId !== undefined
           ? {
-              folderId:
-                savedPhoto.folderId ??
-                null,
+              folderId: savedPhoto.folderId ?? null,
             }
           : {}),
 
-        isFavorite:
-          savedPhoto.isFavorite ??
-          false,
+        isFavorite: savedPhoto.isFavorite ?? false,
 
-        isTrashed:
-          savedPhoto.isTrashed ??
-          false,
+        isTrashed: savedPhoto.isTrashed ?? false,
 
-        uploadedAt:
-          savedPhoto.createdAt ??
-          new Date().toISOString(),
+        uploadedAt: savedPhoto.createdAt ?? new Date().toISOString(),
 
-        createdAt:
-          savedPhoto.createdAt ??
-          new Date().toISOString(),
+        createdAt: savedPhoto.createdAt ?? new Date().toISOString(),
 
-        ...(savedPhoto.updatedAt !==
-        undefined
+        ...(savedPhoto.updatedAt !== undefined
           ? {
-              updatedAt:
-                savedPhoto.updatedAt,
+              updatedAt: savedPhoto.updatedAt,
             }
           : {}),
       };
 
-      onUploaded(
-        uploadedPhoto,
-      );
+      onUploaded(uploadedPhoto);
 
       setStatus("success");
       setProgress(100);
 
-      toast.success(
-        "Media uploaded successfully",
-      );
+      toast.success("Media uploaded successfully");
 
       window.setTimeout(() => {
         reset();
         onOpenChange(false);
       }, 900);
     } catch (uploadError) {
-      console.error(
-        "Upload error:",
-        uploadError,
-      );
+      console.error("Upload error:", uploadError);
 
       const message =
-        uploadError instanceof Error
-          ? uploadError.message
-          : "Upload failed. Please try again.";
+        uploadError instanceof Error ? uploadError.message : "Upload failed. Please try again.";
 
       setStatus("idle");
       setProgress(0);
       setError(message);
 
-      toast.error(
-        "Upload failed",
-        {
-          description:
-            message,
-        },
-      );
+      toast.error("Upload failed", {
+        description: message,
+      });
     }
   }
 
@@ -417,10 +304,7 @@ export function UploadPhoto({
   // ==================================================
 
   function renderPreview() {
-    if (
-      !file ||
-      !previewUrl
-    ) {
+    if (!file || !previewUrl) {
       return null;
     }
 
@@ -428,9 +312,7 @@ export function UploadPhoto({
     // VIDEO
     // ------------------------------------------------
 
-    if (
-      mediaType === "video"
-    ) {
+    if (mediaType === "video") {
       return (
         <div
           className="
@@ -470,9 +352,7 @@ export function UploadPhoto({
     // AUDIO
     // ------------------------------------------------
 
-    if (
-      mediaType === "audio"
-    ) {
+    if (mediaType === "audio") {
       return (
         <div
           className="
@@ -526,10 +406,7 @@ export function UploadPhoto({
                   text-primary
                 "
               >
-                <FileAudio
-                  className="size-5"
-                  aria-hidden="true"
-                />
+                <FileAudio className="size-5" aria-hidden="true" />
               </span>
 
               <div className="min-w-0">
@@ -550,10 +427,7 @@ export function UploadPhoto({
                     text-muted-foreground
                   "
                 >
-                  MP3 audio ·{" "}
-                  {formatFileSize(
-                    file.size,
-                  )}
+                  MP3 audio · {formatFileSize(file.size)}
                 </p>
               </div>
             </div>
@@ -597,10 +471,7 @@ export function UploadPhoto({
       >
         <img
           src={previewUrl}
-          alt={`Preview of ${
-            photoName ||
-            file.name
-          }`}
+          alt={`Preview of ${photoName || file.name}`}
           className="
             absolute
             inset-0
@@ -619,34 +490,15 @@ export function UploadPhoto({
   // ==================================================
 
   function renderMediaIcon() {
-    if (
-      mediaType === "video"
-    ) {
-      return (
-        <FileVideo
-          className="size-5"
-          aria-hidden="true"
-        />
-      );
+    if (mediaType === "video") {
+      return <FileVideo className="size-5" aria-hidden="true" />;
     }
 
-    if (
-      mediaType === "audio"
-    ) {
-      return (
-        <FileAudio
-          className="size-5"
-          aria-hidden="true"
-        />
-      );
+    if (mediaType === "audio") {
+      return <FileAudio className="size-5" aria-hidden="true" />;
     }
 
-    return (
-      <ImageUp
-        className="size-5"
-        aria-hidden="true"
-      />
-    );
+    return <ImageUp className="size-5" aria-hidden="true" />;
   }
 
   // ==================================================
@@ -654,15 +506,11 @@ export function UploadPhoto({
   // ==================================================
 
   function mediaLabel() {
-    if (
-      mediaType === "video"
-    ) {
+    if (mediaType === "video") {
       return "MP4 video";
     }
 
-    if (
-      mediaType === "audio"
-    ) {
+    if (mediaType === "audio") {
       return "MP3 audio";
     }
 
@@ -677,9 +525,7 @@ export function UploadPhoto({
     <Dialog
       open={open}
       onOpenChange={(next) => {
-        if (
-          status === "uploading"
-        ) {
+        if (status === "uploading") {
           return;
         }
 
@@ -746,8 +592,7 @@ export function UploadPhoto({
               <DialogDescription>
                 {ALLOWED_EXTENSIONS_LABEL}
                 {" · "}
-                up to{" "}
-                {MAX_FILE_SIZE_MB} MB
+                up to {MAX_FILE_SIZE_MB} MB
               </DialogDescription>
             </DialogHeader>
           </div>
@@ -769,15 +614,9 @@ export function UploadPhoto({
             <input
               ref={inputRef}
               type="file"
-              accept={ALLOWED_MIME_TYPES.join(
-                ",",
-              )}
+              accept={ALLOWED_MIME_TYPES.join(",")}
               className="sr-only"
-              onChange={(event) =>
-                selectFile(
-                  event.target.files?.[0],
-                )
-              }
+              onChange={(event) => selectFile(event.target.files?.[0])}
             />
 
             {/* ==================================================
@@ -787,25 +626,18 @@ export function UploadPhoto({
             {!file ? (
               <button
                 type="button"
-                onClick={
-                  openFilePicker
-                }
+                onClick={openFilePicker}
                 onDragOver={(event) => {
                   event.preventDefault();
                   setDragging(true);
                 }}
-                onDragLeave={() =>
-                  setDragging(false)
-                }
+                onDragLeave={() => setDragging(false)}
                 onDrop={(event) => {
                   event.preventDefault();
 
                   setDragging(false);
 
-                  selectFile(
-                    event.dataTransfer
-                      .files?.[0],
-                  );
+                  selectFile(event.dataTransfer.files?.[0]);
                 }}
                 className={`
                   flex
@@ -844,17 +676,10 @@ export function UploadPhoto({
                     shadow-soft
                     transition-transform
                     duration-200
-                    ${
-                      dragging
-                        ? "scale-110 -translate-y-1"
-                        : ""
-                    }
+                    ${dragging ? "scale-110 -translate-y-1" : ""}
                   `}
                 >
-                  <UploadCloud
-                    className="size-7"
-                    aria-hidden="true"
-                  />
+                  <UploadCloud className="size-7" aria-hidden="true" />
                 </span>
 
                 <span
@@ -863,9 +688,7 @@ export function UploadPhoto({
                     font-semibold
                   "
                 >
-                  {dragging
-                    ? "Drop it right here"
-                    : "Drag & drop your media here"}
+                  {dragging ? "Drop it right here" : "Drag & drop your media here"}
                 </span>
 
                 <span
@@ -889,8 +712,7 @@ export function UploadPhoto({
                     text-muted-foreground
                   "
                 >
-                  Images · MP4 · MP3 · max{" "}
-                  {MAX_FILE_SIZE_MB} MB
+                  Images · MP4 · MP3 · max {MAX_FILE_SIZE_MB} MB
                 </span>
               </button>
             ) : (
@@ -899,9 +721,7 @@ export function UploadPhoto({
                     PREVIEW
                 ================================================== */}
 
-                <div className="min-w-0">
-                  {renderPreview()}
-                </div>
+                <div className="min-w-0">{renderPreview()}</div>
 
                 {/* ==================================================
                     FILE INFO
@@ -959,9 +779,7 @@ export function UploadPhoto({
                         text-muted-foreground
                       "
                     >
-                      {formatFileSize(
-                        file.size,
-                      )}
+                      {formatFileSize(file.size)}
                       {" · "}
                       {mediaLabel()}
                     </p>
@@ -972,9 +790,7 @@ export function UploadPhoto({
                       type="button"
                       variant="outline"
                       size="sm"
-                      onClick={
-                        openFilePicker
-                      }
+                      onClick={openFilePicker}
                       className="shrink-0 transition-transform active:scale-95"
                     >
                       Change
@@ -995,10 +811,7 @@ export function UploadPhoto({
                       "
                       aria-label="Remove file"
                     >
-                      <X
-                        className="size-4"
-                        aria-hidden="true"
-                      />
+                      <X className="size-4" aria-hidden="true" />
                     </Button>
                   ) : null}
                 </div>
@@ -1007,8 +820,7 @@ export function UploadPhoto({
                     NAME
                 ================================================== */}
 
-                {status !==
-                "success" ? (
+                {status !== "success" ? (
                   <div
                     className="
                       min-w-0
@@ -1048,15 +860,8 @@ export function UploadPhoto({
                       id="photo-name"
                       value={photoName}
                       maxLength={120}
-                      disabled={
-                        status ===
-                        "uploading"
-                      }
-                      onChange={(event) =>
-                        setPhotoName(
-                          event.target.value,
-                        )
-                      }
+                      disabled={status === "uploading"}
+                      onChange={(event) => setPhotoName(event.target.value)}
                       placeholder="e.g. Vrindavan Trip"
                       className="
                         h-11
@@ -1085,8 +890,7 @@ export function UploadPhoto({
                     PROGRESS
                 ================================================== */}
 
-                {status ===
-                "uploading" ? (
+                {status === "uploading" ? (
                   <div
                     className="
                       min-w-0
@@ -1129,9 +933,7 @@ export function UploadPhoto({
                           aria-hidden="true"
                         />
 
-                        <span className="truncate">
-                          Uploading media…
-                        </span>
+                        <span className="truncate">Uploading media…</span>
                       </span>
 
                       <span
@@ -1145,10 +947,7 @@ export function UploadPhoto({
                       </span>
                     </div>
 
-                    <Progress
-                      value={progress}
-                      className="h-2 transition-[width] duration-300"
-                    />
+                    <Progress value={progress} className="h-2 transition-[width] duration-300" />
                   </div>
                 ) : null}
 
@@ -1156,8 +955,7 @@ export function UploadPhoto({
                     SUCCESS
                 ================================================== */}
 
-                {status ===
-                "success" ? (
+                {status === "success" ? (
                   <div
                     className="
                       flex
@@ -1184,9 +982,7 @@ export function UploadPhoto({
                       "
                       aria-hidden="true"
                     />
-
-                    Media uploaded
-                    successfully
+                    Media uploaded successfully
                   </div>
                 ) : null}
               </>
@@ -1223,8 +1019,7 @@ export function UploadPhoto({
               FOOTER
           ================================================== */}
 
-          {file &&
-          status !== "success" ? (
+          {file && status !== "success" ? (
             <div
               className="
                 sticky
@@ -1250,10 +1045,7 @@ export function UploadPhoto({
                   reset();
                   onOpenChange(false);
                 }}
-                disabled={
-                  status ===
-                  "uploading"
-                }
+                disabled={status === "uploading"}
                 className="
                   w-full
                   transition-transform
@@ -1266,14 +1058,8 @@ export function UploadPhoto({
 
               <Button
                 type="button"
-                onClick={
-                  handleUpload
-                }
-                disabled={
-                  status ===
-                    "uploading" ||
-                  !photoName.trim()
-                }
+                onClick={handleUpload}
+                disabled={status === "uploading" || !photoName.trim()}
                 className="
                   w-full
                   transition-transform
@@ -1281,8 +1067,7 @@ export function UploadPhoto({
                   sm:w-auto
                 "
               >
-                {status ===
-                "uploading" ? (
+                {status === "uploading" ? (
                   <Loader2
                     className="
                       size-4
@@ -1291,16 +1076,10 @@ export function UploadPhoto({
                     aria-hidden="true"
                   />
                 ) : (
-                  <UploadCloud
-                    className="size-4"
-                    aria-hidden="true"
-                  />
+                  <UploadCloud className="size-4" aria-hidden="true" />
                 )}
 
-                {status ===
-                "uploading"
-                  ? "Uploading…"
-                  : "Upload media"}
+                {status === "uploading" ? "Uploading…" : "Upload media"}
               </Button>
             </div>
           ) : null}

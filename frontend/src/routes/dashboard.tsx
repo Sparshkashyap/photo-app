@@ -1,25 +1,11 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 
-import {
-  FolderPlus,
-  Loader2,
-  Plus,
-  Search,
-  SlidersHorizontal,
-  X,
-} from "lucide-react";
+import { FolderPlus, Loader2, Plus, Search, SlidersHorizontal, X } from "lucide-react";
 
-import {
-  useCallback,
-  useEffect,
-  useState,
-} from "react";
+import { useCallback, useEffect, useState } from "react";
 
 import { Navbar } from "@/components/Navbar";
-import {
-  MobileNav,
-  Sidebar,
-} from "@/components/Sidebar";
+import { MobileNav, Sidebar } from "@/components/Sidebar";
 import { UploadPhoto } from "@/components/UploadPhoto";
 import { CreateFolderDialog } from "@/components/CreateFolderDialog";
 import { FolderTree } from "@/components/FolderTree";
@@ -29,12 +15,7 @@ import { Button } from "@/components/ui/button";
 
 import { useAuth } from "@/hooks/useAuth";
 
-import {
-  getFolders,
-  getPhotos,
-  type PhotoSort,
-  type PhotoType,
-} from "@/services/api";
+import { getFolders, getPhotos, type PhotoSort, type PhotoType } from "@/services/api";
 
 import type { Folder } from "@/types/folder";
 import type { Photo } from "@/types/photo";
@@ -71,11 +52,7 @@ export const Route = createFileRoute("/dashboard")({
 });
 
 function DashboardPage() {
-  const {
-    user,
-    isAuthenticated,
-    ready,
-  } = useAuth();
+  const { user, isAuthenticated, ready } = useAuth();
 
   const navigate = useNavigate();
 
@@ -83,54 +60,41 @@ function DashboardPage() {
   // PHOTOS / MEDIA
   // ==================================================
 
-  const [photos, setPhotos] =
-    useState<Photo[]>([]);
+  const [photos, setPhotos] = useState<Photo[]>([]);
 
-  const [loadingPhotos, setLoadingPhotos] =
-    useState(true);
+  const [loadingPhotos, setLoadingPhotos] = useState(true);
 
-  const [photoError, setPhotoError] =
-    useState<string | undefined>();
+  const [photoError, setPhotoError] = useState<string | undefined>();
 
   // ==================================================
   // FOLDERS
   // ==================================================
 
-  const [folders, setFolders] =
-    useState<Folder[]>([]);
+  const [folders, setFolders] = useState<Folder[]>([]);
 
-  const [loadingFolders, setLoadingFolders] =
-    useState(true);
+  const [loadingFolders, setLoadingFolders] = useState(true);
 
-  const [selectedFolderId, setSelectedFolderId] =
-    useState<string | null>(null);
+  const [selectedFolderId, setSelectedFolderId] = useState<string | null>(null);
 
-  const [createFolderOpen, setCreateFolderOpen] =
-    useState(false);
+  const [createFolderOpen, setCreateFolderOpen] = useState(false);
 
   // ==================================================
   // UPLOAD
   // ==================================================
 
-  const [uploadOpen, setUploadOpen] =
-    useState(false);
+  const [uploadOpen, setUploadOpen] = useState(false);
 
   // ==================================================
   // SEARCH / SORT / FILTER
   // ==================================================
 
-  const [search, setSearch] =
-    useState("");
+  const [search, setSearch] = useState("");
 
-  const [sort, setSort] =
-    useState<PhotoSort>("newest");
+  const [sort, setSort] = useState<PhotoSort>("newest");
 
-  const [type, setType] =
-    useState<PhotoType>("all");
+  const [type, setType] = useState<PhotoType>("all");
 
-  const hasNonDefaultFilters =
-    sort !== "newest" ||
-    type !== "all";
+  const hasNonDefaultFilters = sort !== "newest" || type !== "all";
 
   function clearFilters() {
     setSort("newest");
@@ -152,261 +116,162 @@ function DashboardPage() {
         replace: true,
       });
     }
-  }, [
-    ready,
-    isAuthenticated,
-    navigate,
-  ]);
+  }, [ready, isAuthenticated, navigate]);
 
   // ==================================================
   // LOAD FOLDERS
   // ==================================================
 
-  const loadFolders =
-    useCallback(async () => {
-      if (!isAuthenticated) {
-        return;
-      }
+  const loadFolders = useCallback(async () => {
+    if (!isAuthenticated) {
+      return;
+    }
 
-      try {
-        setLoadingFolders(true);
+    try {
+      setLoadingFolders(true);
 
-        const response =
-          await getFolders();
+      const response = await getFolders();
 
-        setFolders(
-          response.folders ?? [],
-        );
-      } catch (error) {
-        console.error(
-          "Failed to load folders:",
-          error,
-        );
+      setFolders(response.folders ?? []);
+    } catch (error) {
+      console.error("Failed to load folders:", error);
 
-        setFolders([]);
-      } finally {
-        setLoadingFolders(false);
-      }
-    }, [isAuthenticated]);
+      setFolders([]);
+    } finally {
+      setLoadingFolders(false);
+    }
+  }, [isAuthenticated]);
 
   // ==================================================
   // LOAD PHOTOS / MEDIA
   // ==================================================
 
-  const loadPhotos =
-    useCallback(async () => {
-      if (!isAuthenticated) {
-        return;
-      }
+  const loadPhotos = useCallback(async () => {
+    if (!isAuthenticated) {
+      return;
+    }
 
-      try {
-        setLoadingPhotos(true);
-        setPhotoError(undefined);
+    try {
+      setLoadingPhotos(true);
+      setPhotoError(undefined);
 
-        const trimmedSearch =
-          search.trim();
+      const trimmedSearch = search.trim();
 
-        const response =
-          await getPhotos({
-            ...(trimmedSearch
-              ? {
-                  search:
-                    trimmedSearch,
-                }
-              : {}),
+      const response = await getPhotos({
+        ...(trimmedSearch
+          ? {
+              search: trimmedSearch,
+            }
+          : {}),
 
-            sort,
+        sort,
 
-            type,
+        type,
 
-            ...(selectedFolderId
-              ? {
-                  folderId:
-                    selectedFolderId,
-                }
-              : {}),
-          });
+        ...(selectedFolderId
+          ? {
+              folderId: selectedFolderId,
+            }
+          : {}),
+      });
 
-        const mappedPhotos: Photo[] =
-          (response.photos ?? []).map(
-            (photo) => ({
-              id:
-                photo.photoId,
+      const mappedPhotos: Photo[] = (response.photos ?? []).map((photo) => ({
+        id: photo.photoId,
 
-              photoId:
-                photo.photoId,
+        photoId: photo.photoId,
 
-              userId:
-                photo.userId,
+        userId: photo.userId,
 
-              key:
-                photo.s3Key,
+        key: photo.s3Key,
 
-              s3Key:
-                photo.s3Key,
+        s3Key: photo.s3Key,
 
-              name:
-                photo.name ||
-                photo.fileName ||
-                photo.originalFileName ||
-                "Untitled media",
+        name: photo.name || photo.fileName || photo.originalFileName || "Untitled media",
 
-              originalFileName:
-                photo.originalFileName ||
-                photo.fileName ||
-                "media",
+        originalFileName: photo.originalFileName || photo.fileName || "media",
 
-              fileName:
-                photo.fileName ||
-                photo.originalFileName ||
-                "media",
+        fileName: photo.fileName || photo.originalFileName || "media",
 
-              contentType:
-                photo.contentType ||
-                "image/jpeg",
+        contentType: photo.contentType || "image/jpeg",
 
-              fileSize:
-                photo.fileSize ?? 0,
+        fileSize: photo.fileSize ?? 0,
 
-              url:
-                photo.downloadUrl ||
-                photo.url ||
-                "",
+        url: photo.downloadUrl || photo.url || "",
 
-              downloadUrl:
-                photo.downloadUrl ||
-                photo.url ||
-                "",
+        downloadUrl: photo.downloadUrl || photo.url || "",
 
-              folderId:
-                photo.folderId ??
-                null,
+        folderId: photo.folderId ?? null,
 
-              isTrashed:
-                photo.isTrashed ??
-                false,
+        isTrashed: photo.isTrashed ?? false,
 
-              trashedAt:
-                photo.trashedAt ??
-                null,
+        trashedAt: photo.trashedAt ?? null,
 
-              uploadedAt:
-                photo.createdAt,
+        uploadedAt: photo.createdAt,
 
-              createdAt:
-                photo.createdAt,
+        createdAt: photo.createdAt,
 
-              updatedAt:
-                photo.updatedAt ??
-                photo.createdAt,
-            }),
-          );
+        updatedAt: photo.updatedAt ?? photo.createdAt,
+      }));
 
-        setPhotos(
-          mappedPhotos,
-        );
-      } catch (error) {
-        console.error(
-          "Failed to load photos:",
-          error,
-        );
+      setPhotos(mappedPhotos);
+    } catch (error) {
+      console.error("Failed to load photos:", error);
 
-        setPhotos([]);
+      setPhotos([]);
 
-        setPhotoError(
-          error instanceof Error
-            ? error.message
-            : "Unable to load media. Please try again.",
-        );
-      } finally {
-        setLoadingPhotos(false);
-      }
-    }, [
-      isAuthenticated,
-      search,
-      sort,
-      type,
-      selectedFolderId,
-    ]);
+      setPhotoError(
+        error instanceof Error ? error.message : "Unable to load media. Please try again.",
+      );
+    } finally {
+      setLoadingPhotos(false);
+    }
+  }, [isAuthenticated, search, sort, type, selectedFolderId]);
 
   // ==================================================
   // INITIAL FOLDER LOAD
   // ==================================================
 
   useEffect(() => {
-    if (
-      !ready ||
-      !isAuthenticated
-    ) {
+    if (!ready || !isAuthenticated) {
       return;
     }
 
     void loadFolders();
-  }, [
-    ready,
-    isAuthenticated,
-    loadFolders,
-  ]);
+  }, [ready, isAuthenticated, loadFolders]);
 
   // ==================================================
   // MEDIA LOAD WITH DEBOUNCE
   // ==================================================
 
   useEffect(() => {
-    if (
-      !ready ||
-      !isAuthenticated
-    ) {
+    if (!ready || !isAuthenticated) {
       return;
     }
 
-    const timer =
-      window.setTimeout(() => {
-        void loadPhotos();
-      }, 300);
+    const timer = window.setTimeout(() => {
+      void loadPhotos();
+    }, 300);
 
     return () => {
       window.clearTimeout(timer);
     };
-  }, [
-    ready,
-    isAuthenticated,
-    loadPhotos,
-  ]);
+  }, [ready, isAuthenticated, loadPhotos]);
 
   // ==================================================
   // FOLDER CREATED
   // ==================================================
 
-  async function handleFolderCreated(
-    folder?: Folder,
-  ) {
+  async function handleFolderCreated(folder?: Folder) {
     if (folder) {
-      setFolders(
-        (previous) => {
-          const exists =
-            previous.some(
-              (item) =>
-                item.folderId ===
-                folder.folderId,
-            );
+      setFolders((previous) => {
+        const exists = previous.some((item) => item.folderId === folder.folderId);
 
-          if (exists) {
-            return previous.map(
-              (item) =>
-                item.folderId ===
-                folder.folderId
-                  ? folder
-                  : item,
-            );
-          }
+        if (exists) {
+          return previous.map((item) => (item.folderId === folder.folderId ? folder : item));
+        }
 
-          return [
-            ...previous,
-            folder,
-          ];
-        },
-      );
+        return [...previous, folder];
+      });
 
       return;
     }
@@ -418,12 +283,8 @@ function DashboardPage() {
   // FOLDER SELECT
   // ==================================================
 
-  function handleFolderSelect(
-    folderId: string | null,
-  ) {
-    setSelectedFolderId(
-      folderId,
-    );
+  function handleFolderSelect(folderId: string | null) {
+    setSelectedFolderId(folderId);
 
     setSearch("");
   }
@@ -432,21 +293,16 @@ function DashboardPage() {
   // PHOTO RENAMED
   // ==================================================
 
-  function handlePhotoRenamed(
-    updatedPhoto: Photo,
-  ) {
-    setPhotos(
-      (previous) =>
-        previous.map(
-          (photo) =>
-            photo.photoId ===
-            updatedPhoto.photoId
-              ? {
-                  ...photo,
-                  ...updatedPhoto,
-                }
-              : photo,
-        ),
+  function handlePhotoRenamed(updatedPhoto: Photo) {
+    setPhotos((previous) =>
+      previous.map((photo) =>
+        photo.photoId === updatedPhoto.photoId
+          ? {
+              ...photo,
+              ...updatedPhoto,
+            }
+          : photo,
+      ),
     );
   }
 
@@ -454,38 +310,15 @@ function DashboardPage() {
   // PHOTO MOVED
   // ==================================================
 
-  function handlePhotoMoved(
-    photo: Photo,
-    folderId: string | null,
-  ) {
-    if (
-      selectedFolderId !== null &&
-      folderId !== selectedFolderId
-    ) {
-      setPhotos(
-        (previous) =>
-          previous.filter(
-            (item) =>
-              item.photoId !==
-              photo.photoId,
-          ),
-      );
+  function handlePhotoMoved(photo: Photo, folderId: string | null) {
+    if (selectedFolderId !== null && folderId !== selectedFolderId) {
+      setPhotos((previous) => previous.filter((item) => item.photoId !== photo.photoId));
 
       return;
     }
 
-    if (
-      selectedFolderId === null &&
-      folderId !== null
-    ) {
-      setPhotos(
-        (previous) =>
-          previous.filter(
-            (item) =>
-              item.photoId !==
-              photo.photoId,
-          ),
-      );
+    if (selectedFolderId === null && folderId !== null) {
+      setPhotos((previous) => previous.filter((item) => item.photoId !== photo.photoId));
 
       return;
     }
@@ -497,21 +330,16 @@ function DashboardPage() {
   // PHOTO FAVORITE
   // ==================================================
 
-  function handlePhotoFavorite(
-    updatedPhoto: Photo,
-  ) {
-    setPhotos(
-      (previous) =>
-        previous.map(
-          (item) =>
-            item.photoId ===
-            updatedPhoto.photoId
-              ? {
-                  ...item,
-                  ...updatedPhoto,
-                }
-              : item,
-        ),
+  function handlePhotoFavorite(updatedPhoto: Photo) {
+    setPhotos((previous) =>
+      previous.map((item) =>
+        item.photoId === updatedPhoto.photoId
+          ? {
+              ...item,
+              ...updatedPhoto,
+            }
+          : item,
+      ),
     );
   }
 
@@ -519,26 +347,15 @@ function DashboardPage() {
   // PHOTO TRASHED
   // ==================================================
 
-  function handlePhotoTrashed(
-    photo: Photo,
-  ) {
-    setPhotos(
-      (previous) =>
-        previous.filter(
-          (item) =>
-            item.photoId !==
-            photo.photoId,
-        ),
-    );
+  function handlePhotoTrashed(photo: Photo) {
+    setPhotos((previous) => previous.filter((item) => item.photoId !== photo.photoId));
   }
 
   // ==================================================
   // UPLOAD COMPLETED
   // ==================================================
 
-  function handleUploadCompleted(
-    uploadedPhoto?: Photo,
-  ) {
+  function handleUploadCompleted(uploadedPhoto?: Photo) {
     /*
      * Add the newly uploaded item immediately
      * when it belongs to the current view.
@@ -549,33 +366,17 @@ function DashboardPage() {
 
     if (
       uploadedPhoto &&
-      (
-        selectedFolderId === null ||
-        uploadedPhoto.folderId ===
-          selectedFolderId
-      )
+      (selectedFolderId === null || uploadedPhoto.folderId === selectedFolderId)
     ) {
-      setPhotos(
-        (previous) => {
-          const alreadyExists =
-            previous.some(
-              (item) =>
-                item.photoId ===
-                uploadedPhoto.photoId,
-            );
+      setPhotos((previous) => {
+        const alreadyExists = previous.some((item) => item.photoId === uploadedPhoto.photoId);
 
-          if (
-            alreadyExists
-          ) {
-            return previous;
-          }
+        if (alreadyExists) {
+          return previous;
+        }
 
-          return [
-            uploadedPhoto,
-            ...previous,
-          ];
-        },
-      );
+        return [uploadedPhoto, ...previous];
+      });
     }
 
     void loadPhotos();
@@ -585,10 +386,7 @@ function DashboardPage() {
   // LOADING SCREEN
   // ==================================================
 
-  if (
-    !ready ||
-    !isAuthenticated
-  ) {
+  if (!ready || !isAuthenticated) {
     return (
       <div
         className="
@@ -626,29 +424,13 @@ function DashboardPage() {
   // UI DATA
   // ==================================================
 
-  const selectedFolder =
-    folders.find(
-      (folder) =>
-        folder.folderId ===
-        selectedFolderId,
-    );
+  const selectedFolder = folders.find((folder) => folder.folderId === selectedFolderId);
 
-  const libraryLabel =
-    loadingPhotos
-      ? "Loading your media..."
-      : selectedFolder
-        ? `${selectedFolder.name} · ${
-            photos.length
-          } ${
-            photos.length === 1
-              ? "item"
-              : "items"
-          }`
-        : `${photos.length} ${
-            photos.length === 1
-              ? "item"
-              : "items"
-          } in your library`;
+  const libraryLabel = loadingPhotos
+    ? "Loading your media..."
+    : selectedFolder
+      ? `${selectedFolder.name} · ${photos.length} ${photos.length === 1 ? "item" : "items"}`
+      : `${photos.length} ${photos.length === 1 ? "item" : "items"} in your library`;
 
   // ==================================================
   // UI
@@ -660,15 +442,9 @@ function DashboardPage() {
         search={search}
         sort={sort}
         type={type}
-        onSearchChange={
-          setSearch
-        }
-        onSortChange={
-          setSort
-        }
-        onTypeChange={
-          setType
-        }
+        onSearchChange={setSearch}
+        onSortChange={setSort}
+        onTypeChange={setType}
       />
 
       <MobileNav />
@@ -750,17 +526,9 @@ function DashboardPage() {
                   active:scale-[0.98]
                   sm:w-auto
                 "
-                onClick={() =>
-                  setCreateFolderOpen(
-                    true,
-                  )
-                }
+                onClick={() => setCreateFolderOpen(true)}
               >
-                <FolderPlus
-                  className="size-4"
-                  aria-hidden="true"
-                />
-
+                <FolderPlus className="size-4" aria-hidden="true" />
                 New folder
               </Button>
 
@@ -774,17 +542,9 @@ function DashboardPage() {
                   active:scale-[0.98]
                   sm:w-auto
                 "
-                onClick={() =>
-                  setUploadOpen(
-                    true,
-                  )
-                }
+                onClick={() => setUploadOpen(true)}
               >
-                <Plus
-                  className="size-4"
-                  aria-hidden="true"
-                />
-
+                <Plus className="size-4" aria-hidden="true" />
                 Upload media
               </Button>
             </div>
@@ -824,30 +584,19 @@ function DashboardPage() {
                 aria-hidden="true"
               />
 
-              <span className="text-muted-foreground">
-                Showing
-              </span>
+              <span className="text-muted-foreground">Showing</span>
 
-              <span className="font-medium text-foreground">
-                {TYPE_LABELS[type]}
-              </span>
+              <span className="font-medium text-foreground">{TYPE_LABELS[type]}</span>
 
-              <span
-                className="text-muted-foreground"
-                aria-hidden="true"
-              >
+              <span className="text-muted-foreground" aria-hidden="true">
                 ·
               </span>
 
-              <span className="font-medium text-foreground">
-                {SORT_LABELS[sort]}
-              </span>
+              <span className="font-medium text-foreground">{SORT_LABELS[sort]}</span>
 
               <button
                 type="button"
-                onClick={
-                  clearFilters
-                }
+                onClick={clearFilters}
                 className="
                   ml-auto
                   inline-flex
@@ -861,11 +610,7 @@ function DashboardPage() {
                   hover:bg-primary/10
                 "
               >
-                <X
-                  className="size-3.5"
-                  aria-hidden="true"
-                />
-
+                <X className="size-3.5" aria-hidden="true" />
                 Clear filters
               </button>
             </div>
@@ -899,13 +644,9 @@ function DashboardPage() {
               "
             >
               <div className="min-w-0">
-                <h2 className="text-sm font-semibold">
-                  Folders
-                </h2>
+                <h2 className="text-sm font-semibold">Folders</h2>
 
-                <p className="text-xs text-muted-foreground">
-                  Organize your photos
-                </p>
+                <p className="text-xs text-muted-foreground">Organize your photos</p>
               </div>
 
               <Button
@@ -915,17 +656,9 @@ function DashboardPage() {
                   shrink-0
                   rounded-lg
                 "
-                onClick={() =>
-                  setCreateFolderOpen(
-                    true,
-                  )
-                }
+                onClick={() => setCreateFolderOpen(true)}
               >
-                <FolderPlus
-                  className="size-4"
-                  aria-hidden="true"
-                />
-
+                <FolderPlus className="size-4" aria-hidden="true" />
                 Create
               </Button>
             </div>
@@ -949,11 +682,9 @@ function DashboardPage() {
                   "
                   aria-hidden="true"
                 />
-
                 Loading folders...
               </div>
-            ) : folders.length ===
-              0 ? (
+            ) : folders.length === 0 ? (
               <div
                 className="
                   flex
@@ -982,27 +713,16 @@ function DashboardPage() {
                     text-muted-foreground
                   "
                 >
-                  No folders yet — create
-                  one to start organizing.
+                  No folders yet — create one to start organizing.
                 </p>
               </div>
             ) : (
               <FolderTree
                 folders={folders}
-                selectedFolderId={
-                  selectedFolderId
-                }
-                onSelect={
-                  handleFolderSelect
-                }
-                onCreateFolder={() =>
-                  setCreateFolderOpen(
-                    true,
-                  )
-                }
-                onChanged={
-                  loadFolders
-                }
+                selectedFolderId={selectedFolderId}
+                onSelect={handleFolderSelect}
+                onCreateFolder={() => setCreateFolderOpen(true)}
+                onChanged={loadFolders}
               />
             )}
           </section>
@@ -1041,9 +761,7 @@ function DashboardPage() {
                 aria-hidden="true"
               />
 
-              <span className="text-muted-foreground">
-                Searching for
-              </span>
+              <span className="text-muted-foreground">Searching for</span>
 
               <span
                 className="
@@ -1058,9 +776,7 @@ function DashboardPage() {
 
               <button
                 type="button"
-                onClick={() =>
-                  setSearch("")
-                }
+                onClick={() => setSearch("")}
                 className="
                   ml-auto
                   inline-flex
@@ -1075,11 +791,7 @@ function DashboardPage() {
                   hover:bg-primary/10
                 "
               >
-                <X
-                  className="size-3.5"
-                  aria-hidden="true"
-                />
-
+                <X className="size-3.5" aria-hidden="true" />
                 Clear
               </button>
             </div>
@@ -1109,15 +821,9 @@ function DashboardPage() {
                   tracking-wide
                   text-muted-foreground
                 "
-                title={
-                  selectedFolder
-                    ? selectedFolder.name
-                    : "My Photos"
-                }
+                title={selectedFolder ? selectedFolder.name : "My Photos"}
               >
-                {selectedFolder
-                  ? selectedFolder.name
-                  : "My Photos"}
+                {selectedFolder ? selectedFolder.name : "My Photos"}
               </h2>
             </div>
 
@@ -1134,10 +840,7 @@ function DashboardPage() {
                   text-muted-foreground
                 "
               >
-                {photos.length}{" "}
-                {photos.length === 1
-                  ? "item"
-                  : "items"}
+                {photos.length} {photos.length === 1 ? "item" : "items"}
               </span>
             ) : null}
           </div>
@@ -1150,21 +853,11 @@ function DashboardPage() {
             photos={photos}
             folders={folders}
             loading={loadingPhotos}
-            onUploadClick={() =>
-              setUploadOpen(true)
-            }
-            onRenamed={
-              handlePhotoRenamed
-            }
-            onMoved={
-              handlePhotoMoved
-            }
-            onTrashed={
-              handlePhotoTrashed
-            }
-            onFavorite={
-              handlePhotoFavorite
-            }
+            onUploadClick={() => setUploadOpen(true)}
+            onRenamed={handlePhotoRenamed}
+            onMoved={handlePhotoMoved}
+            onTrashed={handlePhotoTrashed}
+            onFavorite={handlePhotoFavorite}
             onRetry={() => {
               void loadPhotos();
             }}
@@ -1181,12 +874,8 @@ function DashboardPage() {
 
           <UploadPhoto
             open={uploadOpen}
-            onOpenChange={
-              setUploadOpen
-            }
-            onUploaded={
-              handleUploadCompleted
-            }
+            onOpenChange={setUploadOpen}
+            onUploaded={handleUploadCompleted}
           />
 
           {/* ==================================================
@@ -1195,12 +884,8 @@ function DashboardPage() {
 
           <CreateFolderDialog
             open={createFolderOpen}
-            onOpenChange={
-              setCreateFolderOpen
-            }
-            onCreated={
-              handleFolderCreated
-            }
+            onOpenChange={setCreateFolderOpen}
+            onCreated={handleFolderCreated}
           />
         </main>
       </div>
@@ -1211,9 +896,7 @@ function DashboardPage() {
 
       <button
         type="button"
-        onClick={() =>
-          setUploadOpen(true)
-        }
+        onClick={() => setUploadOpen(true)}
         aria-label="Upload media"
         className="
           fixed
@@ -1234,10 +917,7 @@ function DashboardPage() {
           lg:hidden
         "
       >
-        <Plus
-          className="size-6"
-          aria-hidden="true"
-        />
+        <Plus className="size-6" aria-hidden="true" />
       </button>
     </div>
   );

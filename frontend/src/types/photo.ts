@@ -1,11 +1,7 @@
 // frontend/src/types/photo.ts
 // Add mediaType to Photo
 
-export type MediaType =
-  | "image"
-  | "video"
-  | "audio"
-  | "unknown";
+export type MediaType = "image" | "video" | "audio" | "unknown";
 
 export interface Photo {
   id?: string;
@@ -51,8 +47,7 @@ export interface Photo {
   isFavorite?: boolean;
 }
 
-export interface TrashPhoto
-  extends Photo {
+export interface TrashPhoto extends Photo {
   isTrashed: true;
 
   trashedAt?: string | null;

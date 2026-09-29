@@ -118,25 +118,22 @@ function getFolderName(photo: Photo, folders: Folder[]) {
     return "My Photos / Root";
   }
 
-  return folders.find((folder) => folder.folderId === photo.folderId)?.name || `Folder (${photo.folderId})`;
+  return (
+    folders.find((folder) => folder.folderId === photo.folderId)?.name ||
+    `Folder (${photo.folderId})`
+  );
 }
 
-function PropertyRow({
-  icon,
-  label,
-  value,
-}: {
-  icon: ReactNode;
-  label: string;
-  value: string;
-}) {
+function PropertyRow({ icon, label, value }: { icon: ReactNode; label: string; value: string }) {
   return (
     <div className="flex items-start gap-3 rounded-xl border border-border/70 bg-background/50 px-3 py-2.5 transition-colors hover:bg-background/80">
       <span className="mt-0.5 flex size-7 shrink-0 items-center justify-center rounded-lg bg-muted text-muted-foreground">
         {icon}
       </span>
       <div className="min-w-0 flex-1">
-        <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">{label}</p>
+        <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+          {label}
+        </p>
         <p className="mt-0.5 break-words text-sm font-medium text-foreground">{value}</p>
       </div>
     </div>
@@ -1010,26 +1007,34 @@ export function PhotoMenu({
           </div>
 
           <DialogFooter className="flex-col-reverse gap-2 sm:flex-row">
-            <Button variant="outline" onClick={() => setShareOpen(false)} className="transition-transform active:scale-95">
+            <Button
+              variant="outline"
+              onClick={() => setShareOpen(false)}
+              className="transition-transform active:scale-95"
+            >
               Close
             </Button>
 
-            <Button variant="outline" onClick={() => void handleNativeShare()} className="transition-transform active:scale-95">
+            <Button
+              variant="outline"
+              onClick={() => void handleNativeShare()}
+              className="transition-transform active:scale-95"
+            >
               <Share2 className="size-4" />
               Share
             </Button>
 
-            <Button onClick={() => void handleCopyShareUrl()} className="transition-transform active:scale-95">
+            <Button
+              onClick={() => void handleCopyShareUrl()}
+              className="transition-transform active:scale-95"
+            >
               {copied ? "Copied" : "Copy link"}
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
-      <Dialog
-        open={propertiesOpen}
-        onOpenChange={setPropertiesOpen}
-      >
+      <Dialog open={propertiesOpen} onOpenChange={setPropertiesOpen}>
         <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-lg">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
@@ -1037,7 +1042,13 @@ export function PhotoMenu({
               Properties
             </DialogTitle>
             <DialogDescription>
-              Complete information about this {photo.contentType.startsWith("video/") ? "video" : photo.contentType.startsWith("audio/") ? "audio file" : "photo"}.
+              Complete information about this{" "}
+              {photo.contentType.startsWith("video/")
+                ? "video"
+                : photo.contentType.startsWith("audio/")
+                  ? "audio file"
+                  : "photo"}
+              .
             </DialogDescription>
           </DialogHeader>
 
@@ -1053,7 +1064,13 @@ export function PhotoMenu({
               value={photo.originalFileName || photo.fileName || "Not available"}
             />
             <PropertyRow
-              icon={photo.contentType.startsWith("video/") ? <Video className="size-4" /> : <ImageIcon className="size-4" />}
+              icon={
+                photo.contentType.startsWith("video/") ? (
+                  <Video className="size-4" />
+                ) : (
+                  <ImageIcon className="size-4" />
+                )
+              }
               label="Type"
               value={photo.contentType || "Unknown"}
             />
@@ -1107,7 +1124,10 @@ export function PhotoMenu({
           </div>
 
           <DialogFooter>
-            <Button onClick={() => setPropertiesOpen(false)} className="transition-transform active:scale-95">
+            <Button
+              onClick={() => setPropertiesOpen(false)}
+              className="transition-transform active:scale-95"
+            >
               Close
             </Button>
           </DialogFooter>
