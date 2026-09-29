@@ -1,10 +1,12 @@
-
 const {
   S3Client,
   DeleteObjectCommand,
+  GetObjectCommand,
 } = require("@aws-sdk/client-s3");
 
-const { DynamoDBClient } = require("@aws-sdk/client-dynamodb");
+const {
+  DynamoDBClient,
+} = require("@aws-sdk/client-dynamodb");
 
 const {
   DynamoDBDocumentClient,
@@ -18,13 +20,9 @@ const {
   getSignedUrl,
 } = require("@aws-sdk/s3-request-presigner");
 
-const {
-  GetObjectCommand,
-} = require("@aws-sdk/client-s3");
-
-// --------------------------------------------------
-// AWS Clients
-// --------------------------------------------------
+// ==================================================
+// AWS CLIENTS
+// ==================================================
 
 const AWS_REGION =
   process.env.AWS_REGION || "ap-south-1";
@@ -38,11 +36,13 @@ const dynamoClient = new DynamoDBClient({
 });
 
 const dynamoDb =
-  DynamoDBDocumentClient.from(dynamoClient);
+  DynamoDBDocumentClient.from(
+    dynamoClient,
+  );
 
-// --------------------------------------------------
-// Helpers
-// --------------------------------------------------
+// ==================================================
+// HELPERS
+// ==================================================
 
 const getBucketName = () => {
   const bucketName =
@@ -50,7 +50,7 @@ const getBucketName = () => {
 
   if (!bucketName) {
     throw new Error(
-      "S3_BUCKET_NAME is not configured"
+      "S3_BUCKET_NAME is not configured",
     );
   }
 
@@ -63,22 +63,50 @@ const getTableName = () => {
 
   if (!tableName) {
     throw new Error(
-      "DYNAMODB_TABLE is not configured"
+      "DYNAMODB_TABLE is not configured",
     );
   }
 
   return tableName;
 };
 
-// --------------------------------------------------
-// Get Trash Photos
+const getMediaType = (contentType) => {
+  const normalized = String(
+    contentType || "",
+  )
+    .trim()
+    .toLowerCase();
+
+  if (
+    normalized.startsWith("image/")
+  ) {
+    return "image";
+  }
+
+  if (
+    normalized.startsWith("video/")
+  ) {
+    return "video";
+  }
+
+  if (
+    normalized.startsWith("audio/")
+  ) {
+    return "audio";
+  }
+
+  return "unknown";
+};
+
+// ==================================================
+// GET TRASH PHOTOS
 // GET /trash
-// --------------------------------------------------
+// ==================================================
 
 const getTrashPhotos = async (
   req,
   res,
-  next
+  next,
 ) => {
   try {
     const userId =
@@ -97,50 +125,51 @@ const getTrashPhotos = async (
             "userId = :userId",
 
           ExpressionAttributeValues: {
-            ":userId":
-              userId,
+            ":userId": userId,
           },
 
-          ScanIndexForward:
-            false,
-        })
+          ScanIndexForward: false,
+        }),
       );
 
     let photos =
       result.Items || [];
 
+    // ------------------------------------------------
     // Only trashed photos
-    photos =
-      photos.filter(
-        (photo) =>
-          photo.isTrashed === true
-      );
+    // ------------------------------------------------
 
-    // Sort newest trashed first
-    photos.sort(
-      (a, b) => {
-        const dateA =
-          new Date(
-            a.trashedAt ||
-            a.updatedAt ||
-            a.createdAt ||
-            0
-          ).getTime();
-
-        const dateB =
-          new Date(
-            b.trashedAt ||
-            b.updatedAt ||
-            b.createdAt ||
-            0
-          ).getTime();
-
-        return dateB - dateA;
-      }
+    photos = photos.filter(
+      (photo) =>
+        photo.isTrashed === true,
     );
 
-    // Generate signed URLs so Trash UI
-    // can still show photo thumbnails.
+    // ------------------------------------------------
+    // Newest trash first
+    // ------------------------------------------------
+
+    photos.sort((a, b) => {
+      const dateA = new Date(
+        a.trashedAt ||
+          a.updatedAt ||
+          a.createdAt ||
+          0,
+      ).getTime();
+
+      const dateB = new Date(
+        b.trashedAt ||
+          b.updatedAt ||
+          b.createdAt ||
+          0,
+      ).getTime();
+
+      return dateB - dateA;
+    });
+
+    // ------------------------------------------------
+    // Signed URLs
+    // ------------------------------------------------
+
     const photosWithUrls =
       await Promise.all(
         photos.map(
@@ -163,12 +192,12 @@ const getTrashPhotos = async (
                   command,
                   {
                     expiresIn: 300,
-                  }
+                  },
                 );
             } catch (urlError) {
               console.error(
                 `Failed to generate trash URL for ${photo.photoId}:`,
-                urlError
+                urlError,
               );
             }
 
@@ -209,15 +238,26 @@ const getTrashPhotos = async (
                 photo.contentType ||
                 "",
 
+              mediaType:
+                photo.mediaType ||
+                getMediaType(
+                  photo.contentType,
+                ),
+
               fileSize:
-                photo.fileSize ||
-                0,
+                Number(
+                  photo.fileSize,
+                ) || 0,
 
               folderId:
                 photo.folderId ||
                 null,
 
               createdAt:
+                photo.createdAt ||
+                "",
+
+              uploadedAt:
                 photo.createdAt ||
                 "",
 
@@ -230,16 +270,18 @@ const getTrashPhotos = async (
                 photo.trashedAt ||
                 null,
 
-              isTrashed:
-                true,
+              isTrashed: true,
+
+              isFavorite:
+                photo.isFavorite === true,
 
               downloadUrl,
 
               url:
                 downloadUrl,
             };
-          }
-        )
+          },
+        ),
       );
 
     return res.status(200).json({
@@ -254,27 +296,26 @@ const getTrashPhotos = async (
   } catch (error) {
     console.error(
       "Get trash photos error:",
-      error
+      error,
     );
 
     next(error);
   }
 };
 
-// --------------------------------------------------
-// Restore Photo
+// ==================================================
+// RESTORE PHOTO
 // POST /trash/:photoId/restore
-// --------------------------------------------------
+// ==================================================
 
 const restorePhoto = async (
   req,
   res,
-  next
+  next,
 ) => {
   try {
-    const {
-      photoId,
-    } = req.params;
+    const { photoId } =
+      req.params;
 
     if (!photoId) {
       return res.status(400).json({
@@ -296,7 +337,7 @@ const restorePhoto = async (
           Key: {
             photoId,
           },
-        })
+        }),
       );
 
     const photo =
@@ -310,7 +351,6 @@ const restorePhoto = async (
       });
     }
 
-    // Security check
     if (
       photo.userId !== userId
     ) {
@@ -348,16 +388,13 @@ const restorePhoto = async (
             "SET isTrashed = :isTrashed, updatedAt = :updatedAt REMOVE trashedAt",
 
           ExpressionAttributeValues: {
-            ":isTrashed":
-              false,
-
-            ":updatedAt":
-              now,
+            ":isTrashed": false,
+            ":updatedAt": now,
           },
 
           ReturnValues:
             "ALL_NEW",
-        })
+        }),
       );
 
     return res.status(200).json({
@@ -372,181 +409,169 @@ const restorePhoto = async (
   } catch (error) {
     console.error(
       "Restore photo error:",
-      error
+      error,
     );
 
     next(error);
   }
 };
 
-// --------------------------------------------------
-// Delete Photo Forever
+// ==================================================
+// DELETE PHOTO FOREVER
 // DELETE /trash/:photoId
-//
-// Order:
-// 1. Verify DynamoDB metadata
-// 2. Verify ownership
-// 3. Delete S3 object
-// 4. Delete DynamoDB metadata
-// --------------------------------------------------
+// ==================================================
 
-const deletePhotoForever = async (
-  req,
-  res,
-  next
-) => {
-  try {
-    const {
-      photoId,
-    } = req.params;
-
-    if (!photoId) {
-      return res.status(400).json({
-        success: false,
-        message:
-          "photoId is required",
-      });
-    }
-
-    const userId =
-      req.user.userId;
-
-    const result =
-      await dynamoDb.send(
-        new GetCommand({
-          TableName:
-            getTableName(),
-
-          Key: {
-            photoId,
-          },
-        })
-      );
-
-    const photo =
-      result.Item;
-
-    if (!photo) {
-      return res.status(404).json({
-        success: false,
-        message:
-          "Photo not found",
-      });
-    }
-
-    // Security check
-    if (
-      photo.userId !== userId
-    ) {
-      return res.status(403).json({
-        success: false,
-        message:
-          "You are not allowed to permanently delete this photo",
-      });
-    }
-
-    // Only Trash photos can be permanently deleted
-    if (
-      photo.isTrashed !== true
-    ) {
-      return res.status(400).json({
-        success: false,
-        message:
-          "Photo must be in trash before permanent deletion",
-      });
-    }
-
-    // ------------------------------------------------
-    // Delete S3 object
-    // ------------------------------------------------
-
+const deletePhotoForever =
+  async (
+    req,
+    res,
+    next,
+  ) => {
     try {
-      await s3.send(
-        new DeleteObjectCommand({
-          Bucket:
-            getBucketName(),
+      const { photoId } =
+        req.params;
 
-          Key:
-            photo.s3Key,
-        })
-      );
-    } catch (s3Error) {
-      console.error(
-        "S3 permanent delete error:",
-        s3Error
-      );
+      if (!photoId) {
+        return res.status(400).json({
+          success: false,
+          message:
+            "photoId is required",
+        });
+      }
 
-      return res.status(500).json({
-        success: false,
+      const userId =
+        req.user.userId;
+
+      const result =
+        await dynamoDb.send(
+          new GetCommand({
+            TableName:
+              getTableName(),
+
+            Key: {
+              photoId,
+            },
+          }),
+        );
+
+      const photo =
+        result.Item;
+
+      if (!photo) {
+        return res.status(404).json({
+          success: false,
+          message:
+            "Photo not found",
+        });
+      }
+
+      if (
+        photo.userId !== userId
+      ) {
+        return res.status(403).json({
+          success: false,
+          message:
+            "You are not allowed to permanently delete this photo",
+        });
+      }
+
+      if (
+        photo.isTrashed !== true
+      ) {
+        return res.status(400).json({
+          success: false,
+          message:
+            "Photo must be in trash before permanent deletion",
+        });
+      }
+
+      // ------------------------------------------------
+      // Delete S3
+      // ------------------------------------------------
+
+      try {
+        await s3.send(
+          new DeleteObjectCommand({
+            Bucket:
+              getBucketName(),
+
+            Key:
+              photo.s3Key,
+          }),
+        );
+      } catch (s3Error) {
+        console.error(
+          "S3 permanent delete error:",
+          s3Error,
+        );
+
+        return res.status(500).json({
+          success: false,
+          message:
+            "Failed to delete photo from storage. DynamoDB metadata was kept safe.",
+        });
+      }
+
+      // ------------------------------------------------
+      // Delete DynamoDB
+      // ------------------------------------------------
+
+      try {
+        await dynamoDb.send(
+          new DeleteCommand({
+            TableName:
+              getTableName(),
+
+            Key: {
+              photoId,
+            },
+
+            ConditionExpression:
+              "userId = :userId",
+
+            ExpressionAttributeValues: {
+              ":userId": userId,
+            },
+          }),
+        );
+      } catch (dbError) {
+        console.error(
+          "DynamoDB permanent delete error:",
+          dbError,
+        );
+
+        return res.status(500).json({
+          success: false,
+          message:
+            "Photo storage was deleted, but metadata cleanup failed. Please contact support.",
+        });
+      }
+
+      return res.status(200).json({
+        success: true,
+
         message:
-          "Failed to delete photo from storage. DynamoDB metadata was kept safe.",
+          "Photo permanently deleted",
       });
-    }
-
-    // ------------------------------------------------
-    // Delete DynamoDB metadata
-    // ------------------------------------------------
-
-    try {
-      await dynamoDb.send(
-        new DeleteCommand({
-          TableName:
-            getTableName(),
-
-          Key: {
-            photoId,
-          },
-
-          ConditionExpression:
-            "userId = :userId",
-
-          ExpressionAttributeValues: {
-            ":userId":
-              userId,
-          },
-        })
-      );
-    } catch (dbError) {
+    } catch (error) {
       console.error(
-        "DynamoDB permanent delete error:",
-        dbError
+        "Delete photo forever error:",
+        error,
       );
 
-      return res.status(500).json({
-        success: false,
-        message:
-          "Photo storage was deleted, but metadata cleanup failed. Please contact support.",
-      });
+      next(error);
     }
+  };
 
-    return res.status(200).json({
-      success: true,
-
-      message:
-        "Photo permanently deleted",
-    });
-  } catch (error) {
-    console.error(
-      "Delete photo forever error:",
-      error
-    );
-
-    next(error);
-  }
-};
-
-// --------------------------------------------------
-// Empty Trash
+// ==================================================
+// EMPTY TRASH
 // DELETE /trash
-//
-// Permanently deletes ALL photos
-// currently in the user's Trash.
-// --------------------------------------------------
+// ==================================================
 
 const emptyTrash = async (
   req,
   res,
-  next
+  next,
 ) => {
   try {
     const userId =
@@ -565,16 +590,15 @@ const emptyTrash = async (
             "userId = :userId",
 
           ExpressionAttributeValues: {
-            ":userId":
-              userId,
+            ":userId": userId,
           },
-        })
+        }),
       );
 
     const trashPhotos =
       (result.Items || []).filter(
         (photo) =>
-          photo.isTrashed === true
+          photo.isTrashed === true,
       );
 
     if (
@@ -582,10 +606,15 @@ const emptyTrash = async (
     ) {
       return res.status(200).json({
         success: true,
+
         message:
           "Trash is already empty",
+
         deletedCount: 0,
+
         failedCount: 0,
+
+        failures: [],
       });
     }
 
@@ -594,13 +623,14 @@ const emptyTrash = async (
 
     const failures = [];
 
-    // ------------------------------------------------
-    // Permanently delete every trash photo
-    // ------------------------------------------------
-
-    for (const photo of trashPhotos) {
+    for (
+      const photo of trashPhotos
+    ) {
       try {
-        // 1. Delete S3 object
+        // --------------------------------------------
+        // Delete S3 object
+        // --------------------------------------------
+
         await s3.send(
           new DeleteObjectCommand({
             Bucket:
@@ -608,10 +638,13 @@ const emptyTrash = async (
 
             Key:
               photo.s3Key,
-          })
+          }),
         );
 
-        // 2. Delete DynamoDB metadata
+        // --------------------------------------------
+        // Delete DynamoDB item
+        // --------------------------------------------
+
         await dynamoDb.send(
           new DeleteCommand({
             TableName:
@@ -626,10 +659,9 @@ const emptyTrash = async (
               "userId = :userId",
 
             ExpressionAttributeValues: {
-              ":userId":
-                userId,
+              ":userId": userId,
             },
-          })
+          }),
         );
 
         deletedCount++;
@@ -638,7 +670,7 @@ const emptyTrash = async (
 
         console.error(
           `Failed to permanently delete ${photo.photoId}:`,
-          error
+          error,
         );
 
         failures.push({
@@ -657,36 +689,40 @@ const emptyTrash = async (
       }
     }
 
-    return res.status(
-      failedCount > 0 ? 207 : 200
-    ).json({
-      success:
-        failedCount === 0,
+    return res
+      .status(
+        failedCount > 0
+          ? 207
+          : 200,
+      )
+      .json({
+        success:
+          failedCount === 0,
 
-      message:
-        failedCount === 0
-          ? "Trash emptied successfully"
-          : "Trash was partially emptied",
+        message:
+          failedCount === 0
+            ? "Trash emptied successfully"
+            : "Trash was partially emptied",
 
-      deletedCount,
+        deletedCount,
 
-      failedCount,
+        failedCount,
 
-      failures,
-    });
+        failures,
+      });
   } catch (error) {
     console.error(
       "Empty trash error:",
-      error
+      error,
     );
 
     next(error);
   }
 };
 
-// --------------------------------------------------
-// Exports
-// --------------------------------------------------
+// ==================================================
+// EXPORTS
+// ==================================================
 
 module.exports = {
   getTrashPhotos,

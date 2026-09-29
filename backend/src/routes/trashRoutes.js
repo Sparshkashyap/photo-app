@@ -1,8 +1,3 @@
-
-// ==================================================
-// FILE: src/routes/trashRoutes.js
-// ==================================================
-
 const express = require("express");
 
 const authMiddleware =
@@ -18,48 +13,53 @@ const {
 const router =
   express.Router();
 
-// --------------------------------------------------
-// Get all trashed photos
+// ==================================================
+// GET ALL TRASHED PHOTOS
 // GET /trash
-// --------------------------------------------------
+// ==================================================
 
 router.get(
   "/",
   authMiddleware,
-  getTrashPhotos
+  getTrashPhotos,
 );
 
-// --------------------------------------------------
-// Restore photo
+// ==================================================
+// RESTORE PHOTO
 // POST /trash/:photoId/restore
-// --------------------------------------------------
+// ==================================================
 
 router.post(
   "/:photoId/restore",
   authMiddleware,
-  restorePhoto
+  restorePhoto,
 );
 
-// --------------------------------------------------
-// Delete photo forever
+// ==================================================
+// PERMANENT DELETE ONE PHOTO
 // DELETE /trash/:photoId
-// --------------------------------------------------
+// ==================================================
 
 router.delete(
   "/:photoId",
   authMiddleware,
-  deletePhotoForever
+  deletePhotoForever,
 );
 
-// --------------------------------------------------
-// Empty entire trash
+// ==================================================
+// EMPTY ENTIRE TRASH
 // DELETE /trash
-// --------------------------------------------------
+// ==================================================
 
 router.delete(
   "/",
   authMiddleware,
-  emptyTrash
+  emptyTrash,
 );
 
-module.exports = router;
+// ==================================================
+// EXPORT
+// ==================================================
+
+module.exports =
+  router;
