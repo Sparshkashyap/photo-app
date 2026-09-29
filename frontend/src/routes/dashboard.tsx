@@ -5,7 +5,7 @@ import { FolderPlus, Loader2, Plus, Search, SlidersHorizontal, X } from "lucide-
 import { useCallback, useEffect, useState } from "react";
 
 import { Navbar } from "@/components/Navbar";
-import { MobileNav, Sidebar } from "@/components/Sidebar";
+import { Sidebar } from "@/components/Sidebar";
 import { UploadPhoto } from "@/components/UploadPhoto";
 import { CreateFolderDialog } from "@/components/CreateFolderDialog";
 import { FolderTree } from "@/components/FolderTree";
@@ -83,6 +83,12 @@ function DashboardPage() {
   // ==================================================
 
   const [uploadOpen, setUploadOpen] = useState(false);
+
+  // ==================================================
+  // MOBILE SIDEBAR
+  // ==================================================
+
+  const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
 
   // ==================================================
   // SEARCH / SORT / FILTER
@@ -445,9 +451,8 @@ function DashboardPage() {
         onSearchChange={setSearch}
         onSortChange={setSort}
         onTypeChange={setType}
+        onMobileMenuClick={() => setMobileSidebarOpen(true)}
       />
-
-      <MobileNav />
 
       <div
         className="
@@ -457,7 +462,10 @@ function DashboardPage() {
           max-w-[1600px]
         "
       >
-        <Sidebar />
+        <Sidebar
+          mobileOpen={mobileSidebarOpen}
+          onMobileOpenChange={setMobileSidebarOpen}
+        />
 
         <main
           className="
