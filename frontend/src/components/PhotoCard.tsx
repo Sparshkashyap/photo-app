@@ -1,6 +1,21 @@
-import { FileAudio, Heart, ImageOff, Loader2, Play, RotateCw, Video, X } from "lucide-react";
+import {
+  FileAudio,
+  Heart,
+  ImageOff,
+  Loader2,
+  Play,
+  RotateCw,
+  Video,
+  X,
+} from "lucide-react";
 
-import { useEffect, useState, type KeyboardEvent as ReactKeyboardEvent } from "react";
+import {
+  useEffect,
+  useState,
+  type KeyboardEvent as ReactKeyboardEvent,
+} from "react";
+
+import { createPortal } from "react-dom";
 
 import { toast } from "sonner";
 
@@ -65,17 +80,16 @@ export function PhotoCard({
 
   const [previewOpen, setPreviewOpen] = useState(false);
 
-  const [settings, setSettings] = useState<PhotoAppSettings>(getSettings);
+  const [settings, setSettings] =
+    useState<PhotoAppSettings>(getSettings);
 
   const [mediaError, setMediaError] = useState(false);
 
   const [mediaLoaded, setMediaLoaded] = useState(false);
 
-  const [isFavorite, setIsFavorite] = useState(photo.isFavorite === true);
-
-  // ==================================================
-  // SETTINGS
-  // ==================================================
+  const [isFavorite, setIsFavorite] = useState(
+    photo.isFavorite === true,
+  );
 
   useEffect(() => {
     const refreshSettings = () => {
@@ -84,35 +98,32 @@ export function PhotoCard({
 
     window.addEventListener("storage", refreshSettings);
 
-    window.addEventListener(SETTINGS_CHANGED_EVENT, refreshSettings);
+    window.addEventListener(
+      SETTINGS_CHANGED_EVENT,
+      refreshSettings,
+    );
 
     return () => {
-      window.removeEventListener("storage", refreshSettings);
+      window.removeEventListener(
+        "storage",
+        refreshSettings,
+      );
 
-      window.removeEventListener(SETTINGS_CHANGED_EVENT, refreshSettings);
+      window.removeEventListener(
+        SETTINGS_CHANGED_EVENT,
+        refreshSettings,
+      );
     };
   }, []);
-
-  // ==================================================
-  // SYNC FAVORITE STATE
-  // ==================================================
 
   useEffect(() => {
     setIsFavorite(photo.isFavorite === true);
   }, [photo.isFavorite]);
 
-  // ==================================================
-  // RESET MEDIA STATE WHEN PHOTO CHANGES
-  // ==================================================
-
   useEffect(() => {
     setMediaError(false);
     setMediaLoaded(false);
   }, [photo.photoId]);
-
-  // ==================================================
-  // ESCAPE FULLSCREEN
-  // ==================================================
 
   useEffect(() => {
     if (!previewOpen) {
@@ -125,23 +136,26 @@ export function PhotoCard({
       }
     };
 
-    document.addEventListener("keydown", handleEscape);
+    document.addEventListener(
+      "keydown",
+      handleEscape,
+    );
 
     return () => {
-      document.removeEventListener("keydown", handleEscape);
+      document.removeEventListener(
+        "keydown",
+        handleEscape,
+      );
     };
   }, [previewOpen]);
-
-  // ==================================================
-  // LOCK BODY SCROLL WHILE PREVIEW IS OPEN
-  // ==================================================
 
   useEffect(() => {
     if (!previewOpen) {
       return;
     }
 
-    const previousOverflow = document.body.style.overflow;
+    const previousOverflow =
+      document.body.style.overflow;
 
     document.body.style.overflow = "hidden";
 
@@ -150,25 +164,26 @@ export function PhotoCard({
     };
   }, [previewOpen]);
 
-  // ==================================================
-  // DATA
-  // ==================================================
+  const isVideo =
+    photo.contentType?.startsWith("video/") ?? false;
 
-  const isVideo = photo.contentType?.startsWith("video/") ?? false;
+  const isAudio =
+    photo.contentType?.startsWith("audio/") ?? false;
 
-  const isAudio = photo.contentType?.startsWith("audio/") ?? false;
+  const mediaUrl =
+    photo.url || photo.downloadUrl || "";
 
-  const mediaUrl = photo.url || photo.downloadUrl || "";
+  const displayName =
+    photo.name ||
+    photo.fileName ||
+    photo.originalFileName ||
+    "Untitled";
 
-  const displayName = photo.name || photo.fileName || photo.originalFileName || "Untitled";
+  const autoplayVideos =
+    settings.autoplayVideos === true;
 
-  const autoplayVideos = settings.autoplayVideos === true;
-
-  const showFileNames = settings.showFileNames !== false;
-
-  // ==================================================
-  // DOWNLOAD
-  // ==================================================
+  const showFileNames =
+    settings.showFileNames !== false;
 
   async function handleDownload() {
     if (downloading) {
@@ -178,13 +193,18 @@ export function PhotoCard({
     setDownloading(true);
 
     try {
-      const response = await requestDownloadUrl(photo.photoId);
+      const response = await requestDownloadUrl(
+        photo.photoId,
+      );
 
       const link = document.createElement("a");
 
       link.href = response.downloadUrl;
 
-      link.download = photo.name || photo.fileName || "photo";
+      link.download =
+        photo.name ||
+        photo.fileName ||
+        "photo";
 
       link.target = "_blank";
 
@@ -197,22 +217,27 @@ export function PhotoCard({
       link.remove();
 
       toast.success("Download started", {
-        description: photo.name || photo.fileName || "Your file",
+        description:
+          photo.name ||
+          photo.fileName ||
+          "Your file",
       });
     } catch (error) {
-      console.error("Download failed:", error);
+      console.error(
+        "Download failed:",
+        error,
+      );
 
       toast.error("Download failed", {
-        description: error instanceof Error ? error.message : "Please try again.",
+        description:
+          error instanceof Error
+            ? error.message
+            : "Please try again.",
       });
     } finally {
       setDownloading(false);
     }
   }
-
-  // ==================================================
-  // PREVIEW
-  // ==================================================
 
   function handlePreviewOpen() {
     if (!mediaUrl || mediaError) {
@@ -222,15 +247,9 @@ export function PhotoCard({
     setPreviewOpen(true);
   }
 
-  // ==================================================
-  // CHECK INTERACTIVE ELEMENT
-  //
-  // This is important because keyboard events from
-  // Rename inputs / buttons / media controls should
-  // never be interpreted as card keyboard shortcuts.
-  // ==================================================
-
-  function isInteractiveTarget(target: EventTarget | null) {
+  function isInteractiveTarget(
+    target: EventTarget | null,
+  ) {
     if (!(target instanceof HTMLElement)) {
       return false;
     }
@@ -251,115 +270,98 @@ export function PhotoCard({
     }
 
     return Boolean(
-      target.closest("input, textarea, select, button, video, audio, [contenteditable='true']"),
+      target.closest(
+        "input, textarea, select, button, video, audio, [contenteditable='true']",
+      ),
     );
   }
 
-  // ==================================================
-  // KEYBOARD PREVIEW
-  //
-  // IMPORTANT:
-  // Space is intentionally NOT handled here.
-  //
-  // Only Enter opens the preview.
-  // ==================================================
-
-  function handlePreviewKeyDown(event: ReactKeyboardEvent<HTMLElement>) {
-    if (isInteractiveTarget(event.target)) {
+  function handlePreviewKeyDown(
+    event: ReactKeyboardEvent<HTMLElement>,
+  ) {
+    if (
+      isInteractiveTarget(event.target)
+    ) {
       return;
     }
 
     if (event.key === "Enter") {
       event.preventDefault();
+
       handlePreviewOpen();
     }
   }
 
-  // ==================================================
-  // KEYBOARD CAPTURE
-  //
-  // Prevents Space / Enter from bubbling from inputs
-  // such as Rename into the PhotoCard.
-  //
-  // IMPORTANT:
-  // We DO NOT preventDefault().
-  //
-  // Therefore:
-  // Space still types a space.
-  // Enter still works normally where appropriate.
-  // Video controls remain native.
-  // ==================================================
-
-  function handleCardKeyDownCapture(event: ReactKeyboardEvent<HTMLElement>) {
-    if (!isInteractiveTarget(event.target)) {
+  function handleCardKeyDownCapture(
+    event: ReactKeyboardEvent<HTMLElement>,
+  ) {
+    if (
+      !isInteractiveTarget(event.target)
+    ) {
       return;
     }
 
-    if (event.key === " " || event.key === "Spacebar" || event.key === "Enter") {
+    if (
+      event.key === " " ||
+      event.key === "Spacebar" ||
+      event.key === "Enter"
+    ) {
       event.stopPropagation();
     }
   }
 
-  // ==================================================
-  // MEDIA LOADED
-  // ==================================================
-
   function handleMediaLoaded() {
     setMediaLoaded(true);
+
     setMediaError(false);
   }
-
-  // ==================================================
-  // MEDIA ERROR
-  // ==================================================
 
   function handleMediaError() {
     setMediaLoaded(false);
+
     setMediaError(true);
   }
 
-  // ==================================================
-  // RETRY MEDIA
-  // ==================================================
-
   function handleRetryMedia() {
     setMediaError(false);
+
     setMediaLoaded(false);
 
-    /*
-     * Adding a cache-busting query forces the browser
-     * to request the signed URL again when necessary.
-     */
-    const separator = mediaUrl.includes("?") ? "&" : "?";
+    const separator = mediaUrl.includes("?")
+      ? "&"
+      : "?";
 
-    const retryUrl = `${mediaUrl}${separator}retry=${Date.now()}`;
+    const retryUrl =
+      `${mediaUrl}${separator}retry=${Date.now()}`;
 
     const mediaElement = document.querySelector(
       `[data-photo-id="${photo.photoId}"] img, [data-photo-id="${photo.photoId}"] video`,
-    ) as HTMLImageElement | HTMLVideoElement | null;
+    ) as
+      | HTMLImageElement
+      | HTMLVideoElement
+      | null;
 
     if (mediaElement) {
       mediaElement.src = retryUrl;
 
-      if (mediaElement instanceof HTMLVideoElement) {
+      if (
+        mediaElement instanceof
+        HTMLVideoElement
+      ) {
         mediaElement.load();
       }
     }
   }
 
-  // ==================================================
-  // FAVORITE
-  // ==================================================
-
-  function handleFavorite(updatedPhoto: Photo) {
-    setIsFavorite(updatedPhoto.isFavorite === true);
+  function handleFavorite(
+    updatedPhoto: Photo,
+  ) {
+    setIsFavorite(
+      updatedPhoto.isFavorite === true,
+    );
 
     onFavorite?.(updatedPhoto);
   }
-
-  // ==================================================
-  // RENDER
-  // ==================================================
 
   return (
     <>
@@ -380,31 +382,12 @@ export function PhotoCard({
           hover:shadow-lg
         "
       >
-        {/* ==================================================
-            FIXED GALLERY CARD
-
-            The gallery card is ALWAYS square.
-
-            The actual media keeps its ORIGINAL aspect ratio.
-            Nothing is stretched.
-            Nothing is cropped.
-
-            Examples:
-
-            1920x1080 video
-            -> remains landscape
-
-            1080x1920 video
-            -> remains portrait
-
-            1080x1080 video
-            -> remains square
-        ================================================== */}
-
         <div
           data-photo-id={photo.photoId}
           onDoubleClick={handlePreviewOpen}
-          onKeyDownCapture={handleCardKeyDownCapture}
+          onKeyDownCapture={
+            handleCardKeyDownCapture
+          }
           onKeyDown={handlePreviewKeyDown}
           role="button"
           tabIndex={0}
@@ -424,14 +407,10 @@ export function PhotoCard({
             focus-visible:ring-offset-2
           "
         >
-          {/* ==================================================
-              IMAGE BLURRED BACKGROUND
-
-              This only fills the empty area.
-              It does NOT affect the actual media.
-          ================================================== */}
-
-          {!isVideo && !isAudio && mediaUrl && !mediaError ? (
+          {!isVideo &&
+          !isAudio &&
+          mediaUrl &&
+          !mediaError ? (
             <img
               src={mediaUrl}
               alt=""
@@ -464,7 +443,6 @@ export function PhotoCard({
             />
           )}
 
-          {/* Dark overlay */}
           <div
             className="
               absolute
@@ -476,11 +454,9 @@ export function PhotoCard({
             "
           />
 
-          {/* ==================================================
-              LOADING
-          ================================================== */}
-
-          {mediaUrl && !mediaError && !mediaLoaded ? (
+          {mediaUrl &&
+          !mediaError &&
+          !mediaLoaded ? (
             <div
               className="
                 absolute
@@ -491,10 +467,6 @@ export function PhotoCard({
               "
             />
           ) : null}
-
-          {/* ==================================================
-              ERROR / NO MEDIA
-          ================================================== */}
 
           {!mediaUrl || mediaError ? (
             <div
@@ -542,7 +514,9 @@ export function PhotoCard({
                   text-muted-foreground
                 "
               >
-                {mediaError ? "Unable to load media" : "Preview unavailable"}
+                {mediaError
+                  ? "Unable to load media"
+                  : "Preview unavailable"}
               </span>
 
               {mediaError ? (
@@ -550,6 +524,7 @@ export function PhotoCard({
                   type="button"
                   onClick={(event) => {
                     event.stopPropagation();
+
                     handleRetryMedia();
                   }}
                   onDoubleClick={(event) => {
@@ -573,31 +548,16 @@ export function PhotoCard({
                   "
                 >
                   <RotateCw className="size-3" />
+
                   Retry
                 </button>
               ) : null}
             </div>
           ) : null}
 
-          {/* ==================================================
-              VIDEO
-
-              IMPORTANT:
-
-              The video itself is NOT square.
-
-              h-auto + w-auto
-              max-h-full
-              max-w-full
-              object-contain
-
-              preserves the video's real aspect ratio.
-
-              The surrounding gallery card is square,
-              but the video is not forced into a square.
-          ================================================== */}
-
-          {!mediaError && mediaUrl && isVideo ? (
+          {!mediaError &&
+          mediaUrl &&
+          isVideo ? (
             <div
               className="
                 relative
@@ -609,11 +569,8 @@ export function PhotoCard({
                 justify-center
               "
               onDoubleClick={(event) => {
-                /*
-                 * Let the parent handle the double-click
-                 * for preview.
-                 */
                 event.stopPropagation();
+
                 handlePreviewOpen();
               }}
             >
@@ -625,9 +582,15 @@ export function PhotoCard({
                 muted={autoplayVideos}
                 loop={autoplayVideos}
                 playsInline
-                onLoadedMetadata={handleMediaLoaded}
-                onLoadedData={handleMediaLoaded}
-                onError={handleMediaError}
+                onLoadedMetadata={
+                  handleMediaLoaded
+                }
+                onLoadedData={
+                  handleMediaLoaded
+                }
+                onError={
+                  handleMediaError
+                }
                 className={`
                   block
                   h-auto
@@ -637,11 +600,13 @@ export function PhotoCard({
                   object-contain
                   transition-opacity
                   duration-300
-                  ${mediaLoaded ? "opacity-100" : "opacity-0"}
+                  ${
+                    mediaLoaded
+                      ? "opacity-100"
+                      : "opacity-0"
+                  }
                 `}
               />
-
-              {/* Play indicator */}
 
               {!autoplayVideos ? (
                 <div
@@ -676,8 +641,6 @@ export function PhotoCard({
                 </div>
               ) : null}
 
-              {/* Video label */}
-
               <span
                 className="
                   pointer-events-none
@@ -701,11 +664,9 @@ export function PhotoCard({
             </div>
           ) : null}
 
-          {/* ==================================================
-              AUDIO
-          ================================================== */}
-
-          {!mediaError && mediaUrl && isAudio ? (
+          {!mediaError &&
+          mediaUrl &&
+          isAudio ? (
             <div
               className="
                 relative
@@ -729,29 +690,36 @@ export function PhotoCard({
 
               <div
                 className="w-full"
-                onClick={(event) => event.stopPropagation()}
-                onDoubleClick={(event) => event.stopPropagation()}
-                onKeyDown={(event) => event.stopPropagation()}
+                onClick={(event) =>
+                  event.stopPropagation()
+                }
+                onDoubleClick={(event) =>
+                  event.stopPropagation()
+                }
+                onKeyDown={(event) =>
+                  event.stopPropagation()
+                }
               >
                 <audio
                   src={mediaUrl}
                   controls
                   preload="metadata"
-                  onLoadedData={handleMediaLoaded}
-                  onError={handleMediaError}
+                  onLoadedData={
+                    handleMediaLoaded
+                  }
+                  onError={
+                    handleMediaError
+                  }
                   className="w-full"
                 />
               </div>
             </div>
           ) : null}
 
-          {/* ==================================================
-              IMAGE
-
-              Original aspect ratio preserved.
-          ================================================== */}
-
-          {!mediaError && mediaUrl && !isVideo && !isAudio ? (
+          {!mediaError &&
+          mediaUrl &&
+          !isVideo &&
+          !isAudio ? (
             <img
               key={mediaUrl}
               src={mediaUrl}
@@ -771,14 +739,14 @@ export function PhotoCard({
                 object-contain
                 transition-opacity
                 duration-300
-                ${mediaLoaded ? "opacity-100" : "opacity-0"}
+                ${
+                  mediaLoaded
+                    ? "opacity-100"
+                    : "opacity-0"
+                }
               `}
             />
           ) : null}
-
-          {/* ==================================================
-              BOTTOM GRADIENT
-          ================================================== */}
 
           <div
             className="
@@ -797,10 +765,6 @@ export function PhotoCard({
               group-hover:opacity-100
             "
           />
-
-          {/* ==================================================
-              FAVORITE ICON
-          ================================================== */}
 
           {isFavorite ? (
             <div
@@ -836,10 +800,6 @@ export function PhotoCard({
             </div>
           ) : null}
 
-          {/* ==================================================
-              FILE NAME
-          ================================================== */}
-
           {showFileNames ? (
             <figcaption
               className="
@@ -860,10 +820,6 @@ export function PhotoCard({
             </figcaption>
           ) : null}
 
-          {/* ==================================================
-              THREE DOT MENU
-          ================================================== */}
-
           <div
             className="
               absolute
@@ -871,26 +827,35 @@ export function PhotoCard({
               top-2
               z-20
             "
-            onClick={(event) => event.stopPropagation()}
-            onDoubleClick={(event) => event.stopPropagation()}
-            onKeyDown={(event) => event.stopPropagation()}
+            onClick={(event) =>
+              event.stopPropagation()
+            }
+            onDoubleClick={(event) =>
+              event.stopPropagation()
+            }
+            onKeyDown={(event) =>
+              event.stopPropagation()
+            }
           >
             <PhotoMenu
               photo={photo}
               folders={folders}
-              onRenamed={onRenamed ?? (() => {})}
-              onMoved={onMoved ?? (() => {})}
+              onRenamed={
+                onRenamed ?? (() => {})
+              }
+              onMoved={
+                onMoved ?? (() => {})
+              }
               onDownload={() => {
                 void handleDownload();
               }}
-              onTrashed={onTrashed ?? (() => {})}
+              onTrashed={
+                onTrashed ?? (() => {})
+              }
               onFavorite={handleFavorite}
+              onView={handlePreviewOpen}
             />
           </div>
-
-          {/* ==================================================
-              DOWNLOAD LOADING
-          ================================================== */}
 
           {downloading ? (
             <div
@@ -928,226 +893,196 @@ export function PhotoCard({
         </div>
       </figure>
 
-      {/* ======================================================
-          FULL SCREEN ORIGINAL PREVIEW
-
-          IMPORTANT:
-
-          There is NO fixed width/height here.
-
-          The browser calculates the media's real dimensions.
-
-          max-height / max-width only prevent it from
-          overflowing the screen.
-
-          Therefore:
-
-          Horizontal:
-          1920x1080 -> horizontal
-
-          Vertical:
-          1080x1920 -> vertical
-
-          Square:
-          1080x1080 -> square
-      ====================================================== */}
-
-      {previewOpen ? (
-        <div
-          className="
-            fixed
-            inset-0
-            z-[100]
-            flex
-            items-center
-            justify-center
-            bg-black/95
-            p-3
-            backdrop-blur-sm
-            sm:p-6
-            motion-safe:animate-in
-            motion-safe:fade-in
-            motion-safe:duration-150
-          "
-          role="dialog"
-          aria-modal="true"
-          aria-label={`Preview of ${displayName}`}
-          onClick={() => setPreviewOpen(false)}
-        >
-          {/* ==================================================
-              CLOSE BUTTON
-          ================================================== */}
-
-          <button
-            type="button"
-            onClick={() => setPreviewOpen(false)}
-            aria-label="Close preview"
-            title="Close preview"
-            className="
-              absolute
-              right-4
-              top-4
-              z-[110]
-              flex
-              size-11
-              items-center
-              justify-center
-              rounded-full
-              border
-              border-white/20
-              bg-black/60
-              text-white
-              shadow-lg
-              backdrop-blur
-              transition
-              hover:bg-white/15
-              active:scale-90
-              focus:outline-none
-              focus:ring-2
-              focus:ring-white/50
-              sm:right-6
-              sm:top-6
-            "
-          >
-            <X className="size-5" />
-          </button>
-
-          {/* ==================================================
-              ORIGINAL MEDIA
-          ================================================== */}
-
-          <div
-            className="
-              relative
-              flex
-              max-h-[94vh]
-              max-w-[96vw]
-              items-center
-              justify-center
-              motion-safe:animate-in
-              motion-safe:zoom-in-95
-              motion-safe:duration-200
-            "
-            onClick={(event) => event.stopPropagation()}
-          >
-            {/* ==================================================
-                FULLSCREEN VIDEO
-
-                No object-cover.
-                No aspect-square.
-                No forced width.
-                No forced height.
-
-                Only max dimensions are applied.
-            ================================================== */}
-
-            {isVideo ? (
-              <video
-                key={mediaUrl}
-                src={mediaUrl}
-                controls
-                autoPlay
-                playsInline
-                preload="metadata"
+      {previewOpen
+        ? createPortal(
+            <div
+              className="
+                fixed
+                inset-0
+                z-[9999]
+                flex
+                items-center
+                justify-center
+                bg-black/95
+                p-3
+                backdrop-blur-sm
+                sm:p-6
+                motion-safe:animate-in
+                motion-safe:fade-in
+                motion-safe:duration-150
+              "
+              role="dialog"
+              aria-modal="true"
+              aria-label={`Preview of ${displayName}`}
+              onClick={() =>
+                setPreviewOpen(false)
+              }
+            >
+              <button
+                type="button"
+                onClick={() =>
+                  setPreviewOpen(false)
+                }
+                aria-label="Close preview"
+                title="Close preview"
                 className="
-                  block
-                  h-auto
-                  w-auto
-                  max-h-[92vh]
-                  max-w-[95vw]
-                  rounded-lg
-                  object-contain
-                  shadow-2xl
-                "
-              />
-            ) : isAudio ? (
-              <div
-                className="
+                  absolute
+                  right-4
+                  top-4
+                  z-[110]
                   flex
-                  w-[min(92vw,720px)]
-                  flex-col
+                  size-11
                   items-center
-                  gap-6
-                  rounded-2xl
+                  justify-center
+                  rounded-full
                   border
-                  border-white/10
-                  bg-black/70
-                  p-8
-                  shadow-2xl
+                  border-white/20
+                  bg-black/60
+                  text-white
+                  shadow-lg
                   backdrop-blur
+                  transition
+                  hover:bg-white/15
+                  active:scale-90
+                  focus:outline-none
+                  focus:ring-2
+                  focus:ring-white/50
+                  sm:right-6
+                  sm:top-6
                 "
               >
-                <FileAudio
-                  className="
-                    size-20
-                    text-white
-                  "
-                />
+                <X className="size-5" />
+              </button>
 
-                <p
+              <div
+                className="
+                  relative
+                  flex
+                  max-h-[calc(100dvh-72px)]
+                  max-w-[calc(100vw-24px)]
+                  items-center
+                  justify-center
+                  motion-safe:animate-in
+                  motion-safe:zoom-in-95
+                  motion-safe:duration-200
+                "
+                onClick={(event) =>
+                  event.stopPropagation()
+                }
+              >
+                {isVideo ? (
+                  <video
+                    key={mediaUrl}
+                    src={mediaUrl}
+                    controls
+                    autoPlay
+                    playsInline
+                    preload="metadata"
+                    className="
+                      block
+                      h-auto
+                      w-auto
+                      max-h-[calc(100dvh-96px)]
+                      max-w-[calc(100vw-24px)]
+                      rounded-lg
+                      object-contain
+                      shadow-2xl
+                    "
+                  />
+                ) : isAudio ? (
+                  <div
+                    className="
+                      flex
+                      w-[min(92vw,720px)]
+                      max-h-[calc(100dvh-96px)]
+                      flex-col
+                      items-center
+                      gap-6
+                      overflow-auto
+                      rounded-2xl
+                      border
+                      border-white/10
+                      bg-black/70
+                      p-6
+                      shadow-2xl
+                      backdrop-blur
+                      sm:p-8
+                    "
+                  >
+                    <FileAudio
+                      className="
+                        size-20
+                        text-white
+                      "
+                    />
+
+                    <p
+                      className="
+                        max-w-full
+                        truncate
+                        text-sm
+                        font-medium
+                        text-white
+                      "
+                    >
+                      {displayName}
+                    </p>
+
+                    <audio
+                      src={mediaUrl}
+                      controls
+                      autoPlay
+                      className="w-full"
+                    />
+                  </div>
+                ) : (
+                  <img
+                    src={mediaUrl}
+                    alt={displayName}
+                    className="
+                      block
+                      h-auto
+                      w-auto
+                      max-h-[calc(100dvh-96px)]
+                      max-w-[calc(100vw-24px)]
+                      rounded-lg
+                      object-contain
+                      shadow-2xl
+                    "
+                  />
+                )}
+              </div>
+
+              {showFileNames ? (
+                <div
                   className="
-                    max-w-full
+                    pointer-events-none
+                    absolute
+                    bottom-4
+                    left-1/2
+                    max-w-[80vw]
+                    -translate-x-1/2
                     truncate
+                    rounded-full
+                    border
+                    border-white/10
+                    bg-black/60
+                    px-4
+                    py-2
                     text-sm
                     font-medium
                     text-white
+                    backdrop-blur
+                    sm:bottom-6
                   "
                 >
                   {displayName}
-                </p>
-
-                <audio src={mediaUrl} controls autoPlay className="w-full" />
-              </div>
-            ) : (
-              <img
-                src={mediaUrl}
-                alt={displayName}
-                className="
-                  block
-                  h-auto
-                  w-auto
-                  max-h-[92vh]
-                  max-w-[95vw]
-                  rounded-lg
-                  object-contain
-                  shadow-2xl
-                "
-              />
-            )}
-          </div>
-
-          {/* ==================================================
-              FULLSCREEN FILE NAME
-          ================================================== */}
-
-          {showFileNames ? (
-            <div
-              className="
-                pointer-events-none
-                absolute
-                bottom-4
-                left-1/2
-                max-w-[80vw]
-                -translate-x-1/2
-                truncate
-                rounded-full
-                border
-                border-white/10
-                bg-black/60
-                px-4
-                py-2
-                text-sm
-                font-medium
-                text-white
-                backdrop-blur
-                sm:bottom-6
-              "
-            >
-              {displayName}
-            </div>
-          ) : null}
-        </div>
-      ) : null}
+                </div>
+              ) : null}
+            </div>,
+            document.body,
+          )
+        : null}
     </>
   );
 }
