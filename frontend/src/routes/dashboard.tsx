@@ -462,10 +462,7 @@ function DashboardPage() {
           max-w-[1600px]
         "
       >
-        <Sidebar
-          mobileOpen={mobileSidebarOpen}
-          onMobileOpenChange={setMobileSidebarOpen}
-        />
+        <Sidebar mobileOpen={mobileSidebarOpen} onMobileOpenChange={setMobileSidebarOpen} />
 
         <main
           className="

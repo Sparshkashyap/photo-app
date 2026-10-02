@@ -4,12 +4,7 @@ import { Link, useRouterState } from "@tanstack/react-router";
 
 import { useState } from "react";
 
-import {
-  Sheet,
-  SheetContent,
-  SheetHeader,
-  SheetTitle,
-} from "@/components/ui/sheet";
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 
 import { Button } from "@/components/ui/button";
 
@@ -40,32 +35,24 @@ type NavigationItemsProps = {
   onNavigate?: () => void;
 };
 
-function NavigationItems({
-  onNavigate,
-}: NavigationItemsProps) {
+function NavigationItems({ onNavigate }: NavigationItemsProps) {
   const routerState = useRouterState();
 
-  const pathname =
-    routerState.location.pathname;
+  const pathname = routerState.location.pathname;
 
   return (
     <nav className="space-y-1">
       {navigation.map((item) => {
         const Icon = item.icon;
 
-        const active =
-          pathname === item.href ||
-          (item.href === "/dashboard" &&
-            pathname === "/");
+        const active = pathname === item.href || (item.href === "/dashboard" && pathname === "/");
 
         return (
           <Link
             key={item.href}
             to={item.href}
             onClick={onNavigate}
-            aria-current={
-              active ? "page" : undefined
-            }
+            aria-current={active ? "page" : undefined}
             className={`group relative flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-all duration-150 ${
               active
                 ? "bg-primary/10 text-primary"
@@ -74,18 +61,14 @@ function NavigationItems({
           >
             <span
               className={`absolute left-0 top-1/2 h-5 w-1 -translate-y-1/2 rounded-r-full bg-primary transition-all duration-200 ${
-                active
-                  ? "opacity-100"
-                  : "opacity-0"
+                active ? "opacity-100" : "opacity-0"
               }`}
               aria-hidden="true"
             />
 
             <Icon
               className={`size-4 shrink-0 transition-transform duration-150 ${
-                active
-                  ? ""
-                  : "group-hover:scale-110"
+                active ? "" : "group-hover:scale-110"
               }`}
               aria-hidden="true"
             />
@@ -100,15 +83,10 @@ function NavigationItems({
 
 type SidebarProps = {
   mobileOpen?: boolean;
-  onMobileOpenChange?: (
-    open: boolean,
-  ) => void;
+  onMobileOpenChange?: (open: boolean) => void;
 };
 
-export function Sidebar({
-  mobileOpen = false,
-  onMobileOpenChange,
-}: SidebarProps) {
+export function Sidebar({ mobileOpen = false, onMobileOpenChange }: SidebarProps) {
   const handleOpenChange = (open: boolean) => {
     onMobileOpenChange?.(open);
   };
@@ -133,15 +111,8 @@ export function Sidebar({
           MOBILE SIDEBAR
           ================================================== */}
 
-      <Sheet
-        open={mobileOpen}
-        onOpenChange={handleOpenChange}
-      >
-        <SheetContent
-          side="left"
-          className="w-[280px] p-0 md:hidden"
-          aria-describedby={undefined}
-        >
+      <Sheet open={mobileOpen} onOpenChange={handleOpenChange}>
+        <SheetContent side="left" className="w-[280px] p-0 md:hidden" aria-describedby={undefined}>
           {/* 
             IMPORTANT:
             Do NOT add another X button here.
@@ -151,9 +122,7 @@ export function Sidebar({
           */}
 
           <SheetHeader className="border-b border-border px-5 py-4">
-            <SheetTitle className="text-left">
-              Photos
-            </SheetTitle>
+            <SheetTitle className="text-left">Photos</SheetTitle>
           </SheetHeader>
 
           <div className="p-4">
@@ -161,11 +130,7 @@ export function Sidebar({
               Library
             </p>
 
-            <NavigationItems
-              onNavigate={() =>
-                onMobileOpenChange?.(false)
-              }
-            />
+            <NavigationItems onNavigate={() => onMobileOpenChange?.(false)} />
           </div>
         </SheetContent>
       </Sheet>
@@ -174,8 +139,7 @@ export function Sidebar({
 }
 
 export function MobileNav() {
-  const [open, setOpen] =
-    useState(false);
+  const [open, setOpen] = useState(false);
 
   return (
     <div className="sticky top-0 z-40 border-b border-border bg-background/80 backdrop-blur-md supports-[backdrop-filter]:bg-background/60 md:hidden">
@@ -187,10 +151,7 @@ export function MobileNav() {
           onClick={() => setOpen(true)}
           aria-label="Open navigation"
         >
-          <Menu
-            className="size-5"
-            aria-hidden="true"
-          />
+          <Menu className="size-5" aria-hidden="true" />
         </Button>
 
         <Link
@@ -198,25 +159,14 @@ export function MobileNav() {
           className="ml-2 flex items-center gap-1.5 text-sm font-semibold tracking-tight transition-opacity active:opacity-70"
         >
           <span className="flex size-6 items-center justify-center rounded-lg bg-primary/10 text-primary">
-            <Image
-              className="size-3.5"
-              aria-hidden="true"
-            />
+            <Image className="size-3.5" aria-hidden="true" />
           </span>
-
           Photos
         </Link>
       </div>
 
-      <Sheet
-        open={open}
-        onOpenChange={setOpen}
-      >
-        <SheetContent
-          side="left"
-          className="w-[280px] p-0"
-          aria-describedby={undefined}
-        >
+      <Sheet open={open} onOpenChange={setOpen}>
+        <SheetContent side="left" className="w-[280px] p-0" aria-describedby={undefined}>
           {/* 
             IMPORTANT:
             No custom X button here.
@@ -224,9 +174,7 @@ export function MobileNav() {
           */}
 
           <SheetHeader className="border-b border-border px-5 py-4">
-            <SheetTitle className="text-left">
-              Photos
-            </SheetTitle>
+            <SheetTitle className="text-left">Photos</SheetTitle>
           </SheetHeader>
 
           <div className="p-4">
@@ -234,11 +182,7 @@ export function MobileNav() {
               Library
             </p>
 
-            <NavigationItems
-              onNavigate={() =>
-                setOpen(false)
-              }
-            />
+            <NavigationItems onNavigate={() => setOpen(false)} />
           </div>
         </SheetContent>
       </Sheet>
