@@ -6,7 +6,7 @@ import { toast } from "sonner";
 
 import { PhotoLightbox } from "@/components/Photolightbox";
 import { PhotoMenu } from "@/components/PhotoMenu";
-import { generatePhotoCaption, requestDownloadUrl } from "@/services/api";
+import { generatePhotoCaption, getPhoto, requestDownloadUrl } from "@/services/api";
 
 import type { Folder } from "@/types/folder";
 import type { Photo } from "@/types/photo";
@@ -83,6 +83,12 @@ export function PhotoCard({
 
   const [generatingCaption, setGeneratingCaption] = useState(false);
 
+  const isVideo = photo.contentType?.startsWith("video/") ?? false;
+
+  const isAudio = photo.contentType?.startsWith("audio/") ?? false;
+
+  const isImage = !isVideo && !isAudio;
+
   useEffect(() => {
     const refreshSettings = () => setSettings(getSettings());
 
@@ -102,16 +108,58 @@ export function PhotoCard({
   }, [photo.isFavorite, photo.caption]);
 
   useEffect(() => {
+    if (!isImage || (photo.captionStatus !== "pending" && photo.captionStatus !== "processing")) {
+      return;
+    }
+
+    let cancelled = false;
+    let attempts = 0;
+
+    const pollCaption = async () => {
+      attempts += 1;
+
+      try {
+        const response = await getPhoto(photo.photoId);
+        const updatedPhoto = response.photo;
+        const nextStatus = updatedPhoto.captionStatus;
+
+        if (cancelled) {
+          return;
+        }
+
+        if (typeof updatedPhoto.caption === "string" && updatedPhoto.caption.trim()) {
+          setCaption(updatedPhoto.caption);
+          onCaptionChange?.(photo, updatedPhoto.caption);
+          return;
+        }
+
+        if (nextStatus === "failed" || attempts >= 15) {
+          return;
+        }
+
+        window.setTimeout(pollCaption, 4000);
+      } catch (error) {
+        console.error("Background caption status check failed:", error);
+
+        if (!cancelled && attempts < 15) {
+          window.setTimeout(pollCaption, 4000);
+        }
+      }
+    };
+
+    const timer = window.setTimeout(pollCaption, 4000);
+
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timer);
+    };
+  }, [isImage, photo.captionStatus, photo.photoId, onCaptionChange]);
+
+  useEffect(() => {
     setMediaError(false);
     setMediaLoaded(false);
     setRetryKey(0);
   }, [photo.photoId]);
-
-  const isVideo = photo.contentType?.startsWith("video/") ?? false;
-
-  const isAudio = photo.contentType?.startsWith("audio/") ?? false;
-
-  const isImage = !isVideo && !isAudio;
 
   const baseUrl = photo.url || photo.downloadUrl || "";
 
@@ -482,7 +530,6 @@ export function PhotoCard({
           showFileNames={showFileNames}
           onIndexChange={() => {}}
           onClose={() => setPreviewOpen(false)}
-          onCaptionChange={onCaptionChange}
         />
       ) : null}
     </>

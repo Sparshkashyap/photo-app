@@ -17,6 +17,7 @@ import {
   Pencil,
   Ruler,
   Share2,
+  Send,
   Sparkles,
   Trash2,
   Video,
@@ -45,6 +46,7 @@ import {
   setFavorite,
   trashPhoto,
   generatePhotoCaption,
+  requestDownloadUrl,
 } from "@/services/api";
 
 import type { Folder } from "@/types/folder";
@@ -388,6 +390,63 @@ export function PhotoMenu({
       });
     } finally {
       setGeneratingCaption(false);
+    }
+  }
+
+  async function handleSendAsCopy() {
+    if (sharing) return;
+
+    if (typeof navigator === "undefined" || typeof navigator.share !== "function") {
+      toast.error("Direct file sharing is not supported", {
+        description: "Use Download on this browser/device instead.",
+      });
+      return;
+    }
+
+    setSharing(true);
+
+    try {
+      const response = await requestDownloadUrl(photo.photoId);
+
+      const fileResponse = await fetch(response.downloadUrl, {
+        method: "GET",
+        cache: "no-store",
+      });
+
+      if (!fileResponse.ok) {
+        throw new Error("Couldn't download the original file for sharing.");
+      }
+
+      const blob = await fileResponse.blob();
+
+      const fileName = photo.originalFileName || photo.fileName || photo.name || "photo";
+
+      const file = new File([blob], fileName, {
+        type: photo.contentType || blob.type || "application/octet-stream",
+      });
+
+      if (typeof navigator.canShare === "function" && !navigator.canShare({ files: [file] })) {
+        throw new Error("This device cannot share this file directly.");
+      }
+
+      await navigator.share({
+        files: [file],
+        title: fileName,
+      });
+
+      closeMenu();
+    } catch (error) {
+      if (error instanceof DOMException && error.name === "AbortError") {
+        return;
+      }
+
+      console.error("Send as copy failed:", error);
+
+      toast.error("Couldn't send the file", {
+        description: error instanceof Error ? error.message : "Please try Download instead.",
+      });
+    } finally {
+      setSharing(false);
     }
   }
 
@@ -830,6 +889,22 @@ export function PhotoMenu({
           >
             <Download className="size-4 shrink-0 text-muted-foreground" />
             <span>Download</span>
+          </button>
+
+          <button
+            type="button"
+            role="menuitem"
+            tabIndex={-1}
+            onClick={() => void handleSendAsCopy()}
+            disabled={sharing}
+            className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm transition-colors duration-100 hover:bg-accent focus:bg-accent focus:outline-none disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            {sharing ? (
+              <Loader2 className="size-4 shrink-0 animate-spin text-muted-foreground" />
+            ) : (
+              <Send className="size-4 shrink-0 text-muted-foreground" />
+            )}
+            <span>{sharing ? "Preparing file..." : "Send as Copy"}</span>
           </button>
 
           <button

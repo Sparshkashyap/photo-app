@@ -550,61 +550,16 @@ const confirmUpload = async (
       );
 
     // ==================================================
-    // AI IMAGE CAPTION
+    // AI CAPTION STATUS
     // ==================================================
 
-    let caption = null;
-
-    if (
+    // Caption generation is intentionally asynchronous.
+    // The S3 ObjectCreated event will trigger the background
+    // caption worker after the file is uploaded.
+    const captionStatus =
       mediaType === "image"
-    ) {
-      try {
-        const objectResult =
-          await s3.send(
-            new GetObjectCommand({
-              Bucket:
-                getBucketName(),
-
-              Key:
-                key,
-            }),
-          );
-
-        if (
-          objectResult.Body
-        ) {
-          const imageBuffer =
-            Buffer.from(
-              await objectResult.Body.transformToByteArray(),
-            );
-
-          const aiResult =
-            await generateImageCaption({
-              imageBuffer,
-
-              fileName,
-
-              contentType:
-                actualContentType,
-            });
-
-          if (
-            aiResult?.success &&
-            typeof aiResult.caption ===
-              "string"
-          ) {
-            caption =
-              aiResult.caption.trim() ||
-              null;
-          }
-        }
-      } catch (aiError) {
-        console.error(
-          "AI caption generation failed. Saving photo without caption:",
-          aiError,
-        );
-      }
-    }
+        ? "pending"
+        : "not_applicable";
 
     // ==================================================
     // SAVE DYNAMODB METADATA
@@ -635,11 +590,7 @@ const confirmUpload = async (
 
       mediaType,
 
-      ...(caption
-        ? {
-            caption,
-          }
-        : {}),
+      captionStatus,
 
       fileSize:
         actualFileSize,
@@ -691,6 +642,286 @@ const confirmUpload = async (
 
     next(error);
   }
+};
+
+// ==================================================
+// BACKGROUND AI CAPTION WORKER
+// Triggered by the S3 ObjectCreated event.
+// ==================================================
+
+const sleep = (ms) =>
+  new Promise((resolve) =>
+    setTimeout(resolve, ms),
+  );
+
+const getPhotoFromS3Key = async (key) => {
+  if (
+    typeof key !== "string" ||
+    !key.startsWith("photos/")
+  ) {
+    return null;
+  }
+
+  const remainder = key.slice("photos/".length);
+  const separatorIndex = remainder.indexOf("/");
+
+  if (separatorIndex <= 0) {
+    return null;
+  }
+
+  const userId = remainder.slice(0, separatorIndex);
+  const filePart = remainder.slice(separatorIndex + 1);
+  const photoId = filePart.slice(0, 36);
+
+  if (!userId || !photoId) {
+    return null;
+  }
+
+  return {
+    userId,
+    photoId,
+  };
+};
+
+const processCaptionJob = async ({
+  photoId,
+  userId,
+}) => {
+  const MAX_DB_WAIT_ATTEMPTS = 6;
+
+  let photo = null;
+
+  // S3 can invoke this Lambda before /photos/confirm finishes.
+  // Wait briefly for the DynamoDB metadata to appear.
+  for (
+    let attempt = 1;
+    attempt <= MAX_DB_WAIT_ATTEMPTS;
+    attempt += 1
+  ) {
+    const result = await dynamoDb.send(
+      new GetCommand({
+        TableName: getTableName(),
+        Key: { photoId },
+      }),
+    );
+
+    photo = result.Item || null;
+
+    if (photo) {
+      break;
+    }
+
+    if (attempt < MAX_DB_WAIT_ATTEMPTS) {
+      await sleep(Math.min(attempt * 1000, 5000));
+    }
+  }
+
+  if (!photo) {
+    console.warn(
+      "Caption worker: photo metadata was not found",
+      { photoId, userId },
+    );
+
+    return {
+      success: false,
+      skipped: true,
+      reason: "photo_not_found",
+    };
+  }
+
+  if (photo.userId !== userId) {
+    console.error(
+      "Caption worker: user mismatch",
+      { photoId },
+    );
+
+    return {
+      success: false,
+      skipped: true,
+      reason: "user_mismatch",
+    };
+  }
+
+  const mediaType =
+    photo.mediaType ||
+    getMediaType(photo.contentType);
+
+  if (mediaType !== "image") {
+    return {
+      success: true,
+      skipped: true,
+      reason: "not_an_image",
+    };
+  }
+
+  if (photo.isTrashed === true) {
+    return {
+      success: true,
+      skipped: true,
+      reason: "photo_in_trash",
+    };
+  }
+
+  if (photo.captionStatus === "ready") {
+    return {
+      success: true,
+      skipped: true,
+      reason: "already_generated",
+    };
+  }
+
+  const updatedAt = new Date().toISOString();
+
+  await dynamoDb.send(
+    new UpdateCommand({
+      TableName: getTableName(),
+      Key: { photoId },
+      UpdateExpression:
+        "SET captionStatus = :status, updatedAt = :updatedAt",
+      ExpressionAttributeValues: {
+        ":status": "processing",
+        ":updatedAt": updatedAt,
+      },
+    }),
+  );
+
+  try {
+    const objectResult = await s3.send(
+      new GetObjectCommand({
+        Bucket: getBucketName(),
+        Key: photo.s3Key,
+      }),
+    );
+
+    if (!objectResult.Body) {
+      throw new Error(
+        "Photo file could not be loaded from S3",
+      );
+    }
+
+    const imageBuffer = Buffer.from(
+      await objectResult.Body.transformToByteArray(),
+    );
+
+    const aiResult = await generateImageCaption({
+      imageBuffer,
+      fileName:
+        photo.fileName ||
+        photo.originalFileName ||
+        "image.jpg",
+      contentType:
+        photo.contentType || "image/jpeg",
+    });
+
+    const caption =
+      typeof aiResult?.caption === "string"
+        ? aiResult.caption.trim()
+        : "";
+
+    if (!aiResult?.success || !caption) {
+      throw new Error(
+        "AI service returned an empty caption",
+      );
+    }
+
+    const completedAt =
+      new Date().toISOString();
+
+    await dynamoDb.send(
+      new UpdateCommand({
+        TableName: getTableName(),
+        Key: { photoId },
+        UpdateExpression:
+          "SET caption = :caption, captionStatus = :status, updatedAt = :updatedAt REMOVE captionError",
+        ExpressionAttributeValues: {
+          ":caption": caption,
+          ":status": "ready",
+          ":updatedAt": completedAt,
+        },
+      }),
+    );
+
+    console.log(
+      "Caption generated successfully",
+      { photoId },
+    );
+
+    return {
+      success: true,
+      caption,
+    };
+  } catch (error) {
+    console.error(
+      "Background AI caption generation failed:",
+      error,
+    );
+
+    const failedAt =
+      new Date().toISOString();
+
+    await dynamoDb.send(
+      new UpdateCommand({
+        TableName: getTableName(),
+        Key: { photoId },
+        UpdateExpression:
+          "SET captionStatus = :status, captionError = :captionError, updatedAt = :updatedAt",
+        ExpressionAttributeValues: {
+          ":status": "failed",
+          ":captionError":
+            error instanceof Error
+              ? error.message.slice(0, 500)
+              : "AI caption generation failed",
+          ":updatedAt": failedAt,
+        },
+      }),
+    );
+
+    return {
+      success: false,
+      caption: null,
+    };
+  }
+};
+
+const processCaptionJobFromS3Event = async (
+  event,
+) => {
+  const records = Array.isArray(event?.Records)
+    ? event.Records
+    : [];
+
+  for (const record of records) {
+    if (
+      record?.eventSource !== "aws:s3" &&
+      record?.EventSource !== "aws:s3"
+    ) {
+      continue;
+    }
+
+    const rawKey =
+      record?.s3?.object?.key;
+
+    if (!rawKey) {
+      continue;
+    }
+
+    const key = decodeURIComponent(
+      String(rawKey).replace(/\+/g, " "),
+    );
+
+    const parsed =
+      await getPhotoFromS3Key(key);
+
+    if (!parsed) {
+      continue;
+    }
+
+    await processCaptionJob(parsed);
+  }
+
+  return {
+    success: true,
+  };
 };
 
 // ==================================================
@@ -796,9 +1027,11 @@ const generateCaptionForPhoto = async (
       new UpdateCommand({
         TableName: getTableName(),
         Key: { photoId },
-        UpdateExpression: "SET caption = :caption, updatedAt = :updatedAt",
+        UpdateExpression:
+          "SET caption = :caption, captionStatus = :status, updatedAt = :updatedAt REMOVE captionError",
         ExpressionAttributeValues: {
           ":caption": caption,
+          ":status": "ready",
           ":updatedAt": updatedAt,
         },
       }),
@@ -2238,6 +2471,7 @@ module.exports = {
   uploadUrl,
   confirmUpload,
   generateCaptionForPhoto,
+  processCaptionJobFromS3Event,
   getPhotos,
   getPhoto,
   renamePhoto,

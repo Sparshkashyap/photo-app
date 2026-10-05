@@ -193,10 +193,10 @@ export function UploadPhoto({
       await uploadToPresignedUrl(uploadUrl, file, setProgress);
 
       // ------------------------------------------------
-      // 3. Save metadata + generate AI caption
+      // 3. Save metadata immediately
       // ------------------------------------------------
-
-      setStatus("processing");
+      // AI caption generation now runs asynchronously after
+      // the S3 upload, so the upload does not wait for BLIP.
 
       const response = await confirmUpload({
         photoId,
@@ -238,6 +238,8 @@ export function UploadPhoto({
         contentType: savedPhoto.contentType,
 
         caption: savedPhoto.caption ?? null,
+
+        captionStatus: savedPhoto.captionStatus ?? "not_applicable",
 
         mediaType: savedPhoto.mediaType ?? mediaType ?? "image",
 
@@ -282,8 +284,8 @@ export function UploadPhoto({
       setProgress(100);
 
       toast.success(
-        savedPhoto.caption
-          ? "Media uploaded and AI caption generated"
+        mediaType === "image"
+          ? "Media uploaded. AI caption is generating in background."
           : "Media uploaded successfully",
       );
 

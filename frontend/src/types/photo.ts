@@ -27,6 +27,9 @@ export interface Photo {
   /** AI-generated image caption from the BLIP service. */
   caption?: string | null;
 
+  /** Background AI caption generation state. */
+  captionStatus?: "pending" | "processing" | "ready" | "failed" | "not_applicable" | string;
+
   fileSize?: number;
 
   folderId?: string | null;

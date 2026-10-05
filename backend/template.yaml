@@ -229,6 +229,29 @@ Resources:
       Events:
 
         # ------------------------------------------
+        # Background AI caption worker
+        # ------------------------------------------
+        # Runs after a file is uploaded to S3.
+        # The worker waits for /photos/confirm metadata if
+        # the S3 event arrives before the API confirmation.
+
+        CaptionWorker:
+          Type: S3
+
+          Properties:
+
+            Bucket: !Ref PhotosBucket
+
+            Events:
+              - s3:ObjectCreated:Put
+
+            Filter:
+              S3Key:
+                Rules:
+                  - Name: prefix
+                    Value: photos/
+
+        # ------------------------------------------
         # Root
         # ------------------------------------------
 
