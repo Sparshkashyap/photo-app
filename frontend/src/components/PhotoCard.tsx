@@ -17,7 +17,7 @@ import { createPortal } from "react-dom";
 import { toast } from "sonner";
 
 import { PhotoMenu } from "@/components/PhotoMenu";
-import { requestDownloadUrl } from "@/services/api";
+import { generatePhotoCaption, requestDownloadUrl } from "@/services/api";
 
 import type { Folder } from "@/types/folder";
 import type { Photo } from "@/types/photo";
@@ -85,6 +85,10 @@ export function PhotoCard({
 
   const [isFavorite, setIsFavorite] = useState(photo.isFavorite === true);
 
+  const [caption, setCaption] = useState(photo.caption ?? null);
+
+  const [generatingCaption, setGeneratingCaption] = useState(false);
+
   useEffect(() => {
     const refreshSettings = () => {
       setSettings(getSettings());
@@ -103,7 +107,8 @@ export function PhotoCard({
 
   useEffect(() => {
     setIsFavorite(photo.isFavorite === true);
-  }, [photo.isFavorite]);
+    setCaption(photo.caption ?? null);
+  }, [photo.isFavorite, photo.caption]);
 
   useEffect(() => {
     setMediaError(false);
@@ -153,6 +158,24 @@ export function PhotoCard({
   const autoplayVideos = settings.autoplayVideos === true;
 
   const showFileNames = settings.showFileNames !== false;
+
+  async function handleGenerateCaption() {
+    if (generatingCaption || isVideo || isAudio) return;
+
+    setGeneratingCaption(true);
+    try {
+      const response = await generatePhotoCaption(photo.photoId);
+      setCaption(response.caption);
+      toast.success("AI caption generated", { description: response.caption });
+    } catch (error) {
+      console.error("AI caption generation failed:", error);
+      toast.error("AI caption generation failed", {
+        description: error instanceof Error ? error.message : "Please try again.",
+      });
+    } finally {
+      setGeneratingCaption(false);
+    }
+  }
 
   async function handleDownload() {
     if (downloading) {
@@ -685,7 +708,7 @@ export function PhotoCard({
             </div>
           ) : null}
 
-          {showFileNames || photo.caption ? (
+          {showFileNames || caption ? (
             <figcaption
               className="
                 pointer-events-none
@@ -702,10 +725,10 @@ export function PhotoCard({
                 <div className="truncate text-xs font-semibold">{displayName}</div>
               ) : null}
 
-              {photo.caption ? (
+              {caption ? (
                 <div className="mt-1 flex items-start gap-1.5 text-[11px] font-medium leading-4 text-white/90">
                   <Sparkles className="mt-0.5 size-3 shrink-0" aria-hidden="true" />
-                  <span className="line-clamp-2">{photo.caption}</span>
+                  <span className="line-clamp-2">{caption}</span>
                 </div>
               ) : null}
             </figcaption>
@@ -722,6 +745,22 @@ export function PhotoCard({
             onDoubleClick={(event) => event.stopPropagation()}
             onKeyDown={(event) => event.stopPropagation()}
           >
+            {!isVideo && !isAudio ? (
+              <button
+                type="button"
+                onClick={(event) => {
+                  event.stopPropagation();
+                  void handleGenerateCaption();
+                }}
+                disabled={generatingCaption}
+                className="mr-2 inline-flex size-8 items-center justify-center rounded-full bg-black/55 text-white shadow backdrop-blur-sm transition hover:bg-black/75 disabled:opacity-70"
+                title={caption ? "Regenerate AI caption" : "Generate AI caption"}
+                aria-label={caption ? "Regenerate AI caption" : "Generate AI caption"}
+              >
+                {generatingCaption ? <Loader2 className="size-4 animate-spin" /> : <Sparkles className="size-4" />}
+              </button>
+            ) : null}
+
             <PhotoMenu
               photo={photo}
               folders={folders}
@@ -920,10 +959,10 @@ export function PhotoCard({
                   />
                 )}
 
-                {photo.caption ? (
+                {caption ? (
                   <div className="pointer-events-none absolute bottom-3 left-1/2 z-[105] flex max-w-[min(92vw,720px)] -translate-x-1/2 items-start gap-2 rounded-xl border border-white/10 bg-black/65 px-4 py-3 text-sm font-medium text-white backdrop-blur sm:bottom-5">
                     <Sparkles className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
-                    <span className="text-center leading-5">{photo.caption}</span>
+                    <span className="text-center leading-5">{caption}</span>
                   </div>
                 ) : null}
               </div>

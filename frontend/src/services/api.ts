@@ -522,6 +522,21 @@ export type GetPhotosResponse = {
   photos: PhotoApiItem[];
 };
 
+export type GenerateCaptionResponse = {
+  success: boolean;
+  message: string;
+  caption: string;
+};
+
+export async function generatePhotoCaption(
+  photoId: string,
+): Promise<GenerateCaptionResponse> {
+  return request<GenerateCaptionResponse>(
+    `/photos/${encodeURIComponent(photoId)}/caption`,
+    { method: "POST", auth: true },
+  );
+}
+
 export async function getPhotos(options: GetPhotosOptions = {}): Promise<GetPhotosResponse> {
   const params = new URLSearchParams();
 

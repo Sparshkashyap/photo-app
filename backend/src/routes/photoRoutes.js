@@ -5,6 +5,7 @@ const authMiddleware = require("../middleware/authMiddleware");
 const {
   uploadUrl,
   confirmUpload,
+  generateCaptionForPhoto,
   getPhotos,
   getPhoto,
   renamePhoto,
@@ -34,6 +35,13 @@ router.post(
   "/confirm",
   authMiddleware,
   confirmUpload,
+);
+
+// POST /photos/:photoId/caption
+router.post(
+  "/:photoId/caption",
+  authMiddleware,
+  generateCaptionForPhoto,
 );
 
 // ==================================================

@@ -694,6 +694,132 @@ const confirmUpload = async (
 };
 
 // ==================================================
+// GENERATE AI CAPTION FOR EXISTING PHOTO
+// POST /photos/:photoId/caption
+// ==================================================
+
+const generateCaptionForPhoto = async (
+  req,
+  res,
+  next,
+) => {
+  try {
+    const { photoId } = req.params;
+    const userId = getUserId(req);
+
+    if (!photoId) {
+      return res.status(400).json({
+        success: false,
+        message: "photoId is required",
+      });
+    }
+
+    const result = await dynamoDb.send(
+      new GetCommand({
+        TableName: getTableName(),
+        Key: { photoId },
+      }),
+    );
+
+    const photo = result.Item;
+
+    if (!photo) {
+      return res.status(404).json({
+        success: false,
+        message: "Photo not found",
+      });
+    }
+
+    if (photo.userId !== userId) {
+      return res.status(403).json({
+        success: false,
+        message: "You are not allowed to access this photo",
+      });
+    }
+
+    if (photo.isTrashed === true) {
+      return res.status(400).json({
+        success: false,
+        message: "Restore the photo before generating a caption",
+      });
+    }
+
+    const mediaType =
+      photo.mediaType || getMediaType(photo.contentType);
+
+    if (mediaType !== "image") {
+      return res.status(400).json({
+        success: false,
+        message: "AI captions are available only for images",
+      });
+    }
+
+    const objectResult = await s3.send(
+      new GetObjectCommand({
+        Bucket: getBucketName(),
+        Key: photo.s3Key,
+      }),
+    );
+
+    if (!objectResult.Body) {
+      return res.status(404).json({
+        success: false,
+        message: "Photo file could not be loaded",
+      });
+    }
+
+    const imageBuffer = Buffer.from(
+      await objectResult.Body.transformToByteArray(),
+    );
+
+    const aiResult = await generateImageCaption({
+      imageBuffer,
+      fileName: photo.fileName || photo.originalFileName || "image.jpg",
+      contentType: photo.contentType || "image/jpeg",
+    });
+
+    const caption =
+      typeof aiResult?.caption === "string"
+        ? aiResult.caption.trim()
+        : "";
+
+    if (!aiResult?.success || !caption) {
+      return res.status(502).json({
+        success: false,
+        message: "AI caption could not be generated",
+      });
+    }
+
+    const updatedAt = new Date().toISOString();
+
+    await dynamoDb.send(
+      new UpdateCommand({
+        TableName: getTableName(),
+        Key: { photoId },
+        UpdateExpression: "SET caption = :caption, updatedAt = :updatedAt",
+        ExpressionAttributeValues: {
+          ":caption": caption,
+          ":updatedAt": updatedAt,
+        },
+      }),
+    );
+
+    return res.status(200).json({
+      success: true,
+      message: "AI caption generated",
+      caption,
+    });
+  } catch (error) {
+    console.error(
+      "Generate AI caption error:",
+      error,
+    );
+
+    next(error);
+  }
+};
+
+// ==================================================
 // GET CURRENT USER PHOTOS
 // GET /photos
 // ==================================================
@@ -2111,6 +2237,7 @@ const getFavoritePhotos = async (
 module.exports = {
   uploadUrl,
   confirmUpload,
+  generateCaptionForPhoto,
   getPhotos,
   getPhoto,
   renamePhoto,
