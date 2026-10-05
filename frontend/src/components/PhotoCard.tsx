@@ -1,4 +1,4 @@
-import { FileAudio, Heart, ImageOff, Loader2, Play, RotateCw, Video, X } from "lucide-react";
+import { FileAudio, Heart, ImageOff, Loader2, Play, RotateCw, Sparkles, Video, X } from "lucide-react";
 
 import { useEffect, useState, type KeyboardEvent as ReactKeyboardEvent } from "react";
 
@@ -675,7 +675,7 @@ export function PhotoCard({
             </div>
           ) : null}
 
-          {showFileNames ? (
+          {showFileNames || photo.caption ? (
             <figcaption
               className="
                 pointer-events-none
@@ -683,15 +683,21 @@ export function PhotoCard({
                 inset-x-3
                 bottom-3
                 z-[9]
-                truncate
                 pr-12
-                text-xs
-                font-semibold
                 text-white
                 drop-shadow-[0_1px_3px_rgba(0,0,0,0.9)]
               "
             >
-              {displayName}
+              {showFileNames ? (
+                <div className="truncate text-xs font-semibold">{displayName}</div>
+              ) : null}
+
+              {photo.caption ? (
+                <div className="mt-1 flex items-start gap-1.5 text-[11px] font-medium leading-4 text-white/90">
+                  <Sparkles className="mt-0.5 size-3 shrink-0" aria-hidden="true" />
+                  <span className="line-clamp-2">{photo.caption}</span>
+                </div>
+              ) : null}
             </figcaption>
           ) : null}
 
@@ -903,6 +909,13 @@ export function PhotoCard({
                     "
                   />
                 )}
+
+                {photo.caption ? (
+                  <div className="pointer-events-none absolute bottom-3 left-1/2 z-[105] flex max-w-[min(92vw,720px)] -translate-x-1/2 items-start gap-2 rounded-xl border border-white/10 bg-black/65 px-4 py-3 text-sm font-medium text-white backdrop-blur sm:bottom-5">
+                    <Sparkles className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
+                    <span className="text-center leading-5">{photo.caption}</span>
+                  </div>
+                ) : null}
               </div>
 
               {showFileNames ? (

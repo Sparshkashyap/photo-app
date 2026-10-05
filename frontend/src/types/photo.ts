@@ -24,6 +24,9 @@ export interface Photo {
 
   mediaType?: MediaType;
 
+  /** AI-generated image caption from the BLIP service. */
+  caption?: string | null;
+
   fileSize?: number;
 
   folderId?: string | null;
@@ -89,6 +92,9 @@ export interface SharedPhoto {
   contentType: string;
 
   mediaType?: MediaType;
+
+  /** AI-generated image caption from the BLIP service. */
+  caption?: string | null;
 
   fileSize?: number;
 

@@ -29,7 +29,7 @@ import { confirmUpload, requestUploadUrl, uploadToPresignedUrl } from "@/service
 
 import type { Photo } from "@/types/photo";
 
-type Status = "idle" | "uploading" | "success";
+type Status = "idle" | "uploading" | "processing" | "success";
 
 export function UploadPhoto({
   open,
@@ -193,8 +193,10 @@ export function UploadPhoto({
       await uploadToPresignedUrl(uploadUrl, file, setProgress);
 
       // ------------------------------------------------
-      // 3. Save DynamoDB metadata
+      // 3. Save metadata + generate AI caption
       // ------------------------------------------------
+
+      setStatus("processing");
 
       const response = await confirmUpload({
         photoId,
@@ -234,6 +236,8 @@ export function UploadPhoto({
         url: previewUrl ?? "",
 
         contentType: savedPhoto.contentType,
+
+        caption: savedPhoto.caption ?? null,
 
         mediaType: savedPhoto.mediaType ?? mediaType ?? "image",
 
@@ -277,7 +281,11 @@ export function UploadPhoto({
       setStatus("success");
       setProgress(100);
 
-      toast.success("Media uploaded successfully");
+      toast.success(
+        savedPhoto.caption
+          ? "Media uploaded and AI caption generated"
+          : "Media uploaded successfully",
+      );
 
       window.setTimeout(() => {
         reset();
@@ -860,7 +868,7 @@ export function UploadPhoto({
                       id="photo-name"
                       value={photoName}
                       maxLength={120}
-                      disabled={status === "uploading"}
+                      disabled={status === "uploading" || status === "processing"}
                       onChange={(event) => setPhotoName(event.target.value)}
                       placeholder="e.g. Vrindavan Trip"
                       className="
@@ -890,7 +898,7 @@ export function UploadPhoto({
                     PROGRESS
                 ================================================== */}
 
-                {status === "uploading" ? (
+                {status === "uploading" || status === "processing" ? (
                   <div
                     className="
                       min-w-0
@@ -933,7 +941,9 @@ export function UploadPhoto({
                           aria-hidden="true"
                         />
 
-                        <span className="truncate">Uploading media…</span>
+                        <span className="truncate">
+                          {status === "processing" ? "Generating AI caption…" : "Uploading media…"}
+                        </span>
                       </span>
 
                       <span
@@ -943,7 +953,7 @@ export function UploadPhoto({
                           tabular-nums
                         "
                       >
-                        {progress}%
+                        {status === "processing" ? "AI" : `${progress}%`}
                       </span>
                     </div>
 
@@ -1045,7 +1055,7 @@ export function UploadPhoto({
                   reset();
                   onOpenChange(false);
                 }}
-                disabled={status === "uploading"}
+                disabled={status === "uploading" || status === "processing"}
                 className="
                   w-full
                   transition-transform
@@ -1059,7 +1069,7 @@ export function UploadPhoto({
               <Button
                 type="button"
                 onClick={handleUpload}
-                disabled={status === "uploading" || !photoName.trim()}
+                disabled={status === "uploading" || status === "processing" || !photoName.trim()}
                 className="
                   w-full
                   transition-transform
@@ -1067,7 +1077,7 @@ export function UploadPhoto({
                   sm:w-auto
                 "
               >
-                {status === "uploading" ? (
+                {status === "uploading" || status === "processing" ? (
                   <Loader2
                     className="
                       size-4
@@ -1079,7 +1089,7 @@ export function UploadPhoto({
                   <UploadCloud className="size-4" aria-hidden="true" />
                 )}
 
-                {status === "uploading" ? "Uploading…" : "Upload media"}
+                {status === "uploading" ? "Uploading…" : status === "processing" ? "Generating AI caption…" : "Upload media"}
               </Button>
             </div>
           ) : null}

@@ -200,6 +200,10 @@ function DashboardPage() {
 
         contentType: photo.contentType || "image/jpeg",
 
+        mediaType: photo.mediaType ?? "unknown",
+
+        caption: photo.caption ?? null,
+
         fileSize: photo.fileSize ?? 0,
 
         url: photo.downloadUrl || photo.url || "",
@@ -207,6 +211,8 @@ function DashboardPage() {
         downloadUrl: photo.downloadUrl || photo.url || "",
 
         folderId: photo.folderId ?? null,
+
+        isFavorite: photo.isFavorite ?? false,
 
         isTrashed: photo.isTrashed ?? false,
 

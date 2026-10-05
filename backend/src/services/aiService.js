@@ -1,9 +1,11 @@
+// backend/src/services/aiService.js
+
 const axios = require("axios");
 const FormData = require("form-data");
 
 const AI_SERVICE_URL =
   process.env.AI_SERVICE_URL ||
-  "http://127.0.0.1:8000";
+  "https://photo-app-ai-service.tech.blitz.cloud";
 
 const generateImageCaption = async ({
   imageBuffer,
@@ -44,7 +46,7 @@ const generateImageCaption = async ({
             Infinity,
 
           timeout:
-            120000,
+            150000,
         },
       );
 

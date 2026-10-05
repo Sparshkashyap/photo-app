@@ -493,6 +493,8 @@ export type PhotoApiItem = {
 
   mediaType?: "image" | "video" | "audio" | "unknown";
 
+  caption?: string | null;
+
   fileSize: number;
 
   createdAt: string;

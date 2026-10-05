@@ -91,6 +91,10 @@ function FavoritesPage() {
 
             contentType: photo.contentType,
 
+            mediaType: photo.mediaType ?? "unknown",
+
+            caption: photo.caption ?? null,
+
             fileSize: photo.fileSize,
 
             url: photo.downloadUrl || photo.url || "",

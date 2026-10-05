@@ -1,3 +1,5 @@
+// backend/src/controllers/photoController.js
+
 const {
   S3Client,
   PutObjectCommand,
@@ -20,6 +22,10 @@ const {
 const {
   getSignedUrl,
 } = require("@aws-sdk/s3-request-presigner");
+
+const {
+  generateImageCaption,
+} = require("../services/aiService");
 
 const crypto = require("crypto");
 const path = require("path");
@@ -544,6 +550,63 @@ const confirmUpload = async (
       );
 
     // ==================================================
+    // AI IMAGE CAPTION
+    // ==================================================
+
+    let caption = null;
+
+    if (
+      mediaType === "image"
+    ) {
+      try {
+        const objectResult =
+          await s3.send(
+            new GetObjectCommand({
+              Bucket:
+                getBucketName(),
+
+              Key:
+                key,
+            }),
+          );
+
+        if (
+          objectResult.Body
+        ) {
+          const imageBuffer =
+            Buffer.from(
+              await objectResult.Body.transformToByteArray(),
+            );
+
+          const aiResult =
+            await generateImageCaption({
+              imageBuffer,
+
+              fileName,
+
+              contentType:
+                actualContentType,
+            });
+
+          if (
+            aiResult?.success &&
+            typeof aiResult.caption ===
+              "string"
+          ) {
+            caption =
+              aiResult.caption.trim() ||
+              null;
+          }
+        }
+      } catch (aiError) {
+        console.error(
+          "AI caption generation failed. Saving photo without caption:",
+          aiError,
+        );
+      }
+    }
+
+    // ==================================================
     // SAVE DYNAMODB METADATA
     // ==================================================
 
@@ -571,6 +634,12 @@ const confirmUpload = async (
         actualContentType,
 
       mediaType,
+
+      ...(caption
+        ? {
+            caption,
+          }
+        : {}),
 
       fileSize:
         actualFileSize,

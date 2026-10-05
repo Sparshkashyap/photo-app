@@ -7,7 +7,7 @@ Description: Serverless backend for Photo App
 Globals:
   Function:
     Runtime: nodejs24.x
-    Timeout: 20
+    Timeout: 180
     MemorySize: 512
 
     Environment:
@@ -59,6 +59,14 @@ Globals:
         # when deploying the production frontend.
         #
         FRONTEND_URL: "https://main.ddvgp5hdlanze.amplifyapp.com"
+
+
+
+        # ==================================================
+        # AI SERVICE
+        # ==================================================
+
+        AI_SERVICE_URL: "https://photo-app-ai-service.tech.blitz.cloud"
 
         # ==================================================
         # GOOGLE OAUTH
