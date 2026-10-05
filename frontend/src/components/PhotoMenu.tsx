@@ -17,6 +17,7 @@ import {
   Pencil,
   Ruler,
   Share2,
+  Sparkles,
   Trash2,
   Video,
 } from "lucide-react";
@@ -43,6 +44,7 @@ import {
   renamePhoto,
   setFavorite,
   trashPhoto,
+  generatePhotoCaption,
 } from "@/services/api";
 
 import type { Folder } from "@/types/folder";
@@ -57,6 +59,7 @@ type PhotoMenuProps = {
   onTrashed?: (photo: Photo) => void;
   onFavorite?: (photo: Photo) => void;
   onView?: () => void;
+  onCaptionChange?: (photo: Photo, caption: string) => void;
 };
 
 type MenuPosition = {
@@ -156,6 +159,7 @@ export function PhotoMenu({
   onTrashed,
   onFavorite,
   onView,
+  onCaptionChange,
 }: PhotoMenuProps) {
   const [menuOpen, setMenuOpen] = useState(false);
   const [renameOpen, setRenameOpen] = useState(false);
@@ -173,6 +177,7 @@ export function PhotoMenu({
   const [deleting, setDeleting] = useState(false);
   const [sharing, setSharing] = useState(false);
   const [favoriting, setFavoriting] = useState(false);
+  const [generatingCaption, setGeneratingCaption] = useState(false);
   const [copied, setCopied] = useState(false);
 
   const [isFavorite, setIsFavorite] = useState(photo.isFavorite === true);
@@ -357,6 +362,33 @@ export function PhotoMenu({
 
   function closeMenu() {
     setMenuOpen(false);
+  }
+
+  async function handleGenerateCaption() {
+    if (generatingCaption || !photo.contentType?.startsWith("image/")) {
+      return;
+    }
+
+    setGeneratingCaption(true);
+
+    try {
+      const response = await generatePhotoCaption(photo.photoId);
+
+      onCaptionChange?.(photo, response.caption);
+      closeMenu();
+
+      toast.success("Caption added", {
+        description: response.caption,
+      });
+    } catch (error) {
+      console.error("AI caption generation failed:", error);
+
+      toast.error("Couldn't generate a caption", {
+        description: error instanceof Error ? error.message : "Please try again.",
+      });
+    } finally {
+      setGeneratingCaption(false);
+    }
   }
 
   async function handleFavorite() {
@@ -742,6 +774,27 @@ export function PhotoMenu({
             <Eye className="size-4 shrink-0 text-muted-foreground" />
             <span>View</span>
           </button>
+
+          {photo.contentType?.startsWith("image/") ? (
+            <button
+              type="button"
+              role="menuitem"
+              tabIndex={-1}
+              onClick={() => {
+                void handleGenerateCaption();
+              }}
+              disabled={generatingCaption}
+              className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm transition-colors duration-100 hover:bg-accent focus:bg-accent focus:outline-none disabled:cursor-not-allowed disabled:opacity-60 sm:hidden"
+            >
+              {generatingCaption ? (
+                <Loader2 className="size-4 shrink-0 animate-spin text-muted-foreground" />
+              ) : (
+                <Sparkles className="size-4 shrink-0 text-muted-foreground" />
+              )}
+
+              <span>{generatingCaption ? "Generating caption..." : "Generate AI caption"}</span>
+            </button>
+          ) : null}
 
           <button
             type="button"

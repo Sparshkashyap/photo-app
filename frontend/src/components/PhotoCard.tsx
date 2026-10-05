@@ -78,7 +78,9 @@ export function PhotoCard({
   const [retryKey, setRetryKey] = useState(0);
 
   const [isFavorite, setIsFavorite] = useState(photo.isFavorite === true);
+
   const [caption, setCaption] = useState(photo.caption ?? null);
+
   const [generatingCaption, setGeneratingCaption] = useState(false);
 
   useEffect(() => {
@@ -89,6 +91,7 @@ export function PhotoCard({
 
     return () => {
       window.removeEventListener("storage", refreshSettings);
+
       window.removeEventListener(SETTINGS_CHANGED_EVENT, refreshSettings);
     };
   }, []);
@@ -105,22 +108,31 @@ export function PhotoCard({
   }, [photo.photoId]);
 
   const isVideo = photo.contentType?.startsWith("video/") ?? false;
+
   const isAudio = photo.contentType?.startsWith("audio/") ?? false;
+
   const isImage = !isVideo && !isAudio;
 
   const baseUrl = photo.url || photo.downloadUrl || "";
+
   const mediaUrl = useMemo(() => {
-    if (!baseUrl || retryKey === 0) return baseUrl;
+    if (!baseUrl || retryKey === 0) {
+      return baseUrl;
+    }
 
     return `${baseUrl}${baseUrl.includes("?") ? "&" : "?"}retry=${retryKey}`;
   }, [baseUrl, retryKey]);
 
   const displayName = photo.name || photo.fileName || photo.originalFileName || "Untitled";
+
   const autoplayVideos = settings.autoplayVideos === true;
+
   const showFileNames = settings.showFileNames !== false;
 
   async function handleGenerateCaption() {
-    if (generatingCaption || !isImage) return;
+    if (generatingCaption || !isImage) {
+      return;
+    }
 
     setGeneratingCaption(true);
 
@@ -128,9 +140,12 @@ export function PhotoCard({
       const response = await generatePhotoCaption(photo.photoId);
 
       setCaption(response.caption);
+
       onCaptionChange?.(photo, response.caption);
 
-      toast.success("Caption added", { description: response.caption });
+      toast.success("Caption added", {
+        description: response.caption,
+      });
     } catch (error) {
       console.error("AI caption generation failed:", error);
 
@@ -143,7 +158,9 @@ export function PhotoCard({
   }
 
   async function handleDownload() {
-    if (downloading) return;
+    if (downloading) {
+      return;
+    }
 
     setDownloading(true);
 
@@ -153,15 +170,21 @@ export function PhotoCard({
       const link = document.createElement("a");
 
       link.href = response.downloadUrl;
+
       link.download = photo.name || photo.fileName || "photo";
+
       link.target = "_blank";
       link.rel = "noopener noreferrer";
 
       document.body.appendChild(link);
+
       link.click();
+
       link.remove();
 
-      toast.success("Download started", { description: displayName });
+      toast.success("Download started", {
+        description: displayName,
+      });
     } catch (error) {
       console.error("Download failed:", error);
 
@@ -174,7 +197,9 @@ export function PhotoCard({
   }
 
   function handleOpen() {
-    if (!mediaUrl || mediaError) return;
+    if (!mediaUrl || mediaError) {
+      return;
+    }
 
     if (onOpen) {
       onOpen(photo);
@@ -184,8 +209,11 @@ export function PhotoCard({
   }
 
   function handleKeyDown(event: ReactKeyboardEvent<HTMLElement>) {
-    // Only react when the tile itself is focused, not the buttons inside it.
-    if (event.target !== event.currentTarget) return;
+    // Only react when the tile itself is focused,
+    // not the buttons inside it.
+    if (event.target !== event.currentTarget) {
+      return;
+    }
 
     if (event.key === "Enter" || event.key === " ") {
       event.preventDefault();
@@ -206,16 +234,19 @@ export function PhotoCard({
   function handleRetry() {
     setMediaError(false);
     setMediaLoaded(false);
+
     setRetryKey((key) => key + 1);
   }
 
   function handleFavorite(updatedPhoto: Photo) {
     setIsFavorite(updatedPhoto.isFavorite === true);
+
     onFavorite?.(updatedPhoto);
   }
 
   const stopPropagation = {
     onClick: (event: { stopPropagation: () => void }) => event.stopPropagation(),
+
     onKeyDown: (event: { stopPropagation: () => void }) => event.stopPropagation(),
   };
 
@@ -235,7 +266,7 @@ export function PhotoCard({
             canOpen ? "cursor-zoom-in" : "cursor-default"
           }`}
         >
-          {/* Blurred backdrop: fills the space around uncropped images */}
+          {/* Blurred backdrop */}
           {isImage && mediaUrl && !mediaError ? (
             <>
               <img
@@ -244,6 +275,7 @@ export function PhotoCard({
                 aria-hidden="true"
                 className="absolute inset-0 h-full w-full scale-110 object-cover opacity-40 blur-2xl"
               />
+
               <div className="absolute inset-0 bg-black/30" />
             </>
           ) : null}
@@ -284,7 +316,7 @@ export function PhotoCard({
             </div>
           ) : null}
 
-          {/* Image: fills the tile for a clean, even grid */}
+          {/* Image */}
           {!mediaError && mediaUrl && isImage ? (
             <img
               key={mediaUrl}
@@ -350,7 +382,7 @@ export function PhotoCard({
             </div>
           ) : null}
 
-          {/* Legibility gradient: always on for touch, fades in on hover for mouse */}
+          {/* Legibility gradient */}
           {showFileNames || caption ? (
             <div className="pointer-events-none absolute inset-x-0 bottom-0 z-[8] h-28 bg-gradient-to-t from-black/75 via-black/25 to-transparent sm:opacity-0 sm:transition-opacity sm:duration-200 sm:group-hover:opacity-100 sm:group-focus-within:opacity-100" />
           ) : null}
@@ -377,6 +409,7 @@ export function PhotoCard({
               {caption ? (
                 <div className="mt-1 flex items-start gap-1.5 text-[11px] font-medium leading-4 text-white/90">
                   <Sparkles className="mt-0.5 size-3 shrink-0" aria-hidden="true" />
+
                   <span className="line-clamp-2">{caption}</span>
                 </div>
               ) : null}
@@ -390,7 +423,7 @@ export function PhotoCard({
                 type="button"
                 onClick={() => void handleGenerateCaption()}
                 disabled={generatingCaption}
-                className={`${revealOnHover} inline-flex size-9 items-center justify-center rounded-full border border-white/10 bg-black/55 text-white shadow backdrop-blur-sm hover:bg-black/75 focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/60 disabled:opacity-100`}
+                className={`${revealOnHover} hidden sm:inline-flex size-9 items-center justify-center rounded-full border border-white/10 bg-black/55 text-white shadow backdrop-blur-sm hover:bg-black/75 focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/60 disabled:opacity-100`}
                 title={caption ? "Regenerate caption" : "Generate caption"}
                 aria-label={caption ? "Regenerate caption" : "Generate caption"}
               >
@@ -410,7 +443,15 @@ export function PhotoCard({
               onDownload={() => void handleDownload()}
               onTrashed={onTrashed ?? (() => {})}
               onFavorite={handleFavorite}
-              onView={handleOpen}
+              onView={() => {
+                if (onOpen) {
+                  onOpen(photo);
+                  return;
+                }
+
+                handleOpen();
+              }}
+              onCaptionChange={onCaptionChange ?? (() => {})}
             />
           </div>
 
@@ -431,11 +472,17 @@ export function PhotoCard({
 
       {previewOpen ? (
         <PhotoLightbox
-          photos={[{ ...photo, ...(caption ? { caption } : {}) }]}
+          photos={[
+            {
+              ...photo,
+              ...(caption ? { caption } : {}),
+            },
+          ]}
           index={0}
           showFileNames={showFileNames}
           onIndexChange={() => {}}
           onClose={() => setPreviewOpen(false)}
+          onCaptionChange={onCaptionChange}
         />
       ) : null}
     </>
