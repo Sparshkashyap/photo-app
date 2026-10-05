@@ -7,15 +7,13 @@ import {
   RotateCw,
   Sparkles,
   Video,
-  X,
 } from "lucide-react";
 
-import { useEffect, useState, type KeyboardEvent as ReactKeyboardEvent } from "react";
-
-import { createPortal } from "react-dom";
+import { useEffect, useMemo, useState, type KeyboardEvent as ReactKeyboardEvent } from "react";
 
 import { toast } from "sonner";
 
+import { PhotoLightbox } from "@/components/Photolightbox";
 import { PhotoMenu } from "@/components/PhotoMenu";
 import { generatePhotoCaption, requestDownloadUrl } from "@/services/api";
 
@@ -27,12 +25,18 @@ type PhotoCardProps = {
   folders: Folder[];
 
   onRenamed?: (photo: Photo) => void;
-
   onMoved?: (photo: Photo, folderId: string | null) => void;
-
   onTrashed?: (photo: Photo) => void;
-
   onFavorite?: (photo: Photo) => void;
+
+  /**
+   * When provided, the parent owns the preview (so it can offer prev/next
+   * across the whole gallery). When omitted, the card opens its own viewer.
+   */
+  onOpen?: ((photo: Photo) => void) | undefined;
+
+  /** Called after an AI caption is generated so the parent can keep it. */
+  onCaptionChange?: ((photo: Photo, caption: string) => void) | undefined;
 };
 
 type PhotoAppSettings = {
@@ -44,7 +48,6 @@ type PhotoAppSettings = {
 };
 
 const SETTINGS_KEY = "photo-app-settings";
-
 const SETTINGS_CHANGED_EVENT = "photo-app-settings-changed";
 
 function getSettings(): PhotoAppSettings {
@@ -55,15 +58,15 @@ function getSettings(): PhotoAppSettings {
   try {
     const stored = localStorage.getItem(SETTINGS_KEY);
 
-    if (!stored) {
-      return {};
-    }
-
-    return JSON.parse(stored) as PhotoAppSettings;
+    return stored ? (JSON.parse(stored) as PhotoAppSettings) : {};
   } catch {
     return {};
   }
 }
+
+// Controls fade in on hover/focus for mouse users, and stay visible on touch.
+const revealOnHover =
+  "transition-opacity duration-150 sm:opacity-0 sm:group-hover:opacity-100 sm:group-focus-within:opacity-100";
 
 export function PhotoCard({
   photo,
@@ -72,35 +75,29 @@ export function PhotoCard({
   onMoved,
   onTrashed,
   onFavorite,
+  onOpen,
+  onCaptionChange,
 }: PhotoCardProps) {
   const [downloading, setDownloading] = useState(false);
-
   const [previewOpen, setPreviewOpen] = useState(false);
-
   const [settings, setSettings] = useState<PhotoAppSettings>(getSettings);
 
   const [mediaError, setMediaError] = useState(false);
-
   const [mediaLoaded, setMediaLoaded] = useState(false);
+  const [retryKey, setRetryKey] = useState(0);
 
   const [isFavorite, setIsFavorite] = useState(photo.isFavorite === true);
-
   const [caption, setCaption] = useState(photo.caption ?? null);
-
   const [generatingCaption, setGeneratingCaption] = useState(false);
 
   useEffect(() => {
-    const refreshSettings = () => {
-      setSettings(getSettings());
-    };
+    const refreshSettings = () => setSettings(getSettings());
 
     window.addEventListener("storage", refreshSettings);
-
     window.addEventListener(SETTINGS_CHANGED_EVENT, refreshSettings);
 
     return () => {
       window.removeEventListener("storage", refreshSettings);
-
       window.removeEventListener(SETTINGS_CHANGED_EVENT, refreshSettings);
     };
   }, []);
@@ -113,63 +110,40 @@ export function PhotoCard({
   useEffect(() => {
     setMediaError(false);
     setMediaLoaded(false);
+    setRetryKey(0);
   }, [photo.photoId]);
 
-  useEffect(() => {
-    if (!previewOpen) {
-      return;
-    }
-
-    const handleEscape = (event: KeyboardEvent) => {
-      if (event.key === "Escape") {
-        setPreviewOpen(false);
-      }
-    };
-
-    document.addEventListener("keydown", handleEscape);
-
-    return () => {
-      document.removeEventListener("keydown", handleEscape);
-    };
-  }, [previewOpen]);
-
-  useEffect(() => {
-    if (!previewOpen) {
-      return;
-    }
-
-    const previousOverflow = document.body.style.overflow;
-
-    document.body.style.overflow = "hidden";
-
-    return () => {
-      document.body.style.overflow = previousOverflow;
-    };
-  }, [previewOpen]);
-
   const isVideo = photo.contentType?.startsWith("video/") ?? false;
-
   const isAudio = photo.contentType?.startsWith("audio/") ?? false;
+  const isImage = !isVideo && !isAudio;
 
-  const mediaUrl = photo.url || photo.downloadUrl || "";
+  const baseUrl = photo.url || photo.downloadUrl || "";
+  const mediaUrl = useMemo(() => {
+    if (!baseUrl || retryKey === 0) return baseUrl;
+
+    return `${baseUrl}${baseUrl.includes("?") ? "&" : "?"}retry=${retryKey}`;
+  }, [baseUrl, retryKey]);
 
   const displayName = photo.name || photo.fileName || photo.originalFileName || "Untitled";
-
   const autoplayVideos = settings.autoplayVideos === true;
-
   const showFileNames = settings.showFileNames !== false;
 
   async function handleGenerateCaption() {
-    if (generatingCaption || isVideo || isAudio) return;
+    if (generatingCaption || !isImage) return;
 
     setGeneratingCaption(true);
+
     try {
       const response = await generatePhotoCaption(photo.photoId);
+
       setCaption(response.caption);
-      toast.success("AI caption generated", { description: response.caption });
+      onCaptionChange?.(photo, response.caption);
+
+      toast.success("Caption added", { description: response.caption });
     } catch (error) {
       console.error("AI caption generation failed:", error);
-      toast.error("AI caption generation failed", {
+
+      toast.error("Couldn't generate a caption", {
         description: error instanceof Error ? error.message : "Please try again.",
       });
     } finally {
@@ -178,9 +152,7 @@ export function PhotoCard({
   }
 
   async function handleDownload() {
-    if (downloading) {
-      return;
-    }
+    if (downloading) return;
 
     setDownloading(true);
 
@@ -190,22 +162,15 @@ export function PhotoCard({
       const link = document.createElement("a");
 
       link.href = response.downloadUrl;
-
       link.download = photo.name || photo.fileName || "photo";
-
       link.target = "_blank";
-
       link.rel = "noopener noreferrer";
 
       document.body.appendChild(link);
-
       link.click();
-
       link.remove();
 
-      toast.success("Download started", {
-        description: photo.name || photo.fileName || "Your file",
-      });
+      toast.success("Download started", { description: displayName });
     } catch (error) {
       console.error("Download failed:", error);
 
@@ -217,246 +182,99 @@ export function PhotoCard({
     }
   }
 
-  function handlePreviewOpen() {
-    if (!mediaUrl || mediaError) {
-      return;
-    }
+  function handleOpen() {
+    if (!mediaUrl || mediaError) return;
 
-    setPreviewOpen(true);
+    if (onOpen) {
+      onOpen(photo);
+    } else {
+      setPreviewOpen(true);
+    }
   }
 
-  function isInteractiveTarget(target: EventTarget | null) {
-    if (!(target instanceof HTMLElement)) {
-      return false;
-    }
+  function handleKeyDown(event: ReactKeyboardEvent<HTMLElement>) {
+    // Only react when the tile itself is focused, not the buttons inside it.
+    if (event.target !== event.currentTarget) return;
 
-    if (
-      target instanceof HTMLInputElement ||
-      target instanceof HTMLTextAreaElement ||
-      target instanceof HTMLSelectElement ||
-      target instanceof HTMLButtonElement ||
-      target instanceof HTMLVideoElement ||
-      target instanceof HTMLAudioElement
-    ) {
-      return true;
-    }
-
-    if (target.isContentEditable) {
-      return true;
-    }
-
-    return Boolean(
-      target.closest("input, textarea, select, button, video, audio, [contenteditable='true']"),
-    );
-  }
-
-  function handlePreviewKeyDown(event: ReactKeyboardEvent<HTMLElement>) {
-    if (isInteractiveTarget(event.target)) {
-      return;
-    }
-
-    if (event.key === "Enter") {
+    if (event.key === "Enter" || event.key === " ") {
       event.preventDefault();
-
-      handlePreviewOpen();
-    }
-  }
-
-  function handleCardKeyDownCapture(event: ReactKeyboardEvent<HTMLElement>) {
-    if (!isInteractiveTarget(event.target)) {
-      return;
-    }
-
-    if (event.key === " " || event.key === "Spacebar" || event.key === "Enter") {
-      event.stopPropagation();
+      handleOpen();
     }
   }
 
   function handleMediaLoaded() {
     setMediaLoaded(true);
-
     setMediaError(false);
   }
 
   function handleMediaError() {
     setMediaLoaded(false);
-
     setMediaError(true);
   }
 
-  function handleRetryMedia() {
+  function handleRetry() {
     setMediaError(false);
-
     setMediaLoaded(false);
-
-    const separator = mediaUrl.includes("?") ? "&" : "?";
-
-    const retryUrl = `${mediaUrl}${separator}retry=${Date.now()}`;
-
-    const mediaElement = document.querySelector(
-      `[data-photo-id="${photo.photoId}"] img, [data-photo-id="${photo.photoId}"] video`,
-    ) as HTMLImageElement | HTMLVideoElement | null;
-
-    if (mediaElement) {
-      mediaElement.src = retryUrl;
-
-      if (mediaElement instanceof HTMLVideoElement) {
-        mediaElement.load();
-      }
-    }
+    setRetryKey((key) => key + 1);
   }
 
   function handleFavorite(updatedPhoto: Photo) {
     setIsFavorite(updatedPhoto.isFavorite === true);
-
     onFavorite?.(updatedPhoto);
   }
 
+  const stopPropagation = {
+    onClick: (event: { stopPropagation: () => void }) => event.stopPropagation(),
+    onKeyDown: (event: { stopPropagation: () => void }) => event.stopPropagation(),
+  };
+
+  const canOpen = Boolean(mediaUrl) && !mediaError;
+
   return (
     <>
-      <figure
-        className="
-          group
-          relative
-          w-full
-          overflow-hidden
-          rounded-2xl
-          border
-          border-border
-          bg-background
-          shadow-sm
-          transition-all
-          duration-200
-          hover:-translate-y-0.5
-          hover:shadow-lg
-        "
-      >
+      <figure className="group relative w-full overflow-hidden rounded-2xl border border-border bg-muted shadow-sm transition-[box-shadow,transform] duration-200 hover:-translate-y-0.5 hover:shadow-lg motion-reduce:hover:translate-y-0">
         <div
           data-photo-id={photo.photoId}
-          onDoubleClick={handlePreviewOpen}
-          onKeyDownCapture={handleCardKeyDownCapture}
-          onKeyDown={handlePreviewKeyDown}
+          onClick={handleOpen}
+          onKeyDown={handleKeyDown}
           role="button"
           tabIndex={0}
-          aria-label={`Open ${displayName} preview`}
-          className="
-            relative
-            flex
-            aspect-square
-            w-full
-            items-center
-            justify-center
-            overflow-hidden
-            bg-black
-            outline-none
-            focus-visible:ring-2
-            focus-visible:ring-ring
-            focus-visible:ring-offset-2
-          "
+          aria-label={`Open ${displayName}`}
+          className={`relative flex aspect-square w-full items-center justify-center overflow-hidden bg-zinc-950 outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ${
+            canOpen ? "cursor-zoom-in" : "cursor-default"
+          }`}
         >
-          {!isVideo && !isAudio && mediaUrl && !mediaError ? (
-            <img
-              src={mediaUrl}
-              alt=""
-              aria-hidden="true"
-              className="
-                absolute
-                inset-0
-                h-full
-                w-full
-                scale-110
-                object-cover
-                opacity-40
-                blur-2xl
-                transition-transform
-                duration-500
-                ease-out
-                group-hover:scale-125
-              "
-            />
-          ) : (
-            <div
-              className="
-                absolute
-                inset-0
-                bg-gradient-to-br
-                from-black
-                via-zinc-900
-                to-black
-              "
-            />
-          )}
-
-          <div
-            className="
-              absolute
-              inset-0
-              bg-black/10
-              transition-colors
-              duration-200
-              group-hover:bg-black/0
-            "
-          />
-
-          {mediaUrl && !mediaError && !mediaLoaded ? (
-            <div
-              className="
-                absolute
-                inset-0
-                z-[1]
-                animate-pulse
-                bg-muted/30
-              "
-            />
+          {/* Blurred backdrop: fills the space around uncropped images */}
+          {isImage && mediaUrl && !mediaError ? (
+            <>
+              <img
+                src={mediaUrl}
+                alt=""
+                aria-hidden="true"
+                className="absolute inset-0 h-full w-full scale-110 object-cover opacity-40 blur-2xl"
+              />
+              <div className="absolute inset-0 bg-black/30" />
+            </>
           ) : null}
 
+          {/* Loading shimmer */}
+          {mediaUrl && !mediaError && !mediaLoaded && !isAudio ? (
+            <div className="absolute inset-0 z-[1] animate-pulse bg-muted-foreground/10" />
+          ) : null}
+
+          {/* Fallback / error */}
           {!mediaUrl || mediaError ? (
-            <div
-              className="
-                relative
-                z-[5]
-                flex
-                h-full
-                w-full
-                flex-col
-                items-center
-                justify-center
-                gap-3
-                bg-muted/80
-                p-4
-              "
-            >
+            <div className="relative z-[5] flex h-full w-full flex-col items-center justify-center gap-3 bg-muted p-4">
               {isVideo ? (
-                <Video
-                  className="
-                    size-10
-                    text-muted-foreground
-                  "
-                />
+                <Video className="size-10 text-muted-foreground" />
               ) : isAudio ? (
-                <FileAudio
-                  className="
-                    size-10
-                    text-muted-foreground
-                  "
-                />
+                <FileAudio className="size-10 text-muted-foreground" />
               ) : (
-                <ImageOff
-                  className="
-                    size-10
-                    text-muted-foreground
-                  "
-                />
+                <ImageOff className="size-10 text-muted-foreground" />
               )}
 
-              <span
-                className="
-                  text-center
-                  text-xs
-                  text-muted-foreground
-                "
-              >
-                {mediaError ? "Unable to load media" : "Preview unavailable"}
+              <span className="text-center text-xs text-muted-foreground">
+                {mediaError ? "Couldn't load this file" : "No preview available"}
               </span>
 
               {mediaError ? (
@@ -464,161 +282,71 @@ export function PhotoCard({
                   type="button"
                   onClick={(event) => {
                     event.stopPropagation();
-
-                    handleRetryMedia();
+                    handleRetry();
                   }}
-                  onDoubleClick={(event) => {
-                    event.stopPropagation();
-                  }}
-                  className="
-                    inline-flex
-                    items-center
-                    gap-1.5
-                    rounded-full
-                    border
-                    border-border
-                    bg-background
-                    px-3
-                    py-1.5
-                    text-xs
-                    font-medium
-                    transition
-                    hover:bg-accent
-                    active:scale-95
-                  "
+                  className="inline-flex items-center gap-1.5 rounded-full border border-border bg-background px-3 py-1.5 text-xs font-medium transition hover:bg-accent active:scale-95"
                 >
                   <RotateCw className="size-3" />
-                  Retry
+                  Try again
                 </button>
               ) : null}
             </div>
           ) : null}
 
-          {!mediaError && mediaUrl && isVideo ? (
-            <div
-              className="
-                relative
-                z-[3]
-                flex
-                h-full
-                w-full
-                items-center
-                justify-center
-              "
-              onDoubleClick={(event) => {
-                event.stopPropagation();
+          {/* Image: fills the tile for a clean, even grid */}
+          {!mediaError && mediaUrl && isImage ? (
+            <img
+              key={mediaUrl}
+              src={mediaUrl}
+              alt={displayName}
+              loading="lazy"
+              decoding="async"
+              onLoad={handleMediaLoaded}
+              onError={handleMediaError}
+              className={`relative z-[3] block h-full w-full object-contain transition-opacity duration-300 ${
+                mediaLoaded ? "opacity-100" : "opacity-0"
+              }`}
+            />
+          ) : null}
 
-                handlePreviewOpen();
-              }}
-            >
+          {/* Video */}
+          {!mediaError && mediaUrl && isVideo ? (
+            <div className="relative z-[3] flex h-full w-full items-center justify-center bg-black">
               <video
                 key={mediaUrl}
                 src={mediaUrl}
                 preload="metadata"
                 autoPlay={autoplayVideos}
-                muted={autoplayVideos}
+                muted
                 loop={autoplayVideos}
                 playsInline
                 onLoadedMetadata={handleMediaLoaded}
                 onLoadedData={handleMediaLoaded}
                 onError={handleMediaError}
-                className={`
-                  block
-                  h-auto
-                  w-auto
-                  max-h-full
-                  max-w-full
-                  object-contain
-                  transition-opacity
-                  duration-300
-                  ${mediaLoaded ? "opacity-100" : "opacity-0"}
-                `}
+                className={`block h-full w-full object-contain transition-opacity duration-300 ${
+                  mediaLoaded ? "opacity-100" : "opacity-0"
+                }`}
               />
 
               {!autoplayVideos ? (
-                <div
-                  className="
-                    pointer-events-none
-                    absolute
-                    left-1/2
-                    top-1/2
-                    flex
-                    size-12
-                    -translate-x-1/2
-                    -translate-y-1/2
-                    items-center
-                    justify-center
-                    rounded-full
-                    bg-black/60
-                    text-white
-                    shadow-xl
-                    backdrop-blur-sm
-                    transition-transform
-                    duration-200
-                    group-hover:scale-110
-                  "
-                >
-                  <Play
-                    className="
-                      ml-0.5
-                      size-5
-                      fill-current
-                    "
-                  />
+                <div className="pointer-events-none absolute left-1/2 top-1/2 flex size-12 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full bg-black/60 text-white shadow-xl backdrop-blur-sm transition-transform duration-200 group-hover:scale-110">
+                  <Play className="ml-0.5 size-5 fill-current" />
                 </div>
               ) : null}
 
-              <span
-                className="
-                  pointer-events-none
-                  absolute
-                  bottom-3
-                  left-3
-                  rounded-md
-                  bg-black/60
-                  px-2
-                  py-1
-                  text-[10px]
-                  font-semibold
-                  uppercase
-                  tracking-wide
-                  text-white
-                  backdrop-blur-sm
-                "
-              >
+              <span className="pointer-events-none absolute left-3 top-3 inline-flex items-center gap-1 rounded-md bg-black/60 px-2 py-1 text-[11px] font-semibold text-white backdrop-blur-sm">
+                <Video className="size-3" aria-hidden="true" />
                 Video
               </span>
             </div>
           ) : null}
 
+          {/* Audio */}
           {!mediaError && mediaUrl && isAudio ? (
-            <div
-              className="
-                relative
-                z-[3]
-                flex
-                h-full
-                w-full
-                flex-col
-                items-center
-                justify-center
-                gap-5
-                p-5
-              "
-            >
-              <FileAudio
-                className="
-                  size-14
-                  text-white
-                "
-              />
+            <div className="relative z-[3] flex h-full w-full flex-col items-center justify-center gap-5 bg-gradient-to-br from-zinc-900 via-zinc-800 to-zinc-900 p-5">
+              <FileAudio className="size-14 text-white" />
 
-              <div
-                className="w-full"
-                onClick={(event) => event.stopPropagation()}
-                onDoubleClick={(event) => event.stopPropagation()}
-                onKeyDown={(event) => event.stopPropagation()}
-              >
+              <div className="w-full" {...stopPropagation}>
                 <audio
                   src={mediaUrl}
                   controls
@@ -631,96 +359,26 @@ export function PhotoCard({
             </div>
           ) : null}
 
-          {!mediaError && mediaUrl && !isVideo && !isAudio ? (
-            <img
-              key={mediaUrl}
-              src={mediaUrl}
-              alt={displayName}
-              loading="lazy"
-              decoding="async"
-              onLoad={handleMediaLoaded}
-              onError={handleMediaError}
-              className={`
-                relative
-                z-[3]
-                block
-                h-auto
-                w-auto
-                max-h-full
-                max-w-full
-                object-contain
-                transition-opacity
-                duration-300
-                ${mediaLoaded ? "opacity-100" : "opacity-0"}
-              `}
-            />
+          {/* Legibility gradient: always on for touch, fades in on hover for mouse */}
+          {showFileNames || caption ? (
+            <div className="pointer-events-none absolute inset-x-0 bottom-0 z-[8] h-28 bg-gradient-to-t from-black/75 via-black/25 to-transparent sm:opacity-0 sm:transition-opacity sm:duration-200 sm:group-hover:opacity-100 sm:group-focus-within:opacity-100" />
           ) : null}
 
-          <div
-            className="
-              pointer-events-none
-              absolute
-              inset-x-0
-              bottom-0
-              z-[8]
-              h-28
-              bg-gradient-to-t
-              from-black/75
-              via-black/25
-              to-transparent
-              transition-opacity
-              duration-200
-              group-hover:opacity-100
-            "
-          />
-
+          {/* Favorite badge */}
           {isFavorite ? (
             <div
-              className="
-                pointer-events-none
-                absolute
-                left-3
-                top-3
-                z-10
-                flex
-                size-8
-                items-center
-                justify-center
-                rounded-full
-                bg-black/50
-                text-white
-                shadow
-                backdrop-blur-sm
-                motion-safe:animate-in
-                motion-safe:zoom-in-75
-                motion-safe:duration-200
-              "
+              className="pointer-events-none absolute bottom-3 right-3 z-10 flex size-8 items-center justify-center rounded-full bg-black/50 text-white shadow backdrop-blur-sm motion-safe:animate-in motion-safe:zoom-in-75 motion-safe:duration-200"
+              role="img"
               aria-label="Favorite"
               title="Favorite"
             >
-              <Heart
-                className="
-                  size-4
-                  fill-current
-                  text-rose-400
-                "
-              />
+              <Heart className="size-4 fill-current text-rose-400" />
             </div>
           ) : null}
 
+          {/* Name + caption */}
           {showFileNames || caption ? (
-            <figcaption
-              className="
-                pointer-events-none
-                absolute
-                inset-x-3
-                bottom-3
-                z-[9]
-                pr-12
-                text-white
-                drop-shadow-[0_1px_3px_rgba(0,0,0,0.9)]
-              "
-            >
+            <figcaption className="pointer-events-none absolute inset-x-3 bottom-3 z-[9] pr-11 text-white drop-shadow-[0_1px_3px_rgba(0,0,0,0.9)] sm:opacity-0 sm:transition-opacity sm:duration-200 sm:group-hover:opacity-100 sm:group-focus-within:opacity-100">
               {showFileNames ? (
                 <div className="truncate text-xs font-semibold">{displayName}</div>
               ) : null}
@@ -734,30 +392,22 @@ export function PhotoCard({
             </figcaption>
           ) : null}
 
-          <div
-            className="
-              absolute
-              right-2
-              top-2
-              z-20
-            "
-            onClick={(event) => event.stopPropagation()}
-            onDoubleClick={(event) => event.stopPropagation()}
-            onKeyDown={(event) => event.stopPropagation()}
-          >
-            {!isVideo && !isAudio ? (
+          {/* Actions */}
+          <div className="absolute right-2 top-2 z-20 flex items-center gap-2" {...stopPropagation}>
+            {isImage ? (
               <button
                 type="button"
-                onClick={(event) => {
-                  event.stopPropagation();
-                  void handleGenerateCaption();
-                }}
+                onClick={() => void handleGenerateCaption()}
                 disabled={generatingCaption}
-                className="mr-2 inline-flex size-8 items-center justify-center rounded-full bg-black/55 text-white shadow backdrop-blur-sm transition hover:bg-black/75 disabled:opacity-70"
-                title={caption ? "Regenerate AI caption" : "Generate AI caption"}
-                aria-label={caption ? "Regenerate AI caption" : "Generate AI caption"}
+                className={`${revealOnHover} inline-flex size-9 items-center justify-center rounded-full border border-white/10 bg-black/55 text-white shadow backdrop-blur-sm hover:bg-black/75 focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/60 disabled:opacity-100`}
+                title={caption ? "Regenerate caption" : "Generate caption"}
+                aria-label={caption ? "Regenerate caption" : "Generate caption"}
               >
-                {generatingCaption ? <Loader2 className="size-4 animate-spin" /> : <Sparkles className="size-4" />}
+                {generatingCaption ? (
+                  <Loader2 className="size-4 animate-spin" />
+                ) : (
+                  <Sparkles className="size-4" />
+                )}
               </button>
             ) : null}
 
@@ -766,237 +416,37 @@ export function PhotoCard({
               folders={folders}
               onRenamed={onRenamed ?? (() => {})}
               onMoved={onMoved ?? (() => {})}
-              onDownload={() => {
-                void handleDownload();
-              }}
+              onDownload={() => void handleDownload()}
               onTrashed={onTrashed ?? (() => {})}
               onFavorite={handleFavorite}
-              onView={handlePreviewOpen}
+              onView={handleOpen}
             />
           </div>
 
+          {/* Download overlay */}
           {downloading ? (
             <div
-              className="
-                absolute
-                inset-0
-                z-30
-                flex
-                items-center
-                justify-center
-                bg-black/35
-                backdrop-blur-[2px]
-              "
+              className="absolute inset-0 z-30 flex items-center justify-center bg-black/35 backdrop-blur-[2px]"
+              role="status"
+              aria-label="Preparing download"
             >
-              <span
-                className="
-                  flex
-                  size-11
-                  items-center
-                  justify-center
-                  rounded-full
-                  bg-background/95
-                  shadow-xl
-                "
-              >
-                <Loader2
-                  className="
-                    size-5
-                    animate-spin
-                  "
-                />
+              <span className="flex size-11 items-center justify-center rounded-full bg-background/95 shadow-xl">
+                <Loader2 className="size-5 animate-spin" />
               </span>
             </div>
           ) : null}
         </div>
       </figure>
 
-      {previewOpen
-        ? createPortal(
-            <div
-              className="
-                fixed
-                inset-0
-                z-[9999]
-                flex
-                items-center
-                justify-center
-                bg-black/95
-                p-3
-                backdrop-blur-sm
-                sm:p-6
-                motion-safe:animate-in
-                motion-safe:fade-in
-                motion-safe:duration-150
-              "
-              role="dialog"
-              aria-modal="true"
-              aria-label={`Preview of ${displayName}`}
-              onClick={() => setPreviewOpen(false)}
-            >
-              <button
-                type="button"
-                onClick={() => setPreviewOpen(false)}
-                aria-label="Close preview"
-                title="Close preview"
-                className="
-                  absolute
-                  right-4
-                  top-4
-                  z-[110]
-                  flex
-                  size-11
-                  items-center
-                  justify-center
-                  rounded-full
-                  border
-                  border-white/20
-                  bg-black/60
-                  text-white
-                  shadow-lg
-                  backdrop-blur
-                  transition
-                  hover:bg-white/15
-                  active:scale-90
-                  focus:outline-none
-                  focus:ring-2
-                  focus:ring-white/50
-                  sm:right-6
-                  sm:top-6
-                "
-              >
-                <X className="size-5" />
-              </button>
-
-              <div
-                className="
-                  relative
-                  flex
-                  max-h-[calc(100dvh-72px)]
-                  max-w-[calc(100vw-24px)]
-                  items-center
-                  justify-center
-                  motion-safe:animate-in
-                  motion-safe:zoom-in-95
-                  motion-safe:duration-200
-                "
-                onClick={(event) => event.stopPropagation()}
-              >
-                {isVideo ? (
-                  <video
-                    key={mediaUrl}
-                    src={mediaUrl}
-                    controls
-                    autoPlay
-                    playsInline
-                    preload="metadata"
-                    className="
-                      block
-                      h-auto
-                      w-auto
-                      max-h-[calc(100dvh-96px)]
-                      max-w-[calc(100vw-24px)]
-                      rounded-lg
-                      object-contain
-                      shadow-2xl
-                    "
-                  />
-                ) : isAudio ? (
-                  <div
-                    className="
-                      flex
-                      w-[min(92vw,720px)]
-                      max-h-[calc(100dvh-96px)]
-                      flex-col
-                      items-center
-                      gap-6
-                      overflow-auto
-                      rounded-2xl
-                      border
-                      border-white/10
-                      bg-black/70
-                      p-6
-                      shadow-2xl
-                      backdrop-blur
-                      sm:p-8
-                    "
-                  >
-                    <FileAudio
-                      className="
-                        size-20
-                        text-white
-                      "
-                    />
-
-                    <p
-                      className="
-                        max-w-full
-                        truncate
-                        text-sm
-                        font-medium
-                        text-white
-                      "
-                    >
-                      {displayName}
-                    </p>
-
-                    <audio src={mediaUrl} controls autoPlay className="w-full" />
-                  </div>
-                ) : (
-                  <img
-                    src={mediaUrl}
-                    alt={displayName}
-                    className="
-                      block
-                      h-auto
-                      w-auto
-                      max-h-[calc(100dvh-96px)]
-                      max-w-[calc(100vw-24px)]
-                      rounded-lg
-                      object-contain
-                      shadow-2xl
-                    "
-                  />
-                )}
-
-                {caption ? (
-                  <div className="pointer-events-none absolute bottom-3 left-1/2 z-[105] flex max-w-[min(92vw,720px)] -translate-x-1/2 items-start gap-2 rounded-xl border border-white/10 bg-black/65 px-4 py-3 text-sm font-medium text-white backdrop-blur sm:bottom-5">
-                    <Sparkles className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
-                    <span className="text-center leading-5">{caption}</span>
-                  </div>
-                ) : null}
-              </div>
-
-              {showFileNames ? (
-                <div
-                  className="
-                    pointer-events-none
-                    absolute
-                    bottom-4
-                    left-1/2
-                    max-w-[80vw]
-                    -translate-x-1/2
-                    truncate
-                    rounded-full
-                    border
-                    border-white/10
-                    bg-black/60
-                    px-4
-                    py-2
-                    text-sm
-                    font-medium
-                    text-white
-                    backdrop-blur
-                    sm:bottom-6
-                  "
-                >
-                  {displayName}
-                </div>
-              ) : null}
-            </div>,
-            document.body,
-          )
-        : null}
+      {previewOpen ? (
+        <PhotoLightbox
+          photos={[{ ...photo, ...(caption ? { caption } : {}) }]}
+          index={0}
+          showFileNames={showFileNames}
+          onIndexChange={() => {}}
+          onClose={() => setPreviewOpen(false)}
+        />
+      ) : null}
     </>
   );
 }
