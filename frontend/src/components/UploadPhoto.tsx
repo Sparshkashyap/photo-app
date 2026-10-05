@@ -1089,7 +1089,11 @@ export function UploadPhoto({
                   <UploadCloud className="size-4" aria-hidden="true" />
                 )}
 
-                {status === "uploading" ? "Uploading…" : status === "processing" ? "Generating AI caption…" : "Upload media"}
+                {status === "uploading"
+                  ? "Uploading…"
+                  : status === "processing"
+                    ? "Generating AI caption…"
+                    : "Upload media"}
               </Button>
             </div>
           ) : null}

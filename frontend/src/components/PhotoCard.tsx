@@ -1,4 +1,14 @@
-import { FileAudio, Heart, ImageOff, Loader2, Play, RotateCw, Sparkles, Video, X } from "lucide-react";
+import {
+  FileAudio,
+  Heart,
+  ImageOff,
+  Loader2,
+  Play,
+  RotateCw,
+  Sparkles,
+  Video,
+  X,
+} from "lucide-react";
 
 import { useEffect, useState, type KeyboardEvent as ReactKeyboardEvent } from "react";
 
