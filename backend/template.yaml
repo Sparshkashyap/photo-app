@@ -17,20 +17,16 @@ Globals:
         # DYNAMODB
         # ==================================================
 
-        # Existing manually created DynamoDB table
         DYNAMODB_TABLE: PhotoTable
 
-        # Existing manually created Folder table
         FOLDER_TABLE: FolderTable
 
-        # Existing manually created Users table
         USERS_TABLE_NAME: UsersTable
 
         # ==================================================
         # S3
         # ==================================================
 
-        # S3 bucket managed by this SAM stack
         S3_BUCKET_NAME: !Ref PhotosBucket
 
         # ==================================================
@@ -39,28 +35,19 @@ Globals:
 
         JWT_EXPIRES_IN: "1d"
 
-
         GOOGLE_REDIRECT_URI: "https://y181ertste.execute-api.ap-south-1.amazonaws.com/auth/google/callback"
 
         # ==================================================
         # SHARE LINKS
         # ==================================================
 
-        # CloudFormation-managed ShareTable
         SHARE_TABLE_NAME: !Ref ShareTable
 
         # ==================================================
         # FRONTEND
         # ==================================================
 
-        # Local frontend URL
-        #
-        # Change this to your Vercel frontend URL
-        # when deploying the production frontend.
-        #
         FRONTEND_URL: "https://main.ddvgp5hdlanze.amplifyapp.com"
-
-
 
         # ==================================================
         # AI SERVICE
@@ -72,17 +59,9 @@ Globals:
         # GOOGLE OAUTH
         # ==================================================
 
-        # Google OAuth callback URL
-        #
-        # This URL MUST also be added to:
-        #
-        # Google Cloud Console
-        # -> APIs & Services
-        # -> Credentials
-        # -> OAuth 2.0 Client ID
-        # -> Authorized redirect URIs
-        #
-        
+        # Google OAuth callback URL is also configured above.
+
+
 Resources:
 
   # ==================================================
@@ -111,8 +90,9 @@ Resources:
           - DELETE
           - OPTIONS
 
+
   # ==================================================
-  # LAMBDA
+  # MAIN API LAMBDA
   # ==================================================
 
   PhotoAppFunction:
@@ -145,37 +125,26 @@ Resources:
 
             Resource:
 
-              # ------------------------------------------
               # PhotoTable
-              # ------------------------------------------
-
               - !Sub "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/PhotoTable"
 
               - !Sub "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/PhotoTable/index/*"
 
-              # ------------------------------------------
               # FolderTable
-              # ------------------------------------------
-
               - !Sub "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/FolderTable"
 
               - !Sub "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/FolderTable/index/*"
 
-              # ------------------------------------------
               # UsersTable
-              # ------------------------------------------
-
               - !Sub "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/UsersTable"
 
               - !Sub "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/UsersTable/index/*"
 
-              # ------------------------------------------
               # ShareTable
-              # ------------------------------------------
-
               - !GetAtt ShareTable.Arn
 
               - !Sub "${ShareTable.Arn}/index/*"
+
 
         # ==================================================
         # S3
@@ -183,6 +152,7 @@ Resources:
 
         - S3CrudPolicy:
             BucketName: !Ref PhotosBucket
+
 
         # ==================================================
         # SSM PARAMETER STORE
@@ -198,58 +168,20 @@ Resources:
 
             Resource:
 
-              # ------------------------------------------
-              # JWT
-              # ------------------------------------------
-
               - !Sub "arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter/photo-app/JWT_SECRET"
-
-              # ------------------------------------------
-              # Existing Mongo URI
-              # ------------------------------------------
 
               - !Sub "arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter/photo-app/MONGO_URI"
 
-              # ------------------------------------------
-              # Google OAuth Client ID
-              # ------------------------------------------
-
               - !Sub "arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter/photo-app/GOOGLE_CLIENT_ID"
 
-              # ------------------------------------------
-              # Google OAuth Client Secret
-              # ------------------------------------------
-
               - !Sub "arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter/photo-app/GOOGLE_CLIENT_SECRET"
+
 
       # ==================================================
       # API ROUTES
       # ==================================================
 
       Events:
-
-        # ------------------------------------------
-        # Background AI caption worker
-        # ------------------------------------------
-        # Runs after a file is uploaded to S3.
-        # The worker waits for /photos/confirm metadata if
-        # the S3 event arrives before the API confirmation.
-
-        CaptionWorker:
-          Type: S3
-
-          Properties:
-
-            Bucket: !Ref PhotosBucket
-
-            Events:
-              - s3:ObjectCreated:Put
-
-            Filter:
-              S3Key:
-                Rules:
-                  - Name: prefix
-                    Value: photos/
 
         # ------------------------------------------
         # Root
@@ -266,6 +198,7 @@ Resources:
 
             Method: ANY
 
+
         # ------------------------------------------
         # Proxy
         # ------------------------------------------
@@ -281,6 +214,120 @@ Resources:
 
             Method: ANY
 
+
+  # ==================================================
+  # BACKGROUND AI CAPTION WORKER
+  # ==================================================
+
+  CaptionWorkerFunction:
+    Type: AWS::Serverless::Function
+
+    Properties:
+
+      CodeUri: .
+
+      Handler: lambda.handler
+
+      # IMPORTANT:
+      # Override the global S3_BUCKET_NAME reference here.
+      # The actual bucket name is read directly from the S3 event
+      # inside lambda.js / photoController.js.
+      Environment:
+        Variables:
+
+          S3_BUCKET_NAME: ""
+
+      Policies:
+
+        # ==================================================
+        # DYNAMODB
+        # ==================================================
+
+        - Statement:
+
+            Effect: Allow
+
+            Action:
+
+              - dynamodb:GetItem
+              - dynamodb:PutItem
+              - dynamodb:UpdateItem
+
+            Resource:
+
+              - !Sub "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/PhotoTable"
+
+              - !Sub "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/PhotoTable/index/*"
+
+
+        # ==================================================
+        # S3 READ
+        # ==================================================
+
+        - Statement:
+
+            Effect: Allow
+
+            Action:
+
+              - s3:GetObject
+              - s3:GetObjectVersion
+
+            Resource:
+
+              - "arn:aws:s3:::*/*"
+
+
+        # ==================================================
+        # SSM PARAMETER STORE
+        # ==================================================
+
+        - Statement:
+
+            Effect: Allow
+
+            Action:
+
+              - ssm:GetParameter
+
+            Resource:
+
+              - !Sub "arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter/photo-app/JWT_SECRET"
+
+              - !Sub "arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter/photo-app/MONGO_URI"
+
+              - !Sub "arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter/photo-app/GOOGLE_CLIENT_ID"
+
+              - !Sub "arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter/photo-app/GOOGLE_CLIENT_SECRET"
+
+
+      # ==================================================
+      # S3 EVENT
+      # ==================================================
+
+      Events:
+
+        CaptionWorker:
+          Type: S3
+
+          Properties:
+
+            Bucket: !Ref PhotosBucket
+
+            Events:
+
+              - s3:ObjectCreated:Put
+
+            Filter:
+
+              S3Key:
+
+                Rules:
+
+                  - Name: prefix
+                    Value: photos/
+
+
   # ==================================================
   # SHARE LINKS TABLE
   # ==================================================
@@ -290,38 +337,20 @@ Resources:
 
     Properties:
 
-      # ------------------------------------------------
-      # CloudFormation generates physical table name
-      # ------------------------------------------------
-
       BillingMode: PAY_PER_REQUEST
-
-      # ------------------------------------------------
-      # Attribute definitions
-      # ------------------------------------------------
 
       AttributeDefinitions:
 
-        # Main key
         - AttributeName: shareId
           AttributeType: S
 
-        # GSI key
         - AttributeName: token
           AttributeType: S
-
-      # ------------------------------------------------
-      # Primary key
-      # ------------------------------------------------
 
       KeySchema:
 
         - AttributeName: shareId
           KeyType: HASH
-
-      # ------------------------------------------------
-      # Token GSI
-      # ------------------------------------------------
 
       GlobalSecondaryIndexes:
 
@@ -336,15 +365,12 @@ Resources:
 
             ProjectionType: ALL
 
-      # ------------------------------------------------
-      # TTL
-      # ------------------------------------------------
-
       TimeToLiveSpecification:
 
         AttributeName: ttl
 
         Enabled: true
+
 
   # ==================================================
   # S3 PHOTO STORAGE
@@ -356,7 +382,7 @@ Resources:
     Properties:
 
       # ------------------------------------------------
-      # Private bucket
+      # PRIVATE BUCKET
       # ------------------------------------------------
 
       PublicAccessBlockConfiguration:
@@ -368,6 +394,7 @@ Resources:
         IgnorePublicAcls: true
 
         RestrictPublicBuckets: true
+
 
       # ------------------------------------------------
       # S3 CORS
@@ -394,6 +421,7 @@ Resources:
 
               - ETag
 
+
 # ==================================================
 # OUTPUTS
 # ==================================================
@@ -410,6 +438,7 @@ Outputs:
 
     Value: !Sub "https://${PhotoApi}.execute-api.${AWS::Region}.amazonaws.com"
 
+
   # ==================================================
   # DYNAMODB
   # ==================================================
@@ -420,11 +449,13 @@ Outputs:
 
     Value: "PhotoTable"
 
+
   FolderTable:
 
     Description: Existing DynamoDB Folder Metadata Table
 
     Value: "FolderTable"
+
 
   UsersTable:
 
@@ -432,11 +463,13 @@ Outputs:
 
     Value: "UsersTable"
 
+
   ShareTable:
 
     Description: DynamoDB table used for photo share links
 
     Value: !Ref ShareTable
+
 
   # ==================================================
   # S3
