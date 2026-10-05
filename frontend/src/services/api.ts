@@ -528,13 +528,11 @@ export type GenerateCaptionResponse = {
   caption: string;
 };
 
-export async function generatePhotoCaption(
-  photoId: string,
-): Promise<GenerateCaptionResponse> {
-  return request<GenerateCaptionResponse>(
-    `/photos/${encodeURIComponent(photoId)}/caption`,
-    { method: "POST", auth: true },
-  );
+export async function generatePhotoCaption(photoId: string): Promise<GenerateCaptionResponse> {
+  return request<GenerateCaptionResponse>(`/photos/${encodeURIComponent(photoId)}/caption`, {
+    method: "POST",
+    auth: true,
+  });
 }
 
 export async function getPhotos(options: GetPhotosOptions = {}): Promise<GetPhotosResponse> {

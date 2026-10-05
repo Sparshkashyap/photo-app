@@ -218,7 +218,10 @@ export function PhotoGallery({
 
   return (
     <>
-      <ul className={`${gridClass} list-none p-0`} aria-label={`Photo gallery, ${photos.length} items`}>
+      <ul
+        className={`${gridClass} list-none p-0`}
+        aria-label={`Photo gallery, ${photos.length} items`}
+      >
         {photos.map((photo, index) => {
           const isDeleting = deletingPhotoId === photo.photoId;
 

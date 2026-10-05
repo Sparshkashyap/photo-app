@@ -144,9 +144,7 @@ export function PhotoLightbox({
       {/* Top bar */}
       <div className="absolute inset-x-0 top-0 z-[110] flex items-center justify-between gap-3 bg-gradient-to-b from-black/70 to-transparent p-3 sm:p-5">
         <div className="min-w-0 pl-1 text-white">
-          {showFileNames ? (
-            <p className="truncate text-sm font-medium">{displayName}</p>
-          ) : null}
+          {showFileNames ? <p className="truncate text-sm font-medium">{displayName}</p> : null}
 
           {photos.length > 1 ? (
             <p className="text-xs text-white/60" aria-live="polite">
@@ -207,10 +205,7 @@ export function PhotoLightbox({
         onClick={(event) => event.stopPropagation()}
       >
         {loading ? (
-          <Loader2
-            className="absolute size-8 animate-spin text-white/70"
-            aria-label="Loading"
-          />
+          <Loader2 className="absolute size-8 animate-spin text-white/70" aria-label="Loading" />
         ) : null}
 
         {failed || !mediaUrl ? (
