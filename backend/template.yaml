@@ -47,7 +47,7 @@ Globals:
         # FRONTEND
         # ==================================================
 
-        FRONTEND_URL: "https://main.ddvgp5hdlanze.amplifyapp.com"
+        FRONTEND_URL: "http://photo-app-frontend-801664114577.s3-website.ap-south-1.amazonaws.com"
 
         # ==================================================
         # AI SERVICE
