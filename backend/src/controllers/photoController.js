@@ -1989,6 +1989,138 @@ const downloadPhoto = async (
 };
 
 // ==================================================
+// SEND PHOTO AS COPY
+// GET /photos/:photoId/copy
+// ==================================================
+
+const sendCopyPhoto = async (
+  req,
+  res,
+  next,
+) => {
+  try {
+    const {
+      photoId,
+    } = req.params;
+
+    const userId =
+      getUserId(req);
+
+    if (!photoId) {
+      return res.status(400).json({
+        success: false,
+        message:
+          "photoId is required",
+      });
+    }
+
+    const result =
+      await dynamoDb.send(
+        new GetCommand({
+          TableName:
+            getTableName(),
+
+          Key: {
+            photoId,
+          },
+        }),
+      );
+
+    const photo =
+      result.Item;
+
+    if (!photo) {
+      return res.status(404).json({
+        success: false,
+        message:
+          "Photo not found",
+      });
+    }
+
+    if (
+      photo.userId !== userId
+    ) {
+      return res.status(403).json({
+        success: false,
+        message:
+          "You are not allowed to access this photo",
+      });
+    }
+
+    if (
+      photo.isTrashed === true
+    ) {
+      return res.status(404).json({
+        success: false,
+        message:
+          "Photo is in trash",
+      });
+    }
+
+    const safeFileName =
+      sanitizeFileName(
+        photo.fileName ||
+          photo.originalFileName ||
+          photo.name ||
+          "file",
+      );
+
+    const command =
+      new GetObjectCommand({
+        Bucket:
+          getBucketName(),
+
+        Key:
+          photo.s3Key,
+
+        ResponseContentType:
+          photo.contentType ||
+          "application/octet-stream",
+
+        ResponseContentDisposition:
+          `inline; filename="${safeFileName}"`,
+      });
+
+    const copyUrl =
+      await getSignedUrl(
+        s3,
+        command,
+        {
+          expiresIn: 300,
+        },
+      );
+
+    return res.status(200).json({
+      success: true,
+
+      copyUrl,
+
+      fileName:
+        safeFileName,
+
+      contentType:
+        photo.contentType ||
+        "application/octet-stream",
+
+      mediaType:
+        photo.mediaType ||
+        getMediaType(
+          photo.contentType,
+        ),
+
+      expiresIn: 300,
+    });
+  } catch (error) {
+    console.error(
+      "Send photo as copy error:",
+      error,
+    );
+
+    next(error);
+  }
+};
+
+// ==================================================
 // MOVE PHOTO TO TRASH
 // PATCH /photos/:photoId/trash
 // ==================================================
@@ -2477,6 +2609,7 @@ module.exports = {
   renamePhoto,
   movePhoto,
   downloadPhoto,
+  sendCopyPhoto,
   trashPhoto,
   restorePhoto,
   toggleFavorite,

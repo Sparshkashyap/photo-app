@@ -53,7 +53,7 @@ Globals:
         # AI SERVICE
         # ==================================================
 
-        AI_SERVICE_URL: "https://photo-app-ai-service.tech.blitz.cloud"
+        AI_SERVICE_URL: "https://6jqxmedvf37drmktyotegapcg40cyijp.lambda-url.ap-south-1.on.aws"
 
         # ==================================================
         # GOOGLE OAUTH
