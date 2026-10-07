@@ -46,6 +46,7 @@ import {
   setFavorite,
   trashPhoto,
   generatePhotoCaption,
+  requestDownloadUrl,
   requestCopyPhoto,
 } from "@/services/api";
 
@@ -399,71 +400,58 @@ export function PhotoMenu({
     setSharing(true);
 
     try {
-      // First create a real backend copy. The copied file gets its own
-      // S3 object + DynamoDB record and a fresh signed URL.
+      // This endpoint creates a REAL duplicate in S3 + DynamoDB.
+      // Do not use the normal download endpoint here because that only
+      // returns the original file.
       const response = await requestCopyPhoto(photo.photoId);
-      const downloadUrl = response.photo.downloadUrl || response.photo.url;
+      const copiedPhoto = response.photo;
 
-      if (!downloadUrl) {
+      if (!copiedPhoto?.downloadUrl) {
         throw new Error("The copied file URL was not returned by the server.");
       }
 
+      const fileResponse = await fetch(copiedPhoto.downloadUrl, {
+        method: "GET",
+        cache: "no-store",
+      });
+
+      if (!fileResponse.ok) {
+        throw new Error("Couldn't download the copied file for sharing.");
+      }
+
+      const blob = await fileResponse.blob();
       const fileName =
-        response.photo.originalFileName ||
-        response.photo.fileName ||
-        response.photo.name ||
+        copiedPhoto.originalFileName ||
+        copiedPhoto.fileName ||
         photo.originalFileName ||
         photo.fileName ||
         photo.name ||
         "photo";
 
-      // Mobile browsers that support file sharing get the actual copied file.
-      if (typeof navigator !== "undefined" && typeof navigator.share === "function") {
-        const fileResponse = await fetch(downloadUrl, {
-          method: "GET",
-          cache: "no-store",
-        });
+      const file = new File([blob], fileName, {
+        type:
+          copiedPhoto.contentType || photo.contentType || blob.type || "application/octet-stream",
+      });
 
-        if (!fileResponse.ok) {
-          throw new Error("Couldn't download the copied file for sharing.");
-        }
-
-        const blob = await fileResponse.blob();
-        const file = new File([blob], fileName, {
-          type: response.photo.contentType || blob.type || "application/octet-stream",
-        });
-
-        if (typeof navigator.canShare !== "function" || navigator.canShare({ files: [file] })) {
-          await navigator.share({
-            files: [file],
-            title: fileName,
-          });
-
-          closeMenu();
-          toast.success("Copy created and shared");
-          return;
-        }
+      // Send as Copy means an actual file attachment, never a URL.
+      if (typeof navigator.share !== "function") {
+        throw new Error(
+          "This browser does not support sharing files. Open Photo-App on a mobile browser or supported desktop browser to send the copied file.",
+        );
       }
 
-      // Desktop fallback: the copy is already created, so give the user the
-      // copied file URL instead of failing with an unsupported-share message.
-      if (navigator.clipboard?.writeText) {
-        await navigator.clipboard.writeText(downloadUrl);
-      } else {
-        const input = document.createElement("textarea");
-        input.value = downloadUrl;
-        input.setAttribute("readonly", "true");
-        input.style.position = "fixed";
-        input.style.opacity = "0";
-        document.body.appendChild(input);
-        input.select();
-        document.execCommand("copy");
-        input.remove();
+      if (typeof navigator.canShare === "function" && !navigator.canShare({ files: [file] })) {
+        throw new Error("This device or browser cannot share this file as an attachment.");
       }
+
+      await navigator.share({
+        files: [file],
+        title: fileName,
+      });
 
       closeMenu();
-      toast.success("Copy created", {
-        description: "Copied file link is in your clipboard.",
+      toast.success("Copy created and ready to send", {
+        description: "The copied file was attached to the share sheet.",
       });
     } catch (error) {
       if (error instanceof DOMException && error.name === "AbortError") {
@@ -472,7 +460,7 @@ export function PhotoMenu({
 
       console.error("Send as copy failed:", error);
 
-      toast.error("Couldn't send the file", {
+      toast.error("Couldn't send the copied file", {
         description: error instanceof Error ? error.message : "Please try again.",
       });
     } finally {

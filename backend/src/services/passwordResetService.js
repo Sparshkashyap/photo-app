@@ -21,17 +21,7 @@ const hmac = (key, value) => crypto.createHmac("sha256", key).update(value).dige
 const hash = (value) => crypto.createHash("sha256").update(value).digest("hex");
 
 const sendResetEmail = async ({ email, otp }) => {
-  const fromEmail = String(
-    process.env.PASSWORD_RESET_FROM_EMAIL ||
-      (await getSecret("/photo-app/PASSWORD_RESET_FROM_EMAIL")) ||
-      "",
-  ).trim();
-
-  if (!fromEmail || fromEmail.includes("YOUR_VERIFIED_EMAIL")) {
-    throw new Error(
-      "Password reset sender email is not configured. Set /photo-app/PASSWORD_RESET_FROM_EMAIL to a verified SES identity in ap-south-1.",
-    );
-  }
+  const fromEmail = process.env.PASSWORD_RESET_FROM_EMAIL || await getSecret("/photo-app/PASSWORD_RESET_FROM_EMAIL");
   const region = process.env.AWS_REGION || "ap-south-1";
   const service = "ses";
   const host = `email.${region}.amazonaws.com`;
@@ -40,7 +30,17 @@ const sendResetEmail = async ({ email, otp }) => {
   const sessionToken = process.env.AWS_SESSION_TOKEN;
 
   if (!accessKey || !secretKey) {
-    throw new Error("AWS credentials are not available for sending password reset email");
+    const error = new Error("AWS credentials are not available for sending password reset email");
+    error.statusCode = 503;
+    throw error;
+  }
+
+  if (!fromEmail || /YOUR_VERIFIED_EMAIL|example\.com/i.test(String(fromEmail))) {
+    const error = new Error(
+      "Password reset sender email is not configured. Set /photo-app/PASSWORD_RESET_FROM_EMAIL to a verified Amazon SES identity in ap-south-1.",
+    );
+    error.statusCode = 503;
+    throw error;
   }
 
   const body = JSON.stringify({
@@ -108,15 +108,29 @@ const sendResetEmail = async ({ email, otp }) => {
 
   if (!response.ok) {
     const details = await response.text();
-    const normalizedDetails = details.toLowerCase();
-
-    if (normalizedDetails.includes("not verified") || normalizedDetails.includes("emailaddressnotverified")) {
-      throw new Error(
-        "Amazon SES rejected the password reset email because the sender or recipient is not verified in ap-south-1. Verify both email identities in SES or move SES out of sandbox mode.",
-      );
+    let parsed = null;
+    try {
+      parsed = JSON.parse(details);
+    } catch {
+      // SES may return a non-JSON error body.
     }
 
-    throw new Error(`Password reset email could not be sent: ${response.status} ${details.slice(0, 300)}`);
+    const rawMessage = String(parsed?.message || parsed?.Message || details || "");
+    const lowerMessage = rawMessage.toLowerCase();
+    const identityError =
+      response.status === 400 &&
+      (lowerMessage.includes("not verified") ||
+        lowerMessage.includes("email address is not verified") ||
+        lowerMessage.includes("identity"));
+
+    const error = new Error(
+      identityError
+        ? "Amazon SES rejected the password reset email because the sender or recipient is not verified in ap-south-1. Verify the sender email in SES and, while SES is in sandbox mode, verify the recipient email too or request production access."
+        : `Password reset email could not be sent: ${response.status} ${rawMessage.slice(0, 300)}`,
+    );
+    error.statusCode = identityError ? 503 : 502;
+    error.code = identityError ? "SES_IDENTITY_NOT_VERIFIED" : "SES_SEND_FAILED";
+    throw error;
   }
 };
 
@@ -146,11 +160,11 @@ const requestPasswordReset = async (email) => {
   const now = Date.now();
   const expiresAt = new Date(now + OTP_TTL_MS).toISOString();
 
-  // Send first. This prevents a failed SES request from consuming the user's
-  // 60-second retry window or leaving an OTP stored that was never delivered.
-  await sendResetEmail({ email: normalizedEmail, otp });
-
   const db = DynamoDBDocumentClient.from(new DynamoDBClient({ region: process.env.AWS_REGION || "ap-south-1" }));
+
+  // Send the email BEFORE storing the OTP. If SES rejects the message,
+  // do not lock the user out for 60 seconds with an OTP they never received.
+  await sendResetEmail({ email: normalizedEmail, otp });
 
   await db.send(new UpdateCommand({
     TableName: USERS_TABLE,

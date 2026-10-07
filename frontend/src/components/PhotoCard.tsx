@@ -13,9 +13,12 @@ import {
 } from "lucide-react";
 
 import { useEffect, useMemo, useState, type KeyboardEvent as ReactKeyboardEvent } from "react";
+
 import { createPortal } from "react-dom";
 
 import { toast } from "sonner";
+
+import { Button } from "@/components/ui/button";
 
 import { PhotoLightbox } from "@/components/Photolightbox";
 import { PhotoMenu } from "@/components/PhotoMenu";
@@ -596,33 +599,38 @@ export function PhotoCard({
         </div>
       </figure>
 
-      {editingCaption
+      {editingCaption && typeof document !== "undefined"
         ? createPortal(
             <div
-              className="fixed inset-0 z-[500] flex items-center justify-center bg-black/45 p-4 backdrop-blur-[2px]"
+              className="fixed inset-0 z-[500] flex items-center justify-center bg-black/55 p-4 backdrop-blur-sm"
               role="dialog"
               aria-modal="true"
-              aria-label="Edit photo caption"
+              aria-labelledby={`edit-caption-title-${photo.photoId}`}
               onMouseDown={(event) => {
-                if (event.target === event.currentTarget && !savingCaption) {
+                if (event.target === event.currentTarget) {
                   cancelCaptionEdit();
                 }
               }}
             >
               <div
-                className="w-full max-w-md rounded-2xl border border-border bg-popover p-4 text-popover-foreground shadow-2xl ring-1 ring-black/10"
-                onClick={(event) => event.stopPropagation()}
+                className="w-full max-w-lg rounded-2xl border border-border bg-background p-5 shadow-2xl"
+                onMouseDown={(event) => event.stopPropagation()}
               >
-                <div className="mb-3 flex items-center justify-between gap-3">
+                <div className="mb-4 flex items-start justify-between gap-3">
                   <div className="min-w-0">
-                    <h2 className="text-sm font-semibold">Edit caption</h2>
-                    <p className="mt-0.5 truncate text-xs text-muted-foreground">{displayName}</p>
+                    <h2
+                      id={`edit-caption-title-${photo.photoId}`}
+                      className="text-base font-semibold"
+                    >
+                      Edit Caption
+                    </h2>
+                    <p className="mt-1 truncate text-xs text-muted-foreground">{displayName}</p>
                   </div>
                   <button
                     type="button"
                     onClick={cancelCaptionEdit}
                     disabled={savingCaption}
-                    className="flex size-8 shrink-0 items-center justify-center rounded-full text-muted-foreground transition hover:bg-accent hover:text-foreground disabled:opacity-50"
+                    className="flex size-8 shrink-0 items-center justify-center rounded-full text-muted-foreground transition hover:bg-muted hover:text-foreground disabled:opacity-50"
                     aria-label="Close caption editor"
                   >
                     <X className="size-4" />
@@ -633,9 +641,9 @@ export function PhotoCard({
                   value={captionDraft}
                   onChange={(event) => setCaptionDraft(event.target.value.slice(0, 500))}
                   maxLength={500}
-                  rows={4}
+                  rows={5}
                   autoFocus
-                  className="w-full resize-none rounded-xl border border-border bg-background px-3 py-2.5 text-sm leading-5 text-foreground outline-none placeholder:text-muted-foreground focus:border-ring focus:ring-2 focus:ring-ring/20"
+                  className="w-full resize-none rounded-xl border border-input bg-background px-3 py-3 text-sm leading-5 outline-none transition focus:border-ring focus:ring-2 focus:ring-ring/20"
                   placeholder="Add a caption..."
                   onKeyDown={(event) => {
                     if (event.key === "Escape") {
@@ -652,27 +660,26 @@ export function PhotoCard({
                 <div className="mt-2 flex items-center justify-between gap-3">
                   <span className="text-xs text-muted-foreground">{captionDraft.length}/500</span>
                   <div className="flex items-center gap-2">
-                    <button
+                    <Button
                       type="button"
+                      variant="outline"
                       onClick={cancelCaptionEdit}
                       disabled={savingCaption}
-                      className="rounded-lg border border-border px-3 py-2 text-xs font-medium transition hover:bg-accent disabled:opacity-50"
                     >
                       Cancel
-                    </button>
-                    <button
+                    </Button>
+                    <Button
                       type="button"
                       onClick={() => void saveCaptionEdit()}
                       disabled={savingCaption}
-                      className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-3 py-2 text-xs font-medium text-primary-foreground transition hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-60"
                     >
                       {savingCaption ? (
-                        <Loader2 className="size-3.5 animate-spin" />
+                        <Loader2 className="mr-2 size-4 animate-spin" />
                       ) : (
-                        <Check className="size-3.5" />
+                        <Check className="mr-2 size-4" />
                       )}
                       Save
-                    </button>
+                    </Button>
                   </div>
                 </div>
               </div>
