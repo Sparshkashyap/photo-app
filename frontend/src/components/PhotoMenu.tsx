@@ -401,22 +401,23 @@ export function PhotoMenu({
 
     try {
       // This endpoint creates a REAL duplicate in S3 + DynamoDB.
-      // Do not use the normal download endpoint here because that only
-      // returns the original file.
+      // Never use the normal download endpoint here because that points to
+      // the original object.
       const response = await requestCopyPhoto(photo.photoId);
       const copiedPhoto = response.photo;
+      const downloadUrl = copiedPhoto?.downloadUrl || copiedPhoto?.url;
 
-      if (!copiedPhoto?.downloadUrl) {
+      if (!downloadUrl) {
         throw new Error("The copied file URL was not returned by the server.");
       }
 
-      const fileResponse = await fetch(copiedPhoto.downloadUrl, {
+      const fileResponse = await fetch(downloadUrl, {
         method: "GET",
         cache: "no-store",
       });
 
       if (!fileResponse.ok) {
-        throw new Error("Couldn't download the copied file for sharing.");
+        throw new Error("Couldn't download the copied file.");
       }
 
       const blob = await fileResponse.blob();
@@ -433,25 +434,42 @@ export function PhotoMenu({
           copiedPhoto.contentType || photo.contentType || blob.type || "application/octet-stream",
       });
 
-      // Send as Copy means an actual file attachment, never a URL.
-      if (typeof navigator.share !== "function") {
-        throw new Error(
-          "This browser does not support sharing files. Open Photo-App on a mobile browser or supported desktop browser to send the copied file.",
-        );
+      // Preferred path: native OS share sheet with the ACTUAL copied file.
+      // This is what Android/iOS and browsers supporting Web Share Level 2 use.
+      if (typeof navigator.share === "function") {
+        const fileSharingSupported =
+          typeof navigator.canShare !== "function" || navigator.canShare({ files: [file] });
+
+        if (fileSharingSupported) {
+          await navigator.share({
+            files: [file],
+            title: fileName,
+          });
+
+          closeMenu();
+          toast.success("Copy created and ready to send", {
+            description: "The actual copied file was attached to the share sheet.",
+          });
+          return;
+        }
       }
 
-      if (typeof navigator.canShare === "function" && !navigator.canShare({ files: [file] })) {
-        throw new Error("This device or browser cannot share this file as an attachment.");
-      }
-
-      await navigator.share({
-        files: [file],
-        title: fileName,
-      });
+      // Desktop browsers such as Chrome/Edge on Windows generally do not
+      // expose file sharing. Do NOT copy a URL here. Download the actual
+      // copied bytes so the user has the real file and can attach it anywhere.
+      const objectUrl = URL.createObjectURL(blob);
+      const anchor = document.createElement("a");
+      anchor.href = objectUrl;
+      anchor.download = fileName;
+      anchor.style.display = "none";
+      document.body.appendChild(anchor);
+      anchor.click();
+      anchor.remove();
+      window.setTimeout(() => URL.revokeObjectURL(objectUrl), 1000);
 
       closeMenu();
-      toast.success("Copy created and ready to send", {
-        description: "The copied file was attached to the share sheet.",
+      toast.success("Copy created and downloaded", {
+        description: "The actual copied file was downloaded. No link was copied.",
       });
     } catch (error) {
       if (error instanceof DOMException && error.name === "AbortError") {
