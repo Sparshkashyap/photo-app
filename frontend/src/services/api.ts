@@ -723,6 +723,19 @@ export async function requestDownloadUrl(photoId: string): Promise<DownloadUrlRe
   });
 }
 
+export type CopyPhotoResponse = {
+  success: boolean;
+  message: string;
+  photo: PhotoApiItem;
+};
+
+export async function requestCopyPhoto(photoId: string): Promise<CopyPhotoResponse> {
+  return request<CopyPhotoResponse>(`/photos/${encodeURIComponent(photoId)}/copy`, {
+    method: "GET",
+    auth: true,
+  });
+}
+
 // ==================================================
 // TRASH
 // ==================================================

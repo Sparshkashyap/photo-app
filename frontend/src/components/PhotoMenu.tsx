@@ -46,7 +46,7 @@ import {
   setFavorite,
   trashPhoto,
   generatePhotoCaption,
-  requestDownloadUrl,
+  requestCopyPhoto,
 } from "@/services/api";
 
 import type { Folder } from "@/types/folder";
@@ -396,45 +396,75 @@ export function PhotoMenu({
   async function handleSendAsCopy() {
     if (sharing) return;
 
-    if (typeof navigator === "undefined" || typeof navigator.share !== "function") {
-      toast.error("Direct file sharing is not supported", {
-        description: "Use Download on this browser/device instead.",
-      });
-      return;
-    }
-
     setSharing(true);
 
     try {
-      const response = await requestDownloadUrl(photo.photoId);
+      // First create a real backend copy. The copied file gets its own
+      // S3 object + DynamoDB record and a fresh signed URL.
+      const response = await requestCopyPhoto(photo.photoId);
+      const downloadUrl = response.photo.downloadUrl || response.photo.url;
 
-      const fileResponse = await fetch(response.downloadUrl, {
-        method: "GET",
-        cache: "no-store",
-      });
-
-      if (!fileResponse.ok) {
-        throw new Error("Couldn't download the original file for sharing.");
+      if (!downloadUrl) {
+        throw new Error("The copied file URL was not returned by the server.");
       }
 
-      const blob = await fileResponse.blob();
+      const fileName =
+        response.photo.originalFileName ||
+        response.photo.fileName ||
+        response.photo.name ||
+        photo.originalFileName ||
+        photo.fileName ||
+        photo.name ||
+        "photo";
 
-      const fileName = photo.originalFileName || photo.fileName || photo.name || "photo";
+      // Mobile browsers that support file sharing get the actual copied file.
+      if (typeof navigator !== "undefined" && typeof navigator.share === "function") {
+        const fileResponse = await fetch(downloadUrl, {
+          method: "GET",
+          cache: "no-store",
+        });
 
-      const file = new File([blob], fileName, {
-        type: photo.contentType || blob.type || "application/octet-stream",
-      });
+        if (!fileResponse.ok) {
+          throw new Error("Couldn't download the copied file for sharing.");
+        }
 
-      if (typeof navigator.canShare === "function" && !navigator.canShare({ files: [file] })) {
-        throw new Error("This device cannot share this file directly.");
+        const blob = await fileResponse.blob();
+        const file = new File([blob], fileName, {
+          type: response.photo.contentType || blob.type || "application/octet-stream",
+        });
+
+        if (typeof navigator.canShare !== "function" || navigator.canShare({ files: [file] })) {
+          await navigator.share({
+            files: [file],
+            title: fileName,
+          });
+
+          closeMenu();
+          toast.success("Copy created and shared");
+          return;
+        }
       }
 
-      await navigator.share({
-        files: [file],
-        title: fileName,
-      });
+      // Desktop fallback: the copy is already created, so give the user the
+      // copied file URL instead of failing with an unsupported-share message.
+      if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(downloadUrl);
+      } else {
+        const input = document.createElement("textarea");
+        input.value = downloadUrl;
+        input.setAttribute("readonly", "true");
+        input.style.position = "fixed";
+        input.style.opacity = "0";
+        document.body.appendChild(input);
+        input.select();
+        document.execCommand("copy");
+        input.remove();
+      }
 
       closeMenu();
+      toast.success("Copy created", {
+        description: "Copied file link is in your clipboard.",
+      });
     } catch (error) {
       if (error instanceof DOMException && error.name === "AbortError") {
         return;
@@ -443,7 +473,7 @@ export function PhotoMenu({
       console.error("Send as copy failed:", error);
 
       toast.error("Couldn't send the file", {
-        description: error instanceof Error ? error.message : "Please try Download instead.",
+        description: error instanceof Error ? error.message : "Please try again.",
       });
     } finally {
       setSharing(false);

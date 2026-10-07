@@ -21,7 +21,17 @@ const hmac = (key, value) => crypto.createHmac("sha256", key).update(value).dige
 const hash = (value) => crypto.createHash("sha256").update(value).digest("hex");
 
 const sendResetEmail = async ({ email, otp }) => {
-  const fromEmail = process.env.PASSWORD_RESET_FROM_EMAIL || await getSecret("/photo-app/PASSWORD_RESET_FROM_EMAIL");
+  const fromEmail = String(
+    process.env.PASSWORD_RESET_FROM_EMAIL ||
+      (await getSecret("/photo-app/PASSWORD_RESET_FROM_EMAIL")) ||
+      "",
+  ).trim();
+
+  if (!fromEmail || fromEmail.includes("YOUR_VERIFIED_EMAIL")) {
+    throw new Error(
+      "Password reset sender email is not configured. Set /photo-app/PASSWORD_RESET_FROM_EMAIL to a verified SES identity in ap-south-1.",
+    );
+  }
   const region = process.env.AWS_REGION || "ap-south-1";
   const service = "ses";
   const host = `email.${region}.amazonaws.com`;
@@ -98,6 +108,14 @@ const sendResetEmail = async ({ email, otp }) => {
 
   if (!response.ok) {
     const details = await response.text();
+    const normalizedDetails = details.toLowerCase();
+
+    if (normalizedDetails.includes("not verified") || normalizedDetails.includes("emailaddressnotverified")) {
+      throw new Error(
+        "Amazon SES rejected the password reset email because the sender or recipient is not verified in ap-south-1. Verify both email identities in SES or move SES out of sandbox mode.",
+      );
+    }
+
     throw new Error(`Password reset email could not be sent: ${response.status} ${details.slice(0, 300)}`);
   }
 };
@@ -128,6 +146,10 @@ const requestPasswordReset = async (email) => {
   const now = Date.now();
   const expiresAt = new Date(now + OTP_TTL_MS).toISOString();
 
+  // Send first. This prevents a failed SES request from consuming the user's
+  // 60-second retry window or leaving an OTP stored that was never delivered.
+  await sendResetEmail({ email: normalizedEmail, otp });
+
   const db = DynamoDBDocumentClient.from(new DynamoDBClient({ region: process.env.AWS_REGION || "ap-south-1" }));
 
   await db.send(new UpdateCommand({
@@ -141,8 +163,6 @@ const requestPasswordReset = async (email) => {
       ":requestedAt": new Date(now).toISOString(),
     },
   }));
-
-  await sendResetEmail({ email: normalizedEmail, otp });
 
   return genericResponse;
 };

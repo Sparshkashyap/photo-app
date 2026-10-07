@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 
 import { useEffect, useMemo, useState, type KeyboardEvent as ReactKeyboardEvent } from "react";
+import { createPortal } from "react-dom";
 
 import { toast } from "sonner";
 
@@ -520,58 +521,7 @@ export function PhotoCard({
                 <div className="truncate text-xs font-semibold">{displayName}</div>
               ) : null}
 
-              {editingCaption ? (
-                <div className="pointer-events-auto mt-1.5 rounded-xl border border-white/20 bg-black/70 p-2 backdrop-blur-md">
-                  <textarea
-                    value={captionDraft}
-                    onChange={(event) => setCaptionDraft(event.target.value.slice(0, 500))}
-                    maxLength={500}
-                    rows={2}
-                    autoFocus
-                    className="w-full resize-none rounded-lg border border-white/15 bg-white/10 px-2.5 py-2 text-[11px] font-medium leading-4 text-white outline-none placeholder:text-white/50 focus:border-white/40"
-                    placeholder="Add a caption..."
-                    onClick={(event) => event.stopPropagation()}
-                    onKeyDown={(event) => {
-                      if (event.key === "Escape") {
-                        event.stopPropagation();
-                        cancelCaptionEdit();
-                      }
-                    }}
-                  />
-                  <div className="mt-1.5 flex items-center justify-end gap-1.5">
-                    <button
-                      type="button"
-                      onClick={(event) => {
-                        event.stopPropagation();
-                        cancelCaptionEdit();
-                      }}
-                      disabled={savingCaption}
-                      className="flex size-7 items-center justify-center rounded-full bg-white/10 text-white hover:bg-white/20 disabled:opacity-50"
-                      title="Cancel"
-                      aria-label="Cancel caption edit"
-                    >
-                      <X className="size-3.5" />
-                    </button>
-                    <button
-                      type="button"
-                      onClick={(event) => {
-                        event.stopPropagation();
-                        void saveCaptionEdit();
-                      }}
-                      disabled={savingCaption}
-                      className="flex size-7 items-center justify-center rounded-full bg-white text-black hover:bg-white/90 disabled:opacity-50"
-                      title="Save"
-                      aria-label="Save caption"
-                    >
-                      {savingCaption ? (
-                        <Loader2 className="size-3.5 animate-spin" />
-                      ) : (
-                        <Check className="size-3.5" />
-                      )}
-                    </button>
-                  </div>
-                </div>
-              ) : caption ? (
+              {caption ? (
                 <div className="pointer-events-auto mt-1 flex items-start gap-1.5 text-[11px] font-medium leading-4 text-white/90">
                   <Sparkles className="mt-0.5 size-3 shrink-0" aria-hidden="true" />
                   <span className="min-w-0 flex-1 line-clamp-2">{caption}</span>
@@ -645,6 +595,91 @@ export function PhotoCard({
           ) : null}
         </div>
       </figure>
+
+      {editingCaption
+        ? createPortal(
+            <div
+              className="fixed inset-0 z-[500] flex items-center justify-center bg-black/45 p-4 backdrop-blur-[2px]"
+              role="dialog"
+              aria-modal="true"
+              aria-label="Edit photo caption"
+              onMouseDown={(event) => {
+                if (event.target === event.currentTarget && !savingCaption) {
+                  cancelCaptionEdit();
+                }
+              }}
+            >
+              <div
+                className="w-full max-w-md rounded-2xl border border-border bg-popover p-4 text-popover-foreground shadow-2xl ring-1 ring-black/10"
+                onClick={(event) => event.stopPropagation()}
+              >
+                <div className="mb-3 flex items-center justify-between gap-3">
+                  <div className="min-w-0">
+                    <h2 className="text-sm font-semibold">Edit caption</h2>
+                    <p className="mt-0.5 truncate text-xs text-muted-foreground">{displayName}</p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={cancelCaptionEdit}
+                    disabled={savingCaption}
+                    className="flex size-8 shrink-0 items-center justify-center rounded-full text-muted-foreground transition hover:bg-accent hover:text-foreground disabled:opacity-50"
+                    aria-label="Close caption editor"
+                  >
+                    <X className="size-4" />
+                  </button>
+                </div>
+
+                <textarea
+                  value={captionDraft}
+                  onChange={(event) => setCaptionDraft(event.target.value.slice(0, 500))}
+                  maxLength={500}
+                  rows={4}
+                  autoFocus
+                  className="w-full resize-none rounded-xl border border-border bg-background px-3 py-2.5 text-sm leading-5 text-foreground outline-none placeholder:text-muted-foreground focus:border-ring focus:ring-2 focus:ring-ring/20"
+                  placeholder="Add a caption..."
+                  onKeyDown={(event) => {
+                    if (event.key === "Escape") {
+                      event.preventDefault();
+                      cancelCaptionEdit();
+                    }
+                    if ((event.ctrlKey || event.metaKey) && event.key === "Enter") {
+                      event.preventDefault();
+                      void saveCaptionEdit();
+                    }
+                  }}
+                />
+
+                <div className="mt-2 flex items-center justify-between gap-3">
+                  <span className="text-xs text-muted-foreground">{captionDraft.length}/500</span>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={cancelCaptionEdit}
+                      disabled={savingCaption}
+                      className="rounded-lg border border-border px-3 py-2 text-xs font-medium transition hover:bg-accent disabled:opacity-50"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => void saveCaptionEdit()}
+                      disabled={savingCaption}
+                      className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-3 py-2 text-xs font-medium text-primary-foreground transition hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                      {savingCaption ? (
+                        <Loader2 className="size-3.5 animate-spin" />
+                      ) : (
+                        <Check className="size-3.5" />
+                      )}
+                      Save
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>,
+            document.body,
+          )
+        : null}
 
       {previewOpen ? (
         <PhotoLightbox
