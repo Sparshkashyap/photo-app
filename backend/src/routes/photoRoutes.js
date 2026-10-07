@@ -9,6 +9,7 @@ const {
   getPhotos,
   getPhoto,
   renamePhoto,
+  updatePhotoCaption,
   movePhoto,
   downloadPhoto,
   sendCopyPhoto,
@@ -117,6 +118,12 @@ router.patch(
   "/:photoId",
   authMiddleware,
   renamePhoto,
+);
+
+router.patch(
+  "/:photoId/caption",
+  authMiddleware,
+  updatePhotoCaption,
 );
 
 // ==================================================

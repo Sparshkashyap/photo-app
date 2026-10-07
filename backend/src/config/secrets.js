@@ -43,4 +43,5 @@ const loadSecrets = async () => {
 
 module.exports = {
   loadSecrets,
+  getSecret,
 };

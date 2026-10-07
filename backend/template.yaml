@@ -176,6 +176,25 @@ Resources:
 
               - !Sub "arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter/photo-app/GOOGLE_CLIENT_SECRET"
 
+              - !Sub "arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter/photo-app/PASSWORD_RESET_FROM_EMAIL"
+
+
+        # ==================================================
+        # SES - PASSWORD RESET EMAILS
+        # ==================================================
+
+        - Statement:
+
+            Effect: Allow
+
+            Action:
+
+              - ses:SendEmail
+
+              - ses:SendRawEmail
+
+            Resource: "*"
+
 
       # ==================================================
       # API ROUTES
@@ -299,6 +318,7 @@ Resources:
               - !Sub "arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter/photo-app/GOOGLE_CLIENT_ID"
 
               - !Sub "arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter/photo-app/GOOGLE_CLIENT_SECRET"
+
 
 
       # ==================================================

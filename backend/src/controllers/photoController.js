@@ -1673,6 +1673,84 @@ const renamePhoto = async (
 };
 
 // ==================================================
+// UPDATE PHOTO CAPTION
+// PATCH /photos/:photoId/caption
+// ==================================================
+
+const updatePhotoCaption = async (req, res, next) => {
+  try {
+    const { photoId } = req.params;
+    const userId = getUserId(req);
+    const rawCaption = req.body?.caption;
+
+    if (!photoId || typeof rawCaption !== "string") {
+      return res.status(400).json({
+        success: false,
+        message: "photoId and caption are required",
+      });
+    }
+
+    const caption = rawCaption.trim();
+
+    if (caption.length > 500) {
+      return res.status(400).json({
+        success: false,
+        message: "Caption cannot exceed 500 characters",
+      });
+    }
+
+    const existing = await dynamoDb.send(new GetCommand({
+      TableName: getTableName(),
+      Key: { photoId },
+    }));
+
+    const photo = existing.Item;
+
+    if (!photo) {
+      return res.status(404).json({ success: false, message: "Photo not found" });
+    }
+
+    if (photo.userId !== userId) {
+      return res.status(403).json({
+        success: false,
+        message: "You are not allowed to edit this photo",
+      });
+    }
+
+    if (photo.isTrashed === true) {
+      return res.status(400).json({
+        success: false,
+        message: "Photo is in trash. Restore it before editing the caption.",
+      });
+    }
+
+    const now = new Date().toISOString();
+    const expressionValues = {
+      ":caption": caption,
+      ":updatedAt": now,
+      ":status": "ready",
+    };
+
+    const result = await dynamoDb.send(new UpdateCommand({
+      TableName: getTableName(),
+      Key: { photoId },
+      UpdateExpression: "SET caption = :caption, captionStatus = :status, updatedAt = :updatedAt REMOVE captionError",
+      ExpressionAttributeValues: expressionValues,
+      ReturnValues: "ALL_NEW",
+    }));
+
+    return res.status(200).json({
+      success: true,
+      message: "Caption updated successfully",
+      photo: result.Attributes,
+    });
+  } catch (error) {
+    console.error("Update photo caption error:", error);
+    next(error);
+  }
+};
+
+// ==================================================
 // MOVE PHOTO
 // PATCH /photos/:photoId/folder
 // ==================================================
@@ -1981,138 +2059,6 @@ const downloadPhoto = async (
   } catch (error) {
     console.error(
       "Download photo error:",
-      error,
-    );
-
-    next(error);
-  }
-};
-
-// ==================================================
-// SEND PHOTO AS COPY
-// GET /photos/:photoId/copy
-// ==================================================
-
-const sendCopyPhoto = async (
-  req,
-  res,
-  next,
-) => {
-  try {
-    const {
-      photoId,
-    } = req.params;
-
-    const userId =
-      getUserId(req);
-
-    if (!photoId) {
-      return res.status(400).json({
-        success: false,
-        message:
-          "photoId is required",
-      });
-    }
-
-    const result =
-      await dynamoDb.send(
-        new GetCommand({
-          TableName:
-            getTableName(),
-
-          Key: {
-            photoId,
-          },
-        }),
-      );
-
-    const photo =
-      result.Item;
-
-    if (!photo) {
-      return res.status(404).json({
-        success: false,
-        message:
-          "Photo not found",
-      });
-    }
-
-    if (
-      photo.userId !== userId
-    ) {
-      return res.status(403).json({
-        success: false,
-        message:
-          "You are not allowed to access this photo",
-      });
-    }
-
-    if (
-      photo.isTrashed === true
-    ) {
-      return res.status(404).json({
-        success: false,
-        message:
-          "Photo is in trash",
-      });
-    }
-
-    const safeFileName =
-      sanitizeFileName(
-        photo.fileName ||
-          photo.originalFileName ||
-          photo.name ||
-          "file",
-      );
-
-    const command =
-      new GetObjectCommand({
-        Bucket:
-          getBucketName(),
-
-        Key:
-          photo.s3Key,
-
-        ResponseContentType:
-          photo.contentType ||
-          "application/octet-stream",
-
-        ResponseContentDisposition:
-          `inline; filename="${safeFileName}"`,
-      });
-
-    const copyUrl =
-      await getSignedUrl(
-        s3,
-        command,
-        {
-          expiresIn: 300,
-        },
-      );
-
-    return res.status(200).json({
-      success: true,
-
-      copyUrl,
-
-      fileName:
-        safeFileName,
-
-      contentType:
-        photo.contentType ||
-        "application/octet-stream",
-
-      mediaType:
-        photo.mediaType ||
-        getMediaType(
-          photo.contentType,
-        ),
-
-      expiresIn: 300,
-    });
-  } catch (error) {
-    console.error(
-      "Send photo as copy error:",
       error,
     );
 
@@ -2607,9 +2553,9 @@ module.exports = {
   getPhotos,
   getPhoto,
   renamePhoto,
+  updatePhotoCaption,
   movePhoto,
   downloadPhoto,
-  sendCopyPhoto,
   trashPhoto,
   restorePhoto,
   toggleFavorite,

@@ -5,6 +5,9 @@ const {
   signup,
   login,
   logout,
+  forgotPassword,
+  verifyResetOtp,
+  resetPasswordController,
   googleLogin,
   googleCallback,
 } = require("../controllers/authController");
@@ -36,6 +39,10 @@ router.post(
   authMiddleware,
   logout
 );
+
+router.post("/forgot-password", forgotPassword);
+router.post("/verify-reset-otp", verifyResetOtp);
+router.post("/reset-password", resetPasswordController);
 
 /*
  * ==================================================

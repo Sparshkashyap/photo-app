@@ -98,9 +98,11 @@ export function PhotoGallery({
   const viewerPhotos = useMemo(
     () =>
       photos.map((photo) => {
-        const caption = captionOverrides[photo.photoId];
+        if (Object.prototype.hasOwnProperty.call(captionOverrides, photo.photoId)) {
+          return { ...photo, caption: captionOverrides[photo.photoId] || null };
+        }
 
-        return caption ? { ...photo, caption } : photo;
+        return photo;
       }),
     [photos, captionOverrides],
   );

@@ -1,4 +1,4 @@
-import { FileAudio, Heart, ImageOff, Loader2, Play, RotateCw, Sparkles, Video } from "lucide-react";
+import { FileAudio, Heart, ImageOff, Loader2, Pencil, Play, RotateCw, Sparkles, Video, X, Check } from "lucide-react";
 
 import { useEffect, useMemo, useState, type KeyboardEvent as ReactKeyboardEvent } from "react";
 
@@ -6,7 +6,7 @@ import { toast } from "sonner";
 
 import { PhotoLightbox } from "@/components/Photolightbox";
 import { PhotoMenu } from "@/components/PhotoMenu";
-import { generatePhotoCaption, getPhoto, requestDownloadUrl } from "@/services/api";
+import { generatePhotoCaption, getPhoto, requestDownloadUrl, updatePhotoCaption } from "@/services/api";
 
 import type { Folder } from "@/types/folder";
 import type { Photo } from "@/types/photo";
@@ -82,6 +82,9 @@ export function PhotoCard({
   const [caption, setCaption] = useState(photo.caption ?? null);
 
   const [generatingCaption, setGeneratingCaption] = useState(false);
+  const [editingCaption, setEditingCaption] = useState(false);
+  const [captionDraft, setCaptionDraft] = useState(photo.caption ?? "");
+  const [savingCaption, setSavingCaption] = useState(false);
 
   const isVideo = photo.contentType?.startsWith("video/") ?? false;
 
@@ -105,7 +108,10 @@ export function PhotoCard({
   useEffect(() => {
     setIsFavorite(photo.isFavorite === true);
     setCaption(photo.caption ?? null);
-  }, [photo.isFavorite, photo.caption]);
+    if (!editingCaption) {
+      setCaptionDraft(photo.caption ?? "");
+    }
+  }, [photo.isFavorite, photo.caption, editingCaption]);
 
   useEffect(() => {
     if (!isImage || (photo.captionStatus !== "pending" && photo.captionStatus !== "processing")) {
@@ -202,6 +208,49 @@ export function PhotoCard({
       });
     } finally {
       setGeneratingCaption(false);
+    }
+  }
+
+  function startCaptionEdit() {
+    setCaptionDraft(caption ?? "");
+    setEditingCaption(true);
+  }
+
+  function cancelCaptionEdit() {
+    setCaptionDraft(caption ?? "");
+    setEditingCaption(false);
+  }
+
+  async function saveCaptionEdit() {
+    if (savingCaption) return;
+
+    const nextCaption = captionDraft.trim();
+
+    if (nextCaption.length > 500) {
+      toast.error("Caption cannot exceed 500 characters");
+      return;
+    }
+
+    setSavingCaption(true);
+
+    try {
+      const response = await updatePhotoCaption(photo.photoId, nextCaption);
+      const updatedCaption = response.photo.caption?.trim() || null;
+
+      setCaption(updatedCaption);
+      setCaptionDraft(updatedCaption ?? "");
+      setEditingCaption(false);
+
+      onCaptionChange?.(photo, updatedCaption ?? "");
+
+      toast.success("Caption updated");
+    } catch (error) {
+      console.error("Caption update failed:", error);
+      toast.error("Couldn't update caption", {
+        description: error instanceof Error ? error.message : "Please try again.",
+      });
+    } finally {
+      setSavingCaption(false);
     }
   }
 
@@ -448,17 +497,75 @@ export function PhotoCard({
           ) : null}
 
           {/* Name + caption */}
-          {showFileNames || caption ? (
+          {showFileNames || caption || editingCaption ? (
             <figcaption className="pointer-events-none absolute inset-x-3 bottom-3 z-[9] pr-11 text-white drop-shadow-[0_1px_3px_rgba(0,0,0,0.9)] sm:opacity-0 sm:transition-opacity sm:duration-200 sm:group-hover:opacity-100 sm:group-focus-within:opacity-100">
               {showFileNames ? (
                 <div className="truncate text-xs font-semibold">{displayName}</div>
               ) : null}
 
-              {caption ? (
-                <div className="mt-1 flex items-start gap-1.5 text-[11px] font-medium leading-4 text-white/90">
+              {editingCaption ? (
+                <div className="pointer-events-auto mt-1.5 rounded-xl border border-white/20 bg-black/70 p-2 backdrop-blur-md">
+                  <textarea
+                    value={captionDraft}
+                    onChange={(event) => setCaptionDraft(event.target.value.slice(0, 500))}
+                    maxLength={500}
+                    rows={2}
+                    autoFocus
+                    className="w-full resize-none rounded-lg border border-white/15 bg-white/10 px-2.5 py-2 text-[11px] font-medium leading-4 text-white outline-none placeholder:text-white/50 focus:border-white/40"
+                    placeholder="Add a caption..."
+                    onClick={(event) => event.stopPropagation()}
+                    onKeyDown={(event) => {
+                      if (event.key === "Escape") {
+                        event.stopPropagation();
+                        cancelCaptionEdit();
+                      }
+                    }}
+                  />
+                  <div className="mt-1.5 flex items-center justify-end gap-1.5">
+                    <button
+                      type="button"
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        cancelCaptionEdit();
+                      }}
+                      disabled={savingCaption}
+                      className="flex size-7 items-center justify-center rounded-full bg-white/10 text-white hover:bg-white/20 disabled:opacity-50"
+                      title="Cancel"
+                      aria-label="Cancel caption edit"
+                    >
+                      <X className="size-3.5" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        void saveCaptionEdit();
+                      }}
+                      disabled={savingCaption}
+                      className="flex size-7 items-center justify-center rounded-full bg-white text-black hover:bg-white/90 disabled:opacity-50"
+                      title="Save"
+                      aria-label="Save caption"
+                    >
+                      {savingCaption ? <Loader2 className="size-3.5 animate-spin" /> : <Check className="size-3.5" />}
+                    </button>
+                  </div>
+                </div>
+              ) : caption ? (
+                <div className="pointer-events-auto mt-1 flex items-start gap-1.5 text-[11px] font-medium leading-4 text-white/90">
                   <Sparkles className="mt-0.5 size-3 shrink-0" aria-hidden="true" />
-
-                  <span className="line-clamp-2">{caption}</span>
+                  <span className="min-w-0 flex-1 line-clamp-2">{caption}</span>
+                  <button
+                    type="button"
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      startCaptionEdit();
+                    }}
+                    className="ml-auto flex size-6 shrink-0 items-center justify-center rounded-full bg-black/45 text-white/80 transition hover:bg-black/70 hover:text-white"
+                    title="Edit caption"
+                    aria-label="Edit caption"
+                  >
+                    <Pencil className="size-3" />
+                  </button>
                 </div>
               ) : null}
             </figcaption>

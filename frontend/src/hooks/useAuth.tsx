@@ -311,12 +311,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
          * Do not call refreshMe immediately after
          * a failed OAuth callback.
          */
+
         if (mounted) {
           const token = getToken();
 
           if (oauthToken) {
-            // OAuth already fetched and stored the user.
-            // Do not call /user/profile a second time.
+            // OAuth callback already fetched and stored the user.
+            // Avoid a second /user/profile request.
           } else if (token) {
             await refreshMe();
           } else {

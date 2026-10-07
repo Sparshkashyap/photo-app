@@ -240,6 +240,36 @@ export async function login(input: { email: string; password: string }): Promise
   });
 }
 
+export type PasswordResetResponse = {
+  success: boolean;
+  message: string;
+};
+
+export async function forgotPassword(email: string): Promise<PasswordResetResponse> {
+  return request<PasswordResetResponse>("/auth/forgot-password", {
+    method: "POST",
+    body: { email: email.trim().toLowerCase() },
+  });
+}
+
+export async function verifyResetOtp(email: string, otp: string): Promise<PasswordResetResponse> {
+  return request<PasswordResetResponse>("/auth/verify-reset-otp", {
+    method: "POST",
+    body: { email: email.trim().toLowerCase(), otp: otp.trim() },
+  });
+}
+
+export async function resetPassword(
+  email: string,
+  otp: string,
+  password: string,
+): Promise<PasswordResetResponse> {
+  return request<PasswordResetResponse>("/auth/reset-password", {
+    method: "POST",
+    body: { email: email.trim().toLowerCase(), otp: otp.trim(), password },
+  });
+}
+
 export async function loginWithOAuth(provider: OAuthProvider): Promise<void> {
   if (!API_BASE_URL) {
     throw new ApiError("API URL is not configured.");
@@ -595,6 +625,29 @@ export type RenamePhotoResponse = {
 
   photo: Photo;
 };
+
+export type UpdateCaptionResponse = {
+  success: boolean;
+  message: string;
+  photo: Photo;
+};
+
+export async function updatePhotoCaption(
+  photoId: string,
+  caption: string,
+): Promise<UpdateCaptionResponse> {
+  const trimmedCaption = caption.trim();
+
+  if (trimmedCaption.length > 500) {
+    throw new ApiError("Caption must be 500 characters or less.", 400);
+  }
+
+  return request<UpdateCaptionResponse>(`/photos/${encodeURIComponent(photoId)}/caption`, {
+    method: "PATCH",
+    body: { caption: trimmedCaption },
+    auth: true,
+  });
+}
 
 export async function renamePhoto(photoId: string, name: string): Promise<RenamePhotoResponse> {
   const trimmedName = name.trim();
