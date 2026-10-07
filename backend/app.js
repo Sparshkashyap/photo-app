@@ -87,6 +87,17 @@ app.use(
 // ==================================================
 
 app.get(
+  "/",
+  (req, res) => {
+    return res.status(200).json({
+      success: true,
+      message:
+        "Photo App API is running",
+    });
+  },
+);
+
+app.get(
   "/health",
   (req, res) => {
     return res.status(200).json({

@@ -39,7 +39,13 @@ router.post(
   confirmUpload,
 );
 
+// ==================================================
+// AI CAPTION GENERATION
+// ==================================================
+
 // POST /photos/:photoId/caption
+//
+// Generates AI caption for the photo.
 router.post(
   "/:photoId/caption",
   authMiddleware,
@@ -62,7 +68,7 @@ router.get(
 // ==================================================
 
 // IMPORTANT:
-// This must be before /:photoId.
+// This route must be before /:photoId.
 
 router.get(
   "/favorites",
@@ -101,7 +107,6 @@ router.get(
 // ==================================================
 
 // GET /photos/:photoId
-
 router.get(
   "/:photoId",
   authMiddleware,
@@ -113,12 +118,19 @@ router.get(
 // ==================================================
 
 // PATCH /photos/:photoId
-
 router.patch(
   "/:photoId",
   authMiddleware,
   renamePhoto,
 );
+
+// ==================================================
+// UPDATE PHOTO CAPTION
+// ==================================================
+
+// PATCH /photos/:photoId/caption
+//
+// Used when user manually edits an existing caption.
 
 router.patch(
   "/:photoId/caption",
@@ -131,7 +143,6 @@ router.patch(
 // ==================================================
 
 // PATCH /photos/:photoId/folder
-
 router.patch(
   "/:photoId/folder",
   authMiddleware,
@@ -147,14 +158,12 @@ router.patch(
 // This does NOT permanently delete anything.
 //
 // It only sets:
-//
 // isTrashed = true
 //
-// The S3 object remains.
-// The DynamoDB record remains.
+// S3 object remains.
+// DynamoDB record remains.
 //
-// Permanent deletion is handled by:
-//
+// Permanent deletion is handled through:
 // DELETE /trash/:photoId
 
 router.patch(
@@ -171,8 +180,7 @@ router.patch(
 //
 // Kept for backwards compatibility.
 //
-// Main Trash UI should use:
-//
+// Main Trash UI can use:
 // POST /trash/:photoId/restore
 
 router.patch(
@@ -187,7 +195,7 @@ router.patch(
 
 // PATCH /photos/:photoId/favorite
 //
-// The backend toggles the favorite state.
+// Backend toggles favorite state.
 //
 // Request body is not required.
 
