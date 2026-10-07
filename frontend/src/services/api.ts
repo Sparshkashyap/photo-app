@@ -247,7 +247,7 @@ export async function loginWithOAuth(provider: OAuthProvider): Promise<void> {
 
   const deviceId = encodeURIComponent(getDeviceId());
 
-  const callbackUrl = `${window.location.origin}/login`;
+  const callbackUrl = `${window.location.origin}/dashboard`;
 
   const encodedCallback = encodeURIComponent(callbackUrl);
 

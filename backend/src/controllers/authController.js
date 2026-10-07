@@ -25,13 +25,12 @@ const getAllowedRedirectUri = (
     "http://localhost:8080";
 
   const allowedUris = [
-    `${frontendUrl.replace(
-      /\/+$/,
-      ""
-    )}/login`,
+  `${frontendUrl.replace(/\/+$/, "")}/login`,
+  `${frontendUrl.replace(/\/+$/, "")}/dashboard`,
 
-    "http://localhost:8080/login",
-  ];
+  "http://localhost:8080/login",
+  "http://localhost:8080/dashboard",
+];
 
   if (
     redirectUri &&
