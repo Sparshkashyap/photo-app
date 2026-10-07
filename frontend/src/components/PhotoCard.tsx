@@ -1,4 +1,16 @@
-import { FileAudio, Heart, ImageOff, Loader2, Pencil, Play, RotateCw, Sparkles, Video, X, Check } from "lucide-react";
+import {
+  FileAudio,
+  Heart,
+  ImageOff,
+  Loader2,
+  Pencil,
+  Play,
+  RotateCw,
+  Sparkles,
+  Video,
+  X,
+  Check,
+} from "lucide-react";
 
 import { useEffect, useMemo, useState, type KeyboardEvent as ReactKeyboardEvent } from "react";
 
@@ -6,7 +18,12 @@ import { toast } from "sonner";
 
 import { PhotoLightbox } from "@/components/Photolightbox";
 import { PhotoMenu } from "@/components/PhotoMenu";
-import { generatePhotoCaption, getPhoto, requestDownloadUrl, updatePhotoCaption } from "@/services/api";
+import {
+  generatePhotoCaption,
+  getPhoto,
+  requestDownloadUrl,
+  updatePhotoCaption,
+} from "@/services/api";
 
 import type { Folder } from "@/types/folder";
 import type { Photo } from "@/types/photo";
@@ -546,7 +563,11 @@ export function PhotoCard({
                       title="Save"
                       aria-label="Save caption"
                     >
-                      {savingCaption ? <Loader2 className="size-3.5 animate-spin" /> : <Check className="size-3.5" />}
+                      {savingCaption ? (
+                        <Loader2 className="size-3.5 animate-spin" />
+                      ) : (
+                        <Check className="size-3.5" />
+                      )}
                     </button>
                   </div>
                 </div>
