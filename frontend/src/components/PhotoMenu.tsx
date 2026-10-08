@@ -40,7 +40,6 @@ import {
 } from "@/components/ui/dialog";
 
 import {
-  createShare,
   movePhotoToFolder,
   renamePhoto,
   setFavorite,
@@ -393,104 +392,94 @@ export function PhotoMenu({
     }
   }
 
-  async function getFileForNativeShare(
-    downloadUrl: string,
-    fileName: string,
-    contentType?: string,
-  ) {
+  async function getPhotoFileForSharing() {
+    let downloadUrl = photo.downloadUrl || photo.url;
+
+    if (!downloadUrl) {
+      const response = await requestDownloadUrl(photo.photoId);
+      downloadUrl = response.downloadUrl;
+    }
+
+    if (!downloadUrl) {
+      throw new Error("The photo download URL was not available.");
+    }
+
     const fileResponse = await fetch(downloadUrl, {
       method: "GET",
       cache: "no-store",
     });
 
     if (!fileResponse.ok) {
-      throw new Error("Couldn't download the file for sharing.");
+      throw new Error("Couldn't load the photo for sharing.");
     }
 
     const blob = await fileResponse.blob();
+    const fileName = photo.originalFileName || photo.fileName || photo.name || "photo";
 
     return new File([blob], fileName, {
-      type: contentType || blob.type || "application/octet-stream",
+      type: photo.contentType || blob.type || "application/octet-stream",
     });
   }
 
-  function supportsNativeFileShare(file: File) {
-    if (typeof navigator === "undefined" || typeof navigator.share !== "function") {
-      return false;
-    }
-
-    if (typeof navigator.canShare === "function") {
-      return navigator.canShare({ files: [file] });
-    }
-
-    return true;
-  }
-
-  async function downloadBlobAsFile(blob: Blob, fileName: string) {
-    const blobUrl = URL.createObjectURL(blob);
-    const anchor = document.createElement("a");
-    anchor.href = blobUrl;
-    anchor.download = fileName;
-    document.body.appendChild(anchor);
-    anchor.click();
-    anchor.remove();
-    window.setTimeout(() => URL.revokeObjectURL(blobUrl), 1000);
-  }
-
-  async function handleSendAsCopy() {
+  async function sharePhotoFile(actionLabel: string) {
     if (sharing) return;
 
     setSharing(true);
+    closeMenu();
 
     try {
-      // This endpoint creates a REAL duplicate in S3 + DynamoDB.
-      const response = await requestDownloadUrl(photo.photoId);
-      const copiedPhoto = { ...photo, downloadUrl: response.downloadUrl };
+      const file = await getPhotoFileForSharing();
 
-      if (!copiedPhoto?.downloadUrl) {
-        throw new Error("The copied file URL was not returned by the server.");
+      if (typeof navigator.share === "function") {
+        const canShareFile =
+          typeof navigator.canShare !== "function" || navigator.canShare({ files: [file] });
+
+        if (canShareFile) {
+          await navigator.share({
+            files: [file],
+            title: file.name,
+          });
+
+          toast.success(`${actionLabel} ready`, {
+            description:
+              "Choose WhatsApp, Email, Google Drive, Telegram or another app from the share sheet.",
+          });
+          return;
+        }
       }
 
-      const fileName =
-        copiedPhoto.originalFileName ||
-        copiedPhoto.fileName ||
-        photo.originalFileName ||
-        photo.fileName ||
-        photo.name ||
-        "photo";
+      // Web Share is unavailable on this browser/context. Download the
+      // actual file instead. Never create a database/S3 duplicate and never
+      // copy a share URL for Send as Copy.
+      const blob = file.slice(0, file.size, file.type);
+      const blobUrl = URL.createObjectURL(blob);
+      const anchor = document.createElement("a");
+      anchor.href = blobUrl;
+      anchor.download = file.name;
+      document.body.appendChild(anchor);
+      anchor.click();
+      anchor.remove();
+      window.setTimeout(() => URL.revokeObjectURL(blobUrl), 1000);
 
-      const file = await getFileForNativeShare(
-        copiedPhoto.downloadUrl,
-        fileName,
-        copiedPhoto.contentType || photo.contentType,
-      );
-
-      if (supportsNativeFileShare(file)) {
-        await navigator.share({ files: [file], title: fileName });
-        closeMenu();
-        toast.success("Copy created and shared");
-        return;
-      }
-
-      // Never copy a URL for Send as Copy. If the browser has no native
-      // file-share sheet, keep the feature useful by downloading the real copy.
-      await downloadBlobAsFile(file, fileName);
-      closeMenu();
-      toast.success("Copy created and downloaded", {
-        description: "Your browser does not provide the native app share sheet.",
+      toast.success(`${actionLabel} downloaded`, {
+        description: "This browser does not provide the native app share sheet.",
       });
     } catch (error) {
       if (error instanceof DOMException && error.name === "AbortError") {
         return;
       }
 
-      console.error("Send as copy failed:", error);
-      toast.error("Couldn't send the copied file", {
+      console.error(`${actionLabel} failed:`, error);
+      toast.error(`Couldn't ${actionLabel.toLowerCase()}`, {
         description: error instanceof Error ? error.message : "Please try again.",
       });
     } finally {
       setSharing(false);
     }
+  }
+
+  async function handleSendAsCopy() {
+    await sharePhotoFile("Send as Copy");
   }
 
   async function handleFavorite() {
@@ -530,58 +519,7 @@ export function PhotoMenu({
   }
 
   async function handleShare() {
-    if (sharing) {
-      return;
-    }
-
-    setSharing(true);
-    closeMenu();
-
-    try {
-      // Share the actual media file so the browser's native OS share sheet
-      // can offer WhatsApp, Gmail, Telegram, Google Drive and other installed apps.
-      const downloadResponse = await requestDownloadUrl(photo.photoId);
-      const fileName = photo.originalFileName || photo.fileName || photo.name || "photo";
-      const file = await getFileForNativeShare(
-        downloadResponse.downloadUrl,
-        fileName,
-        photo.contentType,
-      );
-
-      if (supportsNativeFileShare(file)) {
-        await navigator.share({
-          files: [file],
-          title: fileName,
-        });
-        toast.success("Photo shared");
-        return;
-      }
-
-      // If this browser cannot show an OS file-share sheet, preserve the
-      // existing web-share link flow instead of showing a misleading error.
-      const response = await createShare(photo.photoId);
-      const share = response.share;
-      const rawShareUrl = share.shareUrl || `/shared/${encodeURIComponent(share.token)}`;
-      const generatedShareUrl = new URL(rawShareUrl, window.location.origin).toString();
-
-      setShareUrl(generatedShareUrl);
-      setCopied(false);
-      setShareOpen(true);
-      toast.info("Native app sharing is not supported in this browser", {
-        description: "Use the Share button in the dialog to copy the secure share link.",
-      });
-    } catch (error) {
-      if (error instanceof DOMException && error.name === "AbortError") {
-        return;
-      }
-
-      console.error("Share failed:", error);
-      toast.error("Share failed", {
-        description: error instanceof Error ? error.message : "Please try again.",
-      });
-    } finally {
-      setSharing(false);
-    }
+    await sharePhotoFile("Share");
   }
 
   async function handleCopyShareUrl() {
