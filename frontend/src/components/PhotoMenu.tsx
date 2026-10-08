@@ -396,18 +396,15 @@ export function PhotoMenu({
   async function handleSendAsCopy() {
     if (sharing) return;
 
-    if (typeof navigator === "undefined" || typeof navigator.share !== "function") {
-      toast.error("File sharing is not supported in this browser", {
-        description: "Open the Photo App on a browser/device that supports file sharing.",
-      });
-      return;
-    }
-
     setSharing(true);
 
     try {
-      // Send as Copy must send the original file as a real attachment.
-      // It must NOT create a duplicate S3 object or DynamoDB photo record.
+      if (typeof navigator.share !== "function") {
+        throw new Error(
+          "Native file sharing is not supported in this browser. Please use a supported browser or device.",
+        );
+      }
+
       const response = await requestDownloadUrl(photo.photoId);
 
       if (!response.downloadUrl) {
@@ -420,7 +417,7 @@ export function PhotoMenu({
       });
 
       if (!fileResponse.ok) {
-        throw new Error("Couldn't load the photo for sharing.");
+        throw new Error("Couldn't prepare the photo for sharing.");
       }
 
       const blob = await fileResponse.blob();
@@ -430,22 +427,20 @@ export function PhotoMenu({
         type: photo.contentType || blob.type || "application/octet-stream",
       });
 
-      const canShareFile =
-        typeof navigator.canShare !== "function" || navigator.canShare({ files: [file] });
-
-      if (!canShareFile) {
-        throw new Error("This browser cannot share files directly.");
+      if (typeof navigator.canShare === "function" && !navigator.canShare({ files: [file] })) {
+        throw new Error(
+          "This browser cannot share files. Please use a supported browser or device.",
+        );
       }
 
+      // Share the ORIGINAL file through the device/browser native share sheet.
+      // No S3 copy and no DynamoDB record are created by this action.
       await navigator.share({
         files: [file],
         title: fileName,
       });
 
       closeMenu();
-      toast.success("Photo ready to send", {
-        description: "Choose WhatsApp, Email, Telegram or another app from the share sheet.",
-      });
     } catch (error) {
       if (error instanceof DOMException && error.name === "AbortError") {
         return;
@@ -453,7 +448,7 @@ export function PhotoMenu({
 
       console.error("Send as copy failed:", error);
 
-      toast.error("Couldn't send the photo", {
+      toast.error("Couldn't share the photo", {
         description: error instanceof Error ? error.message : "Please try again.",
       });
     } finally {

@@ -5,7 +5,6 @@ const {
   PutObjectCommand,
   GetObjectCommand,
   HeadObjectCommand,
-  CopyObjectCommand,
 } = require("@aws-sdk/client-s3");
 
 const {
