@@ -13,6 +13,8 @@ import {
   ImageIcon,
   Info,
   Loader2,
+  Mail,
+  MessageCircle,
   MoreVertical,
   Pencil,
   Ruler,
@@ -178,7 +180,7 @@ const EXTENSION_BY_MIME: Record<string, string> = {
 };
 
 function normalizeMimeType(type?: string | null) {
-  const clean = (type ?? "").split(";")[0]?.trim().toLowerCase() ?? "";
+  const clean = ((type || "").split(";")[0] ?? "").trim().toLowerCase();
 
   // "image/jpg" is not a real MIME type. Browsers reject it in navigator.canShare().
   if (clean === "image/jpg" || clean === "image/pjpeg") {
@@ -259,6 +261,12 @@ function canShareFileNatively(file: File) {
 // still counts as part of the click when this runs from a button handler.
 async function shareFileNatively(file: File): Promise<ShareResult> {
   if (!canShareFileNatively(file)) {
+    console.warn("File share sheet unavailable:", getShareSupportIssue(file), {
+      isSecureContext: typeof window !== "undefined" ? window.isSecureContext : undefined,
+      hasShare: typeof navigator !== "undefined" && typeof navigator.share === "function",
+      mime: file.type,
+    });
+
     return "unsupported";
   }
 
@@ -292,6 +300,90 @@ function downloadFileLocally(file: File) {
 
   window.setTimeout(() => URL.revokeObjectURL(blobUrl), 1000);
 }
+
+// Tells the user WHY the OS share sheet isn't available.
+function getShareSupportIssue(file: File): string | null {
+  if (typeof window !== "undefined" && !window.isSecureContext) {
+    return "This page is not opened over HTTPS, so the browser turns the share sheet off. Open the site with https:// (or localhost).";
+  }
+
+  if (typeof navigator === "undefined" || typeof navigator.share !== "function") {
+    return "This browser/OS has no file share sheet. It works on mobile browsers, Chrome/Edge on Windows, and Safari.";
+  }
+
+  if (typeof navigator.canShare === "function") {
+    try {
+      if (!navigator.canShare({ files: [file] })) {
+        return `This browser can't share ${file.type || "this file type"} files.`;
+      }
+    } catch {
+      return "This browser can't share this file.";
+    }
+  }
+
+  return null;
+}
+
+// Clipboard only accepts PNG images in most browsers, so convert if needed.
+async function fileToPngBlob(file: File): Promise<Blob> {
+  if (file.type === "image/png") {
+    return file;
+  }
+
+  const objectUrl = URL.createObjectURL(file);
+
+  try {
+    const image = await new Promise<HTMLImageElement>((resolve, reject) => {
+      const element = new Image();
+
+      element.onload = () => resolve(element);
+      element.onerror = () => reject(new Error("Couldn't read the image."));
+      element.src = objectUrl;
+    });
+
+    const canvas = document.createElement("canvas");
+
+    canvas.width = image.naturalWidth;
+    canvas.height = image.naturalHeight;
+
+    const context = canvas.getContext("2d");
+
+    if (!context) {
+      throw new Error("Couldn't prepare the image.");
+    }
+
+    context.drawImage(image, 0, 0);
+
+    return await new Promise<Blob>((resolve, reject) => {
+      canvas.toBlob(
+        (blob) => (blob ? resolve(blob) : reject(new Error("Couldn't convert the image."))),
+        "image/png",
+      );
+    });
+  } finally {
+    URL.revokeObjectURL(objectUrl);
+  }
+}
+
+async function copyImageToClipboard(file: File) {
+  if (!file.type.startsWith("image/")) {
+    throw new Error("Only images can be copied to the clipboard.");
+  }
+
+  if (!navigator.clipboard || typeof ClipboardItem === "undefined") {
+    throw new Error("Image copy needs HTTPS and a browser with clipboard support.");
+  }
+
+  const png = await fileToPngBlob(file);
+
+  await navigator.clipboard.write([new ClipboardItem({ "image/png": png })]);
+}
+
+const WEB_APP_URLS = {
+  whatsapp: "https://web.whatsapp.com/",
+  telegram: "https://web.telegram.org/",
+  gmail: "https://mail.google.com/mail/?view=cm&fs=1",
+} as const;
 
 function PropertyRow({ icon, label, value }: { icon: ReactNode; label: string; value: string }) {
   return (
@@ -676,6 +768,44 @@ export function PhotoMenu({
     } finally {
       setSendDialogSharing(false);
     }
+  }
+
+  // Desktop browsers without a file share sheet: copy the real image to the
+  // clipboard, then open the chosen web app so the user can paste (Ctrl/Cmd+V).
+  async function handleCopyImage(showToast = true) {
+    if (!sendFile) return false;
+
+    try {
+      await copyImageToClipboard(sendFile);
+
+      if (showToast) {
+        toast.success("Image copied", {
+          description: "Paste it in any chat or email with Ctrl/Cmd + V.",
+        });
+      }
+
+      return true;
+    } catch (error) {
+      console.error("Copy image failed:", error);
+
+      toast.error("Couldn't copy the image", {
+        description: error instanceof Error ? error.message : "Please try again.",
+      });
+
+      return false;
+    }
+  }
+
+  async function handleSendViaApp(app: keyof typeof WEB_APP_URLS) {
+    const copiedToClipboard = await handleCopyImage(false);
+
+    if (!copiedToClipboard) return;
+
+    window.open(WEB_APP_URLS[app], "_blank", "noopener,noreferrer");
+
+    toast.success("Image copied", {
+      description: "Open the chat and press Ctrl/Cmd + V to send it.",
+    });
   }
 
   function handleDownloadReadyFile() {
@@ -1250,6 +1380,10 @@ export function PhotoMenu({
       )
     : null;
 
+  const sendNativeOk = sendFile ? canShareFileNatively(sendFile) : false;
+  const sendIssueText = sendFile && !sendNativeOk ? getShareSupportIssue(sendFile) : null;
+  const sendIsImage = sendFile ? sendFile.type.startsWith("image/") : false;
+
   return (
     <>
       <div className="relative">
@@ -1418,7 +1552,7 @@ export function PhotoMenu({
           }
         }}
       >
-        <DialogContent className="sm:max-w-lg">
+        <DialogContent className="overflow-hidden sm:max-w-lg">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Share2 className="size-5" />
@@ -1428,8 +1562,8 @@ export function PhotoMenu({
             <DialogDescription>Anyone with this link can view the shared photo.</DialogDescription>
           </DialogHeader>
 
-          <div className="space-y-4">
-            <div className="rounded-xl border border-border bg-muted/40 p-4">
+          <div className="min-w-0 space-y-4">
+            <div className="min-w-0 rounded-xl border border-border bg-muted/40 p-4">
               <p className="truncate text-sm font-medium">
                 {photo.name || photo.fileName || "Photo"}
               </p>
@@ -1440,7 +1574,7 @@ export function PhotoMenu({
               </p>
             </div>
 
-            <div className="rounded-xl border border-border bg-background p-3">
+            <div className="min-w-0 rounded-xl border border-border bg-background p-3">
               <div className="flex min-w-0 items-center gap-2">
                 <input
                   value={shareUrl}
@@ -1503,7 +1637,7 @@ export function PhotoMenu({
           }
         }}
       >
-        <DialogContent className="sm:max-w-md">
+        <DialogContent className="overflow-hidden sm:max-w-md">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Send className="size-5" />
@@ -1511,16 +1645,18 @@ export function PhotoMenu({
             </DialogTitle>
 
             <DialogDescription>
-              {sendFile && canShareFileNatively(sendFile)
+              {sendNativeOk
                 ? sendIssue === "blocked"
                   ? "Your browser needs a fresh tap to open the share sheet. Tap Share and pick WhatsApp, Gmail, Telegram or any other app."
                   : "Tap Share and pick any app to send the actual file."
-                : "This browser can't open the share sheet for files. Download the copy and send it from your device."}
+                : `${sendIssueText ?? "This browser can't open the share sheet for files."}${
+                    sendIsImage ? " You can still send the image without downloading it:" : ""
+                  }`}
             </DialogDescription>
           </DialogHeader>
 
           {sendFile ? (
-            <div className="flex items-center gap-3 rounded-xl border border-border bg-muted/40 p-3">
+            <div className="flex min-w-0 items-center gap-3 rounded-xl border border-border bg-muted/40 p-3">
               {sendPreviewUrl ? (
                 <img
                   src={sendPreviewUrl}
@@ -1543,6 +1679,46 @@ export function PhotoMenu({
             </div>
           ) : null}
 
+          {!sendNativeOk && sendIsImage ? (
+            <div className="min-w-0 space-y-2">
+              <div className="grid grid-cols-3 gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => void handleSendViaApp("whatsapp")}
+                  className="h-auto flex-col gap-1 py-3 transition-transform active:scale-95"
+                >
+                  <MessageCircle className="size-5" />
+                  <span className="text-xs">WhatsApp</span>
+                </Button>
+
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => void handleSendViaApp("telegram")}
+                  className="h-auto flex-col gap-1 py-3 transition-transform active:scale-95"
+                >
+                  <Send className="size-5" />
+                  <span className="text-xs">Telegram</span>
+                </Button>
+
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => void handleSendViaApp("gmail")}
+                  className="h-auto flex-col gap-1 py-3 transition-transform active:scale-95"
+                >
+                  <Mail className="size-5" />
+                  <span className="text-xs">Gmail</span>
+                </Button>
+              </div>
+
+              <p className="text-xs text-muted-foreground">
+                The image is copied for you. In the chat, press Ctrl/Cmd + V to send it.
+              </p>
+            </div>
+          ) : null}
+
           <DialogFooter className="flex-col-reverse gap-2 sm:flex-row">
             <Button
               variant="outline"
@@ -1553,6 +1729,17 @@ export function PhotoMenu({
               Close
             </Button>
 
+            {!sendNativeOk && sendIsImage ? (
+              <Button
+                variant="outline"
+                onClick={() => void handleCopyImage()}
+                className="transition-transform active:scale-95"
+              >
+                <Copy className="size-4" />
+                Copy image
+              </Button>
+            ) : null}
+
             <Button
               variant="outline"
               onClick={handleDownloadReadyFile}
@@ -1562,7 +1749,7 @@ export function PhotoMenu({
               Download copy
             </Button>
 
-            {sendFile && canShareFileNatively(sendFile) ? (
+            {sendNativeOk ? (
               <Button
                 onClick={() => void handleShareReadyFile()}
                 disabled={sendDialogSharing}
