@@ -40,6 +40,7 @@ import {
 } from "@/components/ui/dialog";
 
 import {
+  createShare,
   movePhotoToFolder,
   renamePhoto,
   setFavorite,
@@ -392,94 +393,72 @@ export function PhotoMenu({
     }
   }
 
-  async function getPhotoFileForSharing() {
-    let downloadUrl = photo.downloadUrl || photo.url;
-
-    if (!downloadUrl) {
-      const response = await requestDownloadUrl(photo.photoId);
-      downloadUrl = response.downloadUrl;
-    }
-
-    if (!downloadUrl) {
-      throw new Error("The photo download URL was not available.");
-    }
-
-    const fileResponse = await fetch(downloadUrl, {
-      method: "GET",
-      cache: "no-store",
-    });
-
-    if (!fileResponse.ok) {
-      throw new Error("Couldn't load the photo for sharing.");
-    }
-
-    const blob = await fileResponse.blob();
-    const fileName = photo.originalFileName || photo.fileName || photo.name || "photo";
-
-    return new File([blob], fileName, {
-      type: photo.contentType || blob.type || "application/octet-stream",
-    });
-  }
-
-  async function sharePhotoFile(actionLabel: string) {
+  async function handleSendAsCopy() {
     if (sharing) return;
 
+    if (typeof navigator === "undefined" || typeof navigator.share !== "function") {
+      toast.error("File sharing is not supported in this browser", {
+        description: "Open the Photo App on a browser/device that supports file sharing.",
+      });
+      return;
+    }
+
     setSharing(true);
-    closeMenu();
 
     try {
-      const file = await getPhotoFileForSharing();
+      // Send as Copy must send the original file as a real attachment.
+      // It must NOT create a duplicate S3 object or DynamoDB photo record.
+      const response = await requestDownloadUrl(photo.photoId);
 
-      if (typeof navigator.share === "function") {
-        const canShareFile =
-          typeof navigator.canShare !== "function" || navigator.canShare({ files: [file] });
-
-        if (canShareFile) {
-          await navigator.share({
-            files: [file],
-            title: file.name,
-          });
-
-          toast.success(`${actionLabel} ready`, {
-            description:
-              "Choose WhatsApp, Email, Google Drive, Telegram or another app from the share sheet.",
-          });
-          return;
-        }
+      if (!response.downloadUrl) {
+        throw new Error("The photo file URL was not returned by the server.");
       }
 
-      // Web Share is unavailable on this browser/context. Download the
-      // actual file instead. Never create a database/S3 duplicate and never
-      // copy a share URL for Send as Copy.
-      const blob = file.slice(0, file.size, file.type);
-      const blobUrl = URL.createObjectURL(blob);
-      const anchor = document.createElement("a");
-      anchor.href = blobUrl;
-      anchor.download = file.name;
-      document.body.appendChild(anchor);
-      anchor.click();
-      anchor.remove();
-      window.setTimeout(() => URL.revokeObjectURL(blobUrl), 1000);
+      const fileResponse = await fetch(response.downloadUrl, {
+        method: "GET",
+        cache: "no-store",
+      });
 
-      toast.success(`${actionLabel} downloaded`, {
-        description: "This browser does not provide the native app share sheet.",
+      if (!fileResponse.ok) {
+        throw new Error("Couldn't load the photo for sharing.");
+      }
+
+      const blob = await fileResponse.blob();
+      const fileName = photo.originalFileName || photo.fileName || photo.name || "photo";
+
+      const file = new File([blob], fileName, {
+        type: photo.contentType || blob.type || "application/octet-stream",
+      });
+
+      const canShareFile =
+        typeof navigator.canShare !== "function" || navigator.canShare({ files: [file] });
+
+      if (!canShareFile) {
+        throw new Error("This browser cannot share files directly.");
+      }
+
+      await navigator.share({
+        files: [file],
+        title: fileName,
+      });
+
+      closeMenu();
+      toast.success("Photo ready to send", {
+        description: "Choose WhatsApp, Email, Telegram or another app from the share sheet.",
       });
     } catch (error) {
       if (error instanceof DOMException && error.name === "AbortError") {
         return;
       }
 
-      console.error(`${actionLabel} failed:`, error);
-      toast.error(`Couldn't ${actionLabel.toLowerCase()}`, {
+      console.error("Send as copy failed:", error);
+
+      toast.error("Couldn't send the photo", {
         description: error instanceof Error ? error.message : "Please try again.",
       });
     } finally {
       setSharing(false);
     }
-  }
-
-  async function handleSendAsCopy() {
-    await sharePhotoFile("Send as Copy");
   }
 
   async function handleFavorite() {
@@ -519,7 +498,35 @@ export function PhotoMenu({
   }
 
   async function handleShare() {
-    await sharePhotoFile("Share");
+    if (sharing) {
+      return;
+    }
+
+    setSharing(true);
+    closeMenu();
+
+    try {
+      const response = await createShare(photo.photoId);
+      const share = response.share;
+
+      const rawShareUrl = share.shareUrl || `/shared/${encodeURIComponent(share.token)}`;
+
+      const generatedShareUrl = new URL(rawShareUrl, window.location.origin).toString();
+
+      setShareUrl(generatedShareUrl);
+      setCopied(false);
+      setShareOpen(true);
+
+      toast.success("Share link created");
+    } catch (error) {
+      console.error("Share failed:", error);
+
+      toast.error("Share failed", {
+        description: error instanceof Error ? error.message : "Please try again.",
+      });
+    } finally {
+      setSharing(false);
+    }
   }
 
   async function handleCopyShareUrl() {
