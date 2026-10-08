@@ -434,29 +434,29 @@ export function PhotoMenu({
       });
 
       // Send as Copy means an actual file attachment, never a URL.
+      // On supported mobile/desktop browsers this opens the native OS
+      // share sheet, so WhatsApp, Gmail, Telegram and other installed
+      // apps can receive the actual copied file.
       if (typeof navigator.share === "function") {
-        const canShareFiles =
+        const canShareFile =
           typeof navigator.canShare !== "function" || navigator.canShare({ files: [file] });
 
-        if (canShareFiles) {
+        if (canShareFile) {
           await navigator.share({
             files: [file],
             title: fileName,
-            text: "Sent from Photo-App",
           });
 
           closeMenu();
           toast.success("Copy created and ready to send", {
-            description:
-              "Choose WhatsApp, Email, Telegram or any app shown by your device's share sheet.",
+            description: "Choose WhatsApp, Email, Telegram or another app from the share sheet.",
           });
           return;
         }
       }
 
-      // Desktop browsers that do not expose the native file share sheet
-      // cannot attach a local File to WhatsApp/Email programmatically.
-      // Download the real copied file instead of copying a URL.
+      // Some desktop browsers do not expose file sharing. Do not copy
+      // a link as a fallback because Send as Copy must remain a real file.
       const blobUrl = URL.createObjectURL(blob);
       const anchor = document.createElement("a");
       anchor.href = blobUrl;
@@ -469,7 +469,7 @@ export function PhotoMenu({
       closeMenu();
       toast.success("Copy created and downloaded", {
         description:
-          "Open your device share sheet to send the copied file to WhatsApp, Email or another app.",
+          "This browser does not provide a file share sheet, so the copied file was downloaded instead.",
       });
     } catch (error) {
       if (error instanceof DOMException && error.name === "AbortError") {

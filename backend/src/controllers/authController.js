@@ -3,7 +3,7 @@ const {
   loginUser,
   loginWithGoogle,
   logoutUser,
-  forceLogoutOtherSession,
+  forceLogoutActiveSession,
 } = require("../services/authService");
 
 const {
@@ -210,6 +210,9 @@ const googleLogin = async (
 
       redirectUri:
         frontendRedirect,
+
+      forceSession:
+        req.query.forceSession === "1",
     };
 
     const state =
@@ -340,6 +343,9 @@ const googleCallback = async (
       await loginWithGoogle({
         idToken:
           tokens.id_token,
+
+        forceSession:
+          Boolean(stateData?.forceSession),
       });
 
     /*
@@ -373,8 +379,9 @@ const googleCallback = async (
      * to the frontend.
      */
     if (
-      error?.code ===
-      "ACTIVE_SESSION_EXISTS"
+      (error?.code ===
+        "ACTIVE_SESSION" ||
+        error?.code === "ACTIVE_SESSION_EXISTS")
     ) {
       const errorUrl =
         new URL(
@@ -383,20 +390,13 @@ const googleCallback = async (
 
       errorUrl.searchParams.set(
         "error",
-        "ACTIVE_SESSION"
+        "ACTIVE_SESSION_EXISTS"
       );
 
       errorUrl.searchParams.set(
         "message",
         error.message
       );
-
-      if (error.takeoverToken) {
-        errorUrl.searchParams.set(
-          "takeoverToken",
-          error.takeoverToken
-        );
-      }
 
       return res.redirect(
         errorUrl.toString()
@@ -578,24 +578,58 @@ const resetPasswordController = async (req, res, next) => {
   }
 };
 
-const forceLogoutOtherSessionController = async (
+const forceLogout = async (
   req,
   res,
   next
 ) => {
   try {
-    const takeoverToken = String(req.body?.takeoverToken || "").trim();
+    const {
+      email,
+      password,
+    } = req.body || {};
 
-    if (!takeoverToken) {
+    const normalizedEmail =
+      String(email || "").trim().toLowerCase();
+
+    if (!normalizedEmail || !password) {
       return res.status(400).json({
         success: false,
-        message: "Login takeover request is missing. Please start login again.",
+        message: "Email and password are required",
       });
     }
 
-    const result = await forceLogoutOtherSession(takeoverToken);
+    // Verify the credentials first. Only the account owner can
+    // invalidate the currently active session.
+    await loginUser({
+      email: normalizedEmail,
+      password,
+    }).catch(async (error) => {
+      if (error?.code !== "ACTIVE_SESSION_EXISTS") {
+        throw error;
+      }
+    });
 
-    return res.status(200).json(result);
+    const userResult = await require("../services/dynamoService").findUserByEmail(
+      process.env.USERS_TABLE_NAME,
+      normalizedEmail
+    );
+
+    if (!userResult) {
+      return res.status(401).json({
+        success: false,
+        message: "Invalid email or password",
+      });
+    }
+
+    await forceLogoutActiveSession({
+      userId: userResult.userId,
+    });
+
+    return res.status(200).json({
+      success: true,
+      message: "Other active session has been logged out. You can log in now.",
+    });
   } catch (error) {
     next(error);
   }
@@ -633,7 +667,7 @@ module.exports = {
 
   logout,
 
-  forceLogoutOtherSessionController,
+  forceLogout,
 
   forgotPassword,
 

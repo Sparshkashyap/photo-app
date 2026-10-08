@@ -16,7 +16,7 @@ import { Label } from "@/components/ui/label";
 
 import { useAuth } from "@/hooks/useAuth";
 
-import { ApiError, forceLogoutOtherSession } from "@/services/api";
+import { ApiError, forceLogoutActiveSession } from "@/services/api";
 
 export const Route = createFileRoute("/login")({
   head: () => ({
@@ -55,15 +55,15 @@ function LoginPage() {
 
   const [activeSession, setActiveSession] = useState(false);
 
-  const [takeoverToken, setTakeoverToken] = useState<string | null>(null);
-
-  const [takeoverProvider, setTakeoverProvider] = useState<"google" | "password" | null>(null);
-
-  const [forceLoggingOut, setForceLoggingOut] = useState(false);
-
   const [submitting, setSubmitting] = useState(false);
 
   const [googleLoading, setGoogleLoading] = useState(false);
+
+  const [forceLogoutLoading, setForceLogoutLoading] = useState(false);
+
+  const [activeSessionProvider, setActiveSessionProvider] = useState<"password" | "google" | null>(
+    null,
+  );
 
   /*
    * ==================================================
@@ -102,22 +102,25 @@ function LoginPage() {
     }
 
     const oauthError = sessionStorage.getItem("photos.oauth.error");
-    const oauthTakeoverToken = sessionStorage.getItem("photos.oauth.takeoverToken");
 
-    if (oauthError) {
-      setFormError(oauthError);
+    if (!oauthError) {
+      return;
     }
 
-    if (oauthTakeoverToken) {
-      setTakeoverToken(oauthTakeoverToken);
-      setTakeoverProvider("google");
+    const oauthErrorCode = sessionStorage.getItem("photos.oauth.error.code");
+
+    if (
+      oauthErrorCode === "ACTIVE_SESSION_EXISTS" ||
+      oauthError.toLowerCase().includes("already logged in")
+    ) {
       setActiveSession(true);
-      sessionStorage.removeItem("photos.oauth.takeoverToken");
+      setActiveSessionProvider("google");
     }
 
-    if (oauthError) {
-      sessionStorage.removeItem("photos.oauth.error");
-    }
+    setFormError(oauthError);
+
+    sessionStorage.removeItem("photos.oauth.error");
+    sessionStorage.removeItem("photos.oauth.error.code");
   }, []);
 
   /*
@@ -146,8 +149,7 @@ function LoginPage() {
     setFormError(null);
 
     setActiveSession(false);
-    setTakeoverToken(null);
-    setTakeoverProvider(null);
+    setActiveSessionProvider(null);
 
     if (Object.keys(nextErrors).length > 0) {
       // Move focus to the first invalid field so keyboard/screen-reader
@@ -181,21 +183,9 @@ function LoginPage() {
           error.status === 409)
       ) {
         setActiveSession(true);
+        setActiveSessionProvider("password");
 
-        const nextTakeoverToken =
-          typeof error.details === "object" &&
-          error.details !== null &&
-          "takeoverToken" in error.details &&
-          typeof (error.details as { takeoverToken?: unknown }).takeoverToken === "string"
-            ? (error.details as { takeoverToken: string }).takeoverToken
-            : null;
-
-        setTakeoverToken(nextTakeoverToken);
-        setTakeoverProvider(nextTakeoverToken ? "password" : null);
-
-        setFormError(
-          "Your account is already active on another device. You can log out that session and continue here.",
-        );
+        setFormError("This account is already logged in on another device.");
       } else {
         setFormError(
           error instanceof Error
@@ -208,68 +198,83 @@ function LoginPage() {
     }
   }
 
-  async function handleForceLogoutAndContinue() {
-    if (!takeoverToken || forceLoggingOut) {
-      return;
-    }
-
-    setForceLoggingOut(true);
-    setFormError(null);
-
-    try {
-      await forceLogoutOtherSession(takeoverToken);
-      setTakeoverToken(null);
-      setActiveSession(false);
-      const provider = takeoverProvider;
-      setTakeoverProvider(null);
-      toast.success("Other device logged out");
-
-      if (provider === "google") {
-        setGoogleLoading(true);
-        await loginWithProvider("google");
-        return;
-      }
-
-      if (email.trim() && password) {
-        setSubmitting(true);
-        const user = await login({
-          email: email.trim().toLowerCase(),
-          password,
-        });
-        toast.success(`Welcome back, ${user.name.split(" ")[0]}`);
-        await navigate({ to: "/dashboard", replace: true });
-      }
-    } catch (error) {
-      setFormError(error instanceof Error ? error.message : "Unable to log out the other session.");
-    } finally {
-      setForceLoggingOut(false);
-      setSubmitting(false);
-    }
-  }
-
   /*
    * ==================================================
    * GOOGLE LOGIN
    * ==================================================
    */
 
-  async function handleGoogleLogin() {
-    if (googleLoading || submitting) {
+  async function handleGoogleLogin(forceSession = false) {
+    if (googleLoading || submitting || forceLogoutLoading) {
       return;
     }
 
     setFormError(null);
 
-    setActiveSession(false);
+    if (!forceSession) {
+      setActiveSession(false);
+      setActiveSessionProvider(null);
+    }
 
     setGoogleLoading(true);
 
     try {
-      await loginWithProvider("google");
+      await loginWithProvider("google", forceSession);
     } catch (error) {
       setGoogleLoading(false);
 
       setFormError(error instanceof Error ? error.message : "Unable to continue with Google.");
+    }
+  }
+
+  async function handleForceLogoutAndContinue() {
+    if (forceLogoutLoading || submitting || googleLoading) {
+      return;
+    }
+
+    if (activeSessionProvider === "google") {
+      await handleGoogleLogin(true);
+      return;
+    }
+
+    const normalizedEmail = email.trim().toLowerCase();
+
+    if (!EMAIL_PATTERN.test(normalizedEmail) || password.length < 8) {
+      setFormError("Enter your current email and password first, then use this button.");
+      return;
+    }
+
+    setForceLogoutLoading(true);
+    setFormError(null);
+
+    try {
+      await forceLogoutActiveSession({
+        email: normalizedEmail,
+        password,
+      });
+
+      const user = await login({
+        email: normalizedEmail,
+        password,
+      });
+
+      setActiveSession(false);
+      setActiveSessionProvider(null);
+
+      toast.success(`Welcome back, ${user.name.split(" ")[0]}`);
+
+      await navigate({
+        to: "/dashboard",
+        replace: true,
+      });
+    } catch (error) {
+      setFormError(
+        error instanceof Error
+          ? error.message
+          : "Unable to log out the other session. Please try again.",
+      );
+    } finally {
+      setForceLogoutLoading(false);
     }
   }
 
@@ -296,24 +301,6 @@ function LoginPage() {
       }
     >
       <div className="space-y-6">
-        {activeSession && takeoverToken ? (
-          <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-4">
-            <p className="text-sm font-semibold">Account already logged in</p>
-            <p className="mt-1 text-xs text-muted-foreground">
-              Log out the active session on the other device and continue here.
-            </p>
-            <Button
-              type="button"
-              className="mt-3 w-full"
-              disabled={forceLoggingOut || submitting}
-              onClick={() => void handleForceLogoutAndContinue()}
-            >
-              {forceLoggingOut ? <Loader2 className="mr-2 size-4 animate-spin" /> : null}
-              {forceLoggingOut ? "Logging out other device..." : "Log out other device & continue"}
-            </Button>
-          </div>
-        ) : null}
-
         {/* GOOGLE */}
 
         <Button
@@ -489,8 +476,26 @@ function LoginPage() {
               </p>
 
               <p className="mt-1 text-muted-foreground">
-                Your account is currently active on another device. Log out there and try again.
+                Your account is active on another device. You can log that session out and continue
+                here.
               </p>
+
+              <Button
+                type="button"
+                variant="outline"
+                className="mt-3 h-10 w-full rounded-lg border-amber-500/40 bg-background font-semibold hover:bg-amber-500/10"
+                disabled={forceLogoutLoading || submitting || googleLoading}
+                onClick={() => void handleForceLogoutAndContinue()}
+              >
+                {forceLogoutLoading || googleLoading ? (
+                  <Loader2 className="mr-2 size-4 animate-spin" />
+                ) : null}
+                {activeSessionProvider === "google"
+                  ? "Log out other session & continue with Google"
+                  : forceLogoutLoading
+                    ? "Logging out other session..."
+                    : "Log out other session & continue"}
+              </Button>
             </div>
           ) : null}
 

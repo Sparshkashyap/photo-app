@@ -270,32 +270,38 @@ export async function resetPassword(
   });
 }
 
-export async function loginWithOAuth(provider: OAuthProvider): Promise<void> {
+export async function loginWithOAuth(provider: OAuthProvider, forceSession = false): Promise<void> {
   if (!API_BASE_URL) {
     throw new ApiError("API URL is not configured.");
   }
 
   const deviceId = encodeURIComponent(getDeviceId());
 
-  const callbackUrl = `${window.location.origin}/login`;
+  const callbackUrl = `${window.location.origin}/dashboard`;
 
   const encodedCallback = encodeURIComponent(callbackUrl);
 
   window.location.assign(
-    `${API_BASE_URL}/auth/${provider}?deviceId=${deviceId}&redirectUri=${encodedCallback}`,
+    `${API_BASE_URL}/auth/${provider}?deviceId=${deviceId}&redirectUri=${encodedCallback}${forceSession ? "&forceSession=1" : ""}`,
   );
 }
 
-export async function forceLogoutOtherSession(takeoverToken: string): Promise<{
+export async function forceLogoutActiveSession(input: {
+  email: string;
+  password: string;
+}): Promise<{
   success: boolean;
   message?: string;
 }> {
   return request<{
     success: boolean;
     message?: string;
-  }>("/auth/force-logout-other-session", {
+  }>("/auth/force-logout", {
     method: "POST",
-    body: { takeoverToken },
+    body: {
+      email: input.email.trim().toLowerCase(),
+      password: input.password,
+    },
   });
 }
 

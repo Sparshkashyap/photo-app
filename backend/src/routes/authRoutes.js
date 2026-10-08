@@ -5,12 +5,12 @@ const {
   signup,
   login,
   logout,
+  forceLogout,
   forgotPassword,
   verifyResetOtp,
   resetPasswordController,
   googleLogin,
   googleCallback,
-  forceLogoutOtherSessionController,
 } = require("../controllers/authController");
 
 const authMiddleware =
@@ -42,8 +42,8 @@ router.post(
 );
 
 router.post(
-  "/force-logout-other-session",
-  forceLogoutOtherSessionController
+  "/force-logout",
+  forceLogout
 );
 
 router.post("/forgot-password", forgotPassword);
