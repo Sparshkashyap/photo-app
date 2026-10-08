@@ -1,5 +1,6 @@
 const bcrypt = require("bcryptjs");
 const crypto = require("crypto");
+const jwt = require("jsonwebtoken");
 
 const {
   OAuth2Client,
@@ -53,6 +54,52 @@ const createSessionToken = (
     userId,
     sessionId,
   });
+};
+
+const createSessionTakeoverToken = ({
+  userId,
+  email,
+}) => {
+  if (!process.env.JWT_SECRET) {
+    throw new Error("JWT_SECRET is not configured");
+  }
+
+  return jwt.sign(
+    {
+      purpose: "SESSION_TAKEOVER",
+      userId,
+      email,
+    },
+    process.env.JWT_SECRET,
+    { expiresIn: "10m" },
+  );
+};
+
+const forceLogoutOtherSession = async (takeoverToken) => {
+  if (!process.env.JWT_SECRET) {
+    throw new Error("JWT_SECRET is not configured");
+  }
+
+  let payload;
+  try {
+    payload = jwt.verify(takeoverToken, process.env.JWT_SECRET);
+  } catch {
+    const error = new Error("This login takeover request has expired. Please start login again.");
+    error.statusCode = 401;
+    error.code = "TAKEOVER_TOKEN_INVALID";
+    throw error;
+  }
+
+  if (payload?.purpose !== "SESSION_TAKEOVER" || !payload?.userId) {
+    const error = new Error("Invalid login takeover request. Please start login again.");
+    error.statusCode = 401;
+    error.code = "TAKEOVER_TOKEN_INVALID";
+    throw error;
+  }
+
+  await clearUserSession(USERS_TABLE, payload.userId);
+
+  return { success: true, message: "The previous session was logged out. You can continue here." };
 };
 
 const publicUser = (user) => ({
@@ -243,6 +290,10 @@ const loginUser = async ({
 
     error.code =
       "ACTIVE_SESSION_EXISTS";
+    error.takeoverToken = createSessionTakeoverToken({
+      userId: user.userId,
+      email: user.email,
+    });
 
     throw error;
   }
@@ -520,6 +571,8 @@ module.exports = {
   loginUser,
 
   loginWithGoogle,
+
+  forceLogoutOtherSession,
 
   logoutUser,
 };

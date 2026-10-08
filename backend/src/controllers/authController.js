@@ -3,6 +3,7 @@ const {
   loginUser,
   loginWithGoogle,
   logoutUser,
+  forceLogoutOtherSession,
 } = require("../services/authService");
 
 const {
@@ -373,7 +374,7 @@ const googleCallback = async (
      */
     if (
       error?.code ===
-      "ACTIVE_SESSION"
+      "ACTIVE_SESSION_EXISTS"
     ) {
       const errorUrl =
         new URL(
@@ -389,6 +390,13 @@ const googleCallback = async (
         "message",
         error.message
       );
+
+      if (error.takeoverToken) {
+        errorUrl.searchParams.set(
+          "takeoverToken",
+          error.takeoverToken
+        );
+      }
 
       return res.redirect(
         errorUrl.toString()
@@ -570,6 +578,29 @@ const resetPasswordController = async (req, res, next) => {
   }
 };
 
+const forceLogoutOtherSessionController = async (
+  req,
+  res,
+  next
+) => {
+  try {
+    const takeoverToken = String(req.body?.takeoverToken || "").trim();
+
+    if (!takeoverToken) {
+      return res.status(400).json({
+        success: false,
+        message: "Login takeover request is missing. Please start login again.",
+      });
+    }
+
+    const result = await forceLogoutOtherSession(takeoverToken);
+
+    return res.status(200).json(result);
+  } catch (error) {
+    next(error);
+  }
+};
+
 const logout = async (
   req,
   res,
@@ -601,6 +632,8 @@ module.exports = {
   login,
 
   logout,
+
+  forceLogoutOtherSessionController,
 
   forgotPassword,
 

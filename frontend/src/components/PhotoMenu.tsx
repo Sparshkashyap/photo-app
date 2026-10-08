@@ -401,23 +401,22 @@ export function PhotoMenu({
 
     try {
       // This endpoint creates a REAL duplicate in S3 + DynamoDB.
-      // Never use the normal download endpoint here because that points to
-      // the original object.
+      // Do not use the normal download endpoint here because that only
+      // returns the original file.
       const response = await requestCopyPhoto(photo.photoId);
       const copiedPhoto = response.photo;
-      const downloadUrl = copiedPhoto?.downloadUrl || copiedPhoto?.url;
 
-      if (!downloadUrl) {
+      if (!copiedPhoto?.downloadUrl) {
         throw new Error("The copied file URL was not returned by the server.");
       }
 
-      const fileResponse = await fetch(downloadUrl, {
+      const fileResponse = await fetch(copiedPhoto.downloadUrl, {
         method: "GET",
         cache: "no-store",
       });
 
       if (!fileResponse.ok) {
-        throw new Error("Couldn't download the copied file.");
+        throw new Error("Couldn't download the copied file for sharing.");
       }
 
       const blob = await fileResponse.blob();
@@ -434,42 +433,43 @@ export function PhotoMenu({
           copiedPhoto.contentType || photo.contentType || blob.type || "application/octet-stream",
       });
 
-      // Preferred path: native OS share sheet with the ACTUAL copied file.
-      // This is what Android/iOS and browsers supporting Web Share Level 2 use.
+      // Send as Copy means an actual file attachment, never a URL.
       if (typeof navigator.share === "function") {
-        const fileSharingSupported =
+        const canShareFiles =
           typeof navigator.canShare !== "function" || navigator.canShare({ files: [file] });
 
-        if (fileSharingSupported) {
+        if (canShareFiles) {
           await navigator.share({
             files: [file],
             title: fileName,
+            text: "Sent from Photo-App",
           });
 
           closeMenu();
           toast.success("Copy created and ready to send", {
-            description: "The actual copied file was attached to the share sheet.",
+            description:
+              "Choose WhatsApp, Email, Telegram or any app shown by your device's share sheet.",
           });
           return;
         }
       }
 
-      // Desktop browsers such as Chrome/Edge on Windows generally do not
-      // expose file sharing. Do NOT copy a URL here. Download the actual
-      // copied bytes so the user has the real file and can attach it anywhere.
-      const objectUrl = URL.createObjectURL(blob);
+      // Desktop browsers that do not expose the native file share sheet
+      // cannot attach a local File to WhatsApp/Email programmatically.
+      // Download the real copied file instead of copying a URL.
+      const blobUrl = URL.createObjectURL(blob);
       const anchor = document.createElement("a");
-      anchor.href = objectUrl;
+      anchor.href = blobUrl;
       anchor.download = fileName;
-      anchor.style.display = "none";
       document.body.appendChild(anchor);
       anchor.click();
       anchor.remove();
-      window.setTimeout(() => URL.revokeObjectURL(objectUrl), 1000);
+      window.setTimeout(() => URL.revokeObjectURL(blobUrl), 1000);
 
       closeMenu();
       toast.success("Copy created and downloaded", {
-        description: "The actual copied file was downloaded. No link was copied.",
+        description:
+          "Open your device share sheet to send the copied file to WhatsApp, Email or another app.",
       });
     } catch (error) {
       if (error instanceof DOMException && error.name === "AbortError") {

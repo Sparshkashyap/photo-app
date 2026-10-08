@@ -277,13 +277,26 @@ export async function loginWithOAuth(provider: OAuthProvider): Promise<void> {
 
   const deviceId = encodeURIComponent(getDeviceId());
 
-  const callbackUrl = `${window.location.origin}/dashboard`;
+  const callbackUrl = `${window.location.origin}/login`;
 
   const encodedCallback = encodeURIComponent(callbackUrl);
 
   window.location.assign(
     `${API_BASE_URL}/auth/${provider}?deviceId=${deviceId}&redirectUri=${encodedCallback}`,
   );
+}
+
+export async function forceLogoutOtherSession(takeoverToken: string): Promise<{
+  success: boolean;
+  message?: string;
+}> {
+  return request<{
+    success: boolean;
+    message?: string;
+  }>("/auth/force-logout-other-session", {
+    method: "POST",
+    body: { takeoverToken },
+  });
 }
 
 export async function logout(): Promise<{

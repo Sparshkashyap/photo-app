@@ -9,6 +9,10 @@ const errorHandler = (err, req, res, next) => {
       statusCode === 500
         ? "Internal server error"
         : err.message,
+    code: err.code,
+    details: err.takeoverToken
+      ? { takeoverToken: err.takeoverToken }
+      : undefined,
   });
 };
 

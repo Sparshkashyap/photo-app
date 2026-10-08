@@ -95,6 +95,8 @@ function clearOAuthQueryParams() {
 
   url.searchParams.delete("message");
 
+  url.searchParams.delete("takeoverToken");
+
   window.history.replaceState({}, document.title, url.pathname + url.search + url.hash);
 }
 
@@ -202,6 +204,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
            */
           if (typeof window !== "undefined") {
             sessionStorage.setItem("photos.oauth.error", oauthError.message || oauthError.error);
+
+            const takeoverToken = new URLSearchParams(window.location.search).get("takeoverToken");
+
+            if (takeoverToken) {
+              sessionStorage.setItem("photos.oauth.takeoverToken", takeoverToken);
+            }
           }
 
           clearOAuthQueryParams();
