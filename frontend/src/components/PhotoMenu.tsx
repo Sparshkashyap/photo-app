@@ -134,6 +134,165 @@ function getFolderName(photo: Photo, folders: Folder[]) {
   );
 }
 
+// ==================================================
+// SEND AS COPY HELPERS
+// ==================================================
+
+type ShareResult = "shared" | "cancelled" | "blocked" | "unsupported";
+
+const MIME_BY_EXTENSION: Record<string, string> = {
+  jpg: "image/jpeg",
+  jpeg: "image/jpeg",
+  png: "image/png",
+  gif: "image/gif",
+  webp: "image/webp",
+  avif: "image/avif",
+  heic: "image/heic",
+  heif: "image/heif",
+  bmp: "image/bmp",
+  svg: "image/svg+xml",
+  mp4: "video/mp4",
+  mov: "video/quicktime",
+  webm: "video/webm",
+  m4v: "video/x-m4v",
+  mp3: "audio/mpeg",
+  pdf: "application/pdf",
+};
+
+const EXTENSION_BY_MIME: Record<string, string> = {
+  "image/jpeg": "jpg",
+  "image/png": "png",
+  "image/gif": "gif",
+  "image/webp": "webp",
+  "image/avif": "avif",
+  "image/heic": "heic",
+  "image/heif": "heif",
+  "image/bmp": "bmp",
+  "image/svg+xml": "svg",
+  "video/mp4": "mp4",
+  "video/quicktime": "mov",
+  "video/webm": "webm",
+  "video/x-m4v": "m4v",
+  "audio/mpeg": "mp3",
+  "application/pdf": "pdf",
+};
+
+function normalizeMimeType(type?: string | null) {
+  const clean = (type ?? "").split(";")[0]?.trim().toLowerCase() ?? "";
+
+  // "image/jpg" is not a real MIME type. Browsers reject it in navigator.canShare().
+  if (clean === "image/jpg" || clean === "image/pjpeg") {
+    return "image/jpeg";
+  }
+
+  return clean;
+}
+
+function getFileExtension(name: string) {
+  const match = /\.([a-z0-9]+)$/i.exec(name);
+
+  return match?.[1]?.toLowerCase() ?? "";
+}
+
+// Builds a File that browsers accept in navigator.share({ files }).
+// canShare() returns false when the MIME type is wrong/generic or the
+// extension is missing, and then the app used to fall back to a download.
+function buildShareFile(
+  blob: Blob,
+  names: Array<string | undefined>,
+  types: Array<string | undefined | null>,
+): File {
+  let fileName = (names.find((name) => name && name.trim()) || "photo")
+    .trim()
+    .replace(/[\\/]/g, "-");
+
+  const extension = getFileExtension(fileName);
+
+  let mimeType = "";
+
+  for (const candidate of [...types, blob.type]) {
+    const normalized = normalizeMimeType(candidate);
+
+    if (normalized && normalized !== "application/octet-stream") {
+      mimeType = normalized;
+      break;
+    }
+  }
+
+  if (!mimeType && extension) {
+    mimeType = MIME_BY_EXTENSION[extension] || "";
+  }
+
+  if (!mimeType) {
+    mimeType = "application/octet-stream";
+  }
+
+  if (!extension && EXTENSION_BY_MIME[mimeType]) {
+    fileName = `${fileName}.${EXTENSION_BY_MIME[mimeType]}`;
+  }
+
+  return new File([blob], fileName, {
+    type: mimeType,
+    lastModified: Date.now(),
+  });
+}
+
+function canShareFileNatively(file: File) {
+  if (typeof navigator === "undefined" || typeof navigator.share !== "function") {
+    return false;
+  }
+
+  if (typeof navigator.canShare !== "function") {
+    return true;
+  }
+
+  try {
+    return navigator.canShare({ files: [file] });
+  } catch {
+    return false;
+  }
+}
+
+// Opens the OS share sheet with the real file (no URL, no title/text so that
+// WhatsApp / Telegram / Gmail receive only the image itself).
+// navigator.share() is called synchronously (before the first await) so it
+// still counts as part of the click when this runs from a button handler.
+async function shareFileNatively(file: File): Promise<ShareResult> {
+  if (!canShareFileNatively(file)) {
+    return "unsupported";
+  }
+
+  try {
+    await navigator.share({ files: [file] });
+
+    return "shared";
+  } catch (error) {
+    if (error instanceof DOMException && error.name === "AbortError") {
+      return "cancelled";
+    }
+
+    // Usually NotAllowedError: the browser only allows share() right after a
+    // tap, and the copy + download took too long, so the tap "expired".
+    console.error("navigator.share failed:", error);
+
+    return "blocked";
+  }
+}
+
+function downloadFileLocally(file: File) {
+  const blobUrl = URL.createObjectURL(file);
+  const anchor = document.createElement("a");
+
+  anchor.href = blobUrl;
+  anchor.download = file.name;
+
+  document.body.appendChild(anchor);
+  anchor.click();
+  anchor.remove();
+
+  window.setTimeout(() => URL.revokeObjectURL(blobUrl), 1000);
+}
+
 function PropertyRow({ icon, label, value }: { icon: ReactNode; label: string; value: string }) {
   return (
     <div className="flex items-start gap-3 rounded-xl border border-border/70 bg-background/50 px-3 py-2.5 transition-colors hover:bg-background/80">
@@ -182,6 +341,12 @@ export function PhotoMenu({
   const [generatingCaption, setGeneratingCaption] = useState(false);
   const [copied, setCopied] = useState(false);
 
+  const [sendingCopy, setSendingCopy] = useState(false);
+  const [sendFile, setSendFile] = useState<File | null>(null);
+  const [sendPreviewUrl, setSendPreviewUrl] = useState<string | null>(null);
+  const [sendIssue, setSendIssue] = useState<"blocked" | "unsupported">("blocked");
+  const [sendDialogSharing, setSendDialogSharing] = useState(false);
+
   const [isFavorite, setIsFavorite] = useState(photo.isFavorite === true);
 
   const [dimensions, setDimensions] = useState<{
@@ -203,6 +368,21 @@ export function PhotoMenu({
   useEffect(() => {
     setIsFavorite(photo.isFavorite === true);
   }, [photo.isFavorite]);
+
+  useEffect(() => {
+    if (!sendFile || !sendFile.type.startsWith("image/")) {
+      setSendPreviewUrl(null);
+      return;
+    }
+
+    const url = URL.createObjectURL(sendFile);
+
+    setSendPreviewUrl(url);
+
+    return () => {
+      URL.revokeObjectURL(url);
+    };
+  }, [sendFile]);
 
   useEffect(() => {
     if (!menuOpen) {
@@ -393,72 +573,117 @@ export function PhotoMenu({
     }
   }
 
-  async function handleSendAsCopy() {
-    if (sharing) return;
+  // Downloads the original through the existing /download endpoint and
+  // wraps it in a File the browser accepts for navigator.share({ files }).
+  async function fetchShareFile(): Promise<File> {
+    const response = await requestDownloadUrl(photo.photoId);
 
-    if (typeof navigator === "undefined" || typeof navigator.share !== "function") {
-      toast.error("File sharing is not supported in this browser", {
-        description: "Open the Photo App on a browser/device that supports file sharing.",
-      });
-      return;
+    if (!response.downloadUrl) {
+      throw new Error("The file URL was not returned by the server.");
     }
 
-    setSharing(true);
+    const fileResponse = await fetch(response.downloadUrl, {
+      method: "GET",
+      cache: "no-store",
+    });
+
+    if (!fileResponse.ok) {
+      throw new Error("Couldn't download the file for sharing.");
+    }
+
+    const blob = await fileResponse.blob();
+
+    return buildShareFile(
+      blob,
+      [photo.originalFileName, photo.fileName, photo.name],
+      [photo.contentType],
+    );
+  }
+
+  async function handleSendAsCopy() {
+    if (sendingCopy) return;
+
+    setSendingCopy(true);
+
+    const toastId = toast.loading("Preparing a copy to send...");
 
     try {
-      // Send as Copy must send the original file as a real attachment.
-      // It must NOT create a duplicate S3 object or DynamoDB photo record.
-      const response = await requestDownloadUrl(photo.photoId);
+      const file = await fetchShareFile();
 
-      if (!response.downloadUrl) {
-        throw new Error("The photo file URL was not returned by the server.");
-      }
+      toast.dismiss(toastId);
 
-      const fileResponse = await fetch(response.downloadUrl, {
-        method: "GET",
-        cache: "no-store",
-      });
+      // First try: open the OS share sheet straight away with the real file.
+      const result = await shareFileNatively(file);
 
-      if (!fileResponse.ok) {
-        throw new Error("Couldn't load the photo for sharing.");
-      }
+      if (result === "shared") {
+        closeMenu();
 
-      const blob = await fileResponse.blob();
-      const fileName = photo.originalFileName || photo.fileName || photo.name || "photo";
+        toast.success("Copy shared");
 
-      const file = new File([blob], fileName, {
-        type: photo.contentType || blob.type || "application/octet-stream",
-      });
-
-      const canShareFile =
-        typeof navigator.canShare !== "function" || navigator.canShare({ files: [file] });
-
-      if (!canShareFile) {
-        throw new Error("This browser cannot share files directly.");
-      }
-
-      await navigator.share({
-        files: [file],
-        title: fileName,
-      });
-
-      closeMenu();
-      toast.success("Photo ready to send", {
-        description: "Choose WhatsApp, Email, Telegram or another app from the share sheet.",
-      });
-    } catch (error) {
-      if (error instanceof DOMException && error.name === "AbortError") {
         return;
       }
 
+      if (result === "cancelled") {
+        closeMenu();
+
+        return;
+      }
+
+      // The browser refused to open the share sheet from here (tap expired,
+      // or no file-share support). Do NOT silently download: show a "ready"
+      // dialog whose Share button is a fresh tap.
+      closeMenu();
+
+      setSendIssue(result);
+      setSendFile(file);
+    } catch (error) {
+      toast.dismiss(toastId);
+
       console.error("Send as copy failed:", error);
 
-      toast.error("Couldn't send the photo", {
+      toast.error("Couldn't send the copied file", {
         description: error instanceof Error ? error.message : "Please try again.",
       });
     } finally {
-      setSharing(false);
+      setSendingCopy(false);
     }
+  }
+
+  async function handleShareReadyFile() {
+    if (!sendFile || sendDialogSharing) return;
+
+    setSendDialogSharing(true);
+
+    try {
+      // Called directly from the button tap, so the browser allows the sheet.
+      const result = await shareFileNatively(sendFile);
+
+      if (result === "shared") {
+        setSendFile(null);
+
+        toast.success("Copy shared");
+
+        return;
+      }
+
+      if (result === "blocked" || result === "unsupported") {
+        setSendIssue(result);
+
+        toast.error("Couldn't open the share sheet", {
+          description: "Use Download copy, then send the file from your device.",
+        });
+      }
+    } finally {
+      setSendDialogSharing(false);
+    }
+  }
+
+  function handleDownloadReadyFile() {
+    if (!sendFile) return;
+
+    downloadFileLocally(sendFile);
+
+    toast.success("Copy downloaded");
   }
 
   async function handleFavorite() {
@@ -505,20 +730,54 @@ export function PhotoMenu({
     setSharing(true);
     closeMenu();
 
+    const toastId = toast.loading("Preparing file to share...");
+
     try {
+      // Share the actual media file so the OS share sheet can offer
+      // WhatsApp, Gmail, Telegram, Drive and other installed apps.
+      const file = await fetchShareFile();
+
+      toast.dismiss(toastId);
+
+      const result = await shareFileNatively(file);
+
+      if (result === "shared") {
+        toast.success("Photo shared");
+        return;
+      }
+
+      if (result === "cancelled") {
+        return;
+      }
+
+      if (result === "blocked") {
+        // The browser supports file sharing but needs a fresh tap.
+        setSendIssue("blocked");
+        setSendFile(file);
+        return;
+      }
+
+      // "unsupported": this browser cannot share files at all, so fall back
+      // to the secure share-link dialog.
       const response = await createShare(photo.photoId);
       const share = response.share;
-
       const rawShareUrl = share.shareUrl || `/shared/${encodeURIComponent(share.token)}`;
-
       const generatedShareUrl = new URL(rawShareUrl, window.location.origin).toString();
 
       setShareUrl(generatedShareUrl);
       setCopied(false);
       setShareOpen(true);
 
-      toast.success("Share link created");
+      toast.info("Native app sharing is not supported in this browser", {
+        description: "Use the Share button in the dialog to copy the secure share link.",
+      });
     } catch (error) {
+      toast.dismiss(toastId);
+
+      if (error instanceof DOMException && error.name === "AbortError") {
+        return;
+      }
+
       console.error("Share failed:", error);
 
       toast.error("Share failed", {
@@ -907,15 +1166,15 @@ export function PhotoMenu({
             role="menuitem"
             tabIndex={-1}
             onClick={() => void handleSendAsCopy()}
-            disabled={sharing}
+            disabled={sendingCopy}
             className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm transition-colors duration-100 hover:bg-accent focus:bg-accent focus:outline-none disabled:cursor-not-allowed disabled:opacity-60"
           >
-            {sharing ? (
+            {sendingCopy ? (
               <Loader2 className="size-4 shrink-0 animate-spin text-muted-foreground" />
             ) : (
               <Send className="size-4 shrink-0 text-muted-foreground" />
             )}
-            <span>{sharing ? "Preparing file..." : "Send as Copy"}</span>
+            <span>{sendingCopy ? "Preparing file..." : "Send as Copy"}</span>
           </button>
 
           <button
@@ -1232,6 +1491,91 @@ export function PhotoMenu({
             >
               {copied ? "Copied" : "Copy link"}
             </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={sendFile !== null}
+        onOpenChange={(open) => {
+          if (!open && !sendDialogSharing) {
+            setSendFile(null);
+          }
+        }}
+      >
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Send className="size-5" />
+              Ready to share
+            </DialogTitle>
+
+            <DialogDescription>
+              {sendFile && canShareFileNatively(sendFile)
+                ? sendIssue === "blocked"
+                  ? "Your browser needs a fresh tap to open the share sheet. Tap Share and pick WhatsApp, Gmail, Telegram or any other app."
+                  : "Tap Share and pick any app to send the actual file."
+                : "This browser can't open the share sheet for files. Download the copy and send it from your device."}
+            </DialogDescription>
+          </DialogHeader>
+
+          {sendFile ? (
+            <div className="flex items-center gap-3 rounded-xl border border-border bg-muted/40 p-3">
+              {sendPreviewUrl ? (
+                <img
+                  src={sendPreviewUrl}
+                  alt=""
+                  className="size-16 shrink-0 rounded-lg object-cover"
+                />
+              ) : (
+                <span className="flex size-16 shrink-0 items-center justify-center rounded-lg bg-muted text-muted-foreground">
+                  <FileText className="size-6" />
+                </span>
+              )}
+
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-sm font-medium">{sendFile.name}</p>
+
+                <p className="mt-0.5 text-xs text-muted-foreground">
+                  {formatFileSize(sendFile.size)} · {sendFile.type || "file"}
+                </p>
+              </div>
+            </div>
+          ) : null}
+
+          <DialogFooter className="flex-col-reverse gap-2 sm:flex-row">
+            <Button
+              variant="outline"
+              onClick={() => setSendFile(null)}
+              disabled={sendDialogSharing}
+              className="transition-transform active:scale-95"
+            >
+              Close
+            </Button>
+
+            <Button
+              variant="outline"
+              onClick={handleDownloadReadyFile}
+              className="transition-transform active:scale-95"
+            >
+              <Download className="size-4" />
+              Download copy
+            </Button>
+
+            {sendFile && canShareFileNatively(sendFile) ? (
+              <Button
+                onClick={() => void handleShareReadyFile()}
+                disabled={sendDialogSharing}
+                className="transition-transform active:scale-95"
+              >
+                {sendDialogSharing ? (
+                  <Loader2 className="size-4 animate-spin" />
+                ) : (
+                  <Share2 className="size-4" />
+                )}
+                Share
+              </Button>
+            ) : null}
           </DialogFooter>
         </DialogContent>
       </Dialog>
