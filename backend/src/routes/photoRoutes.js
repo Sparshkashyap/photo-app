@@ -12,7 +12,6 @@ const {
   updatePhotoCaption,
   movePhoto,
   downloadPhoto,
-  sendCopyPhoto,
   trashPhoto,
   restorePhoto,
   toggleFavorite,
@@ -89,17 +88,6 @@ router.get(
   "/:photoId/download",
   authMiddleware,
   downloadPhoto,
-);
-
-// ==================================================
-// SEND AS COPY
-// ==================================================
-
-// GET /photos/:photoId/copy
-router.get(
-  "/:photoId/copy",
-  authMiddleware,
-  sendCopyPhoto,
 );
 
 // ==================================================

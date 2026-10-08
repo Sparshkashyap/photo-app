@@ -47,7 +47,6 @@ import {
   trashPhoto,
   generatePhotoCaption,
   requestDownloadUrl,
-  requestCopyPhoto,
 } from "@/services/api";
 
 import type { Folder } from "@/types/folder";
@@ -397,79 +396,55 @@ export function PhotoMenu({
   async function handleSendAsCopy() {
     if (sharing) return;
 
+    if (typeof navigator === "undefined" || typeof navigator.share !== "function") {
+      toast.error("File sharing is not supported in this browser", {
+        description: "Open the Photo App on a browser/device that supports file sharing.",
+      });
+      return;
+    }
+
     setSharing(true);
 
     try {
-      // This endpoint creates a REAL duplicate in S3 + DynamoDB.
-      // Do not use the normal download endpoint here because that only
-      // returns the original file.
-      const response = await requestCopyPhoto(photo.photoId);
-      const copiedPhoto = response.photo;
+      // Send as Copy must send the original file as a real attachment.
+      // It must NOT create a duplicate S3 object or DynamoDB photo record.
+      const response = await requestDownloadUrl(photo.photoId);
 
-      if (!copiedPhoto?.downloadUrl) {
-        throw new Error("The copied file URL was not returned by the server.");
+      if (!response.downloadUrl) {
+        throw new Error("The photo file URL was not returned by the server.");
       }
 
-      const fileResponse = await fetch(copiedPhoto.downloadUrl, {
+      const fileResponse = await fetch(response.downloadUrl, {
         method: "GET",
         cache: "no-store",
       });
 
       if (!fileResponse.ok) {
-        throw new Error("Couldn't download the copied file for sharing.");
+        throw new Error("Couldn't load the photo for sharing.");
       }
 
       const blob = await fileResponse.blob();
-      const fileName =
-        copiedPhoto.originalFileName ||
-        copiedPhoto.fileName ||
-        photo.originalFileName ||
-        photo.fileName ||
-        photo.name ||
-        "photo";
+      const fileName = photo.originalFileName || photo.fileName || photo.name || "photo";
 
       const file = new File([blob], fileName, {
-        type:
-          copiedPhoto.contentType || photo.contentType || blob.type || "application/octet-stream",
+        type: photo.contentType || blob.type || "application/octet-stream",
       });
 
-      // Send as Copy means an actual file attachment, never a URL.
-      // On supported mobile/desktop browsers this opens the native OS
-      // share sheet, so WhatsApp, Gmail, Telegram and other installed
-      // apps can receive the actual copied file.
-      if (typeof navigator.share === "function") {
-        const canShareFile =
-          typeof navigator.canShare !== "function" || navigator.canShare({ files: [file] });
+      const canShareFile =
+        typeof navigator.canShare !== "function" || navigator.canShare({ files: [file] });
 
-        if (canShareFile) {
-          await navigator.share({
-            files: [file],
-            title: fileName,
-          });
-
-          closeMenu();
-          toast.success("Copy created and ready to send", {
-            description: "Choose WhatsApp, Email, Telegram or another app from the share sheet.",
-          });
-          return;
-        }
+      if (!canShareFile) {
+        throw new Error("This browser cannot share files directly.");
       }
 
-      // Some desktop browsers do not expose file sharing. Do not copy
-      // a link as a fallback because Send as Copy must remain a real file.
-      const blobUrl = URL.createObjectURL(blob);
-      const anchor = document.createElement("a");
-      anchor.href = blobUrl;
-      anchor.download = fileName;
-      document.body.appendChild(anchor);
-      anchor.click();
-      anchor.remove();
-      window.setTimeout(() => URL.revokeObjectURL(blobUrl), 1000);
+      await navigator.share({
+        files: [file],
+        title: fileName,
+      });
 
       closeMenu();
-      toast.success("Copy created and downloaded", {
-        description:
-          "This browser does not provide a file share sheet, so the copied file was downloaded instead.",
+      toast.success("Photo ready to send", {
+        description: "Choose WhatsApp, Email, Telegram or another app from the share sheet.",
       });
     } catch (error) {
       if (error instanceof DOMException && error.name === "AbortError") {
@@ -478,7 +453,7 @@ export function PhotoMenu({
 
       console.error("Send as copy failed:", error);
 
-      toast.error("Couldn't send the copied file", {
+      toast.error("Couldn't send the photo", {
         description: error instanceof Error ? error.message : "Please try again.",
       });
     } finally {
