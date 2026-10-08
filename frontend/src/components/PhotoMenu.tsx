@@ -393,62 +393,99 @@ export function PhotoMenu({
     }
   }
 
+  async function getFileForNativeShare(
+    downloadUrl: string,
+    fileName: string,
+    contentType?: string,
+  ) {
+    const fileResponse = await fetch(downloadUrl, {
+      method: "GET",
+      cache: "no-store",
+    });
+
+    if (!fileResponse.ok) {
+      throw new Error("Couldn't download the file for sharing.");
+    }
+
+    const blob = await fileResponse.blob();
+
+    return new File([blob], fileName, {
+      type: contentType || blob.type || "application/octet-stream",
+    });
+  }
+
+  function supportsNativeFileShare(file: File) {
+    if (typeof navigator === "undefined" || typeof navigator.share !== "function") {
+      return false;
+    }
+
+    if (typeof navigator.canShare === "function") {
+      return navigator.canShare({ files: [file] });
+    }
+
+    return true;
+  }
+
+  async function downloadBlobAsFile(blob: Blob, fileName: string) {
+    const blobUrl = URL.createObjectURL(blob);
+    const anchor = document.createElement("a");
+    anchor.href = blobUrl;
+    anchor.download = fileName;
+    document.body.appendChild(anchor);
+    anchor.click();
+    anchor.remove();
+    window.setTimeout(() => URL.revokeObjectURL(blobUrl), 1000);
+  }
+
   async function handleSendAsCopy() {
     if (sharing) return;
 
     setSharing(true);
 
     try {
-      if (typeof navigator.share !== "function") {
-        throw new Error(
-          "Native file sharing is not supported in this browser. Please use a supported browser or device.",
-        );
-      }
-
+      // This endpoint creates a REAL duplicate in S3 + DynamoDB.
       const response = await requestDownloadUrl(photo.photoId);
+      const copiedPhoto = { ...photo, downloadUrl: response.downloadUrl };
 
-      if (!response.downloadUrl) {
-        throw new Error("The photo file URL was not returned by the server.");
+      if (!copiedPhoto?.downloadUrl) {
+        throw new Error("The copied file URL was not returned by the server.");
       }
 
-      const fileResponse = await fetch(response.downloadUrl, {
-        method: "GET",
-        cache: "no-store",
-      });
+      const fileName =
+        copiedPhoto.originalFileName ||
+        copiedPhoto.fileName ||
+        photo.originalFileName ||
+        photo.fileName ||
+        photo.name ||
+        "photo";
 
-      if (!fileResponse.ok) {
-        throw new Error("Couldn't prepare the photo for sharing.");
+      const file = await getFileForNativeShare(
+        copiedPhoto.downloadUrl,
+        fileName,
+        copiedPhoto.contentType || photo.contentType,
+      );
+
+      if (supportsNativeFileShare(file)) {
+        await navigator.share({ files: [file], title: fileName });
+        closeMenu();
+        toast.success("Copy created and shared");
+        return;
       }
 
-      const blob = await fileResponse.blob();
-      const fileName = photo.originalFileName || photo.fileName || photo.name || "photo";
-
-      const file = new File([blob], fileName, {
-        type: photo.contentType || blob.type || "application/octet-stream",
-      });
-
-      if (typeof navigator.canShare === "function" && !navigator.canShare({ files: [file] })) {
-        throw new Error(
-          "This browser cannot share files. Please use a supported browser or device.",
-        );
-      }
-
-      // Share the ORIGINAL file through the device/browser native share sheet.
-      // No S3 copy and no DynamoDB record are created by this action.
-      await navigator.share({
-        files: [file],
-        title: fileName,
-      });
-
+      // Never copy a URL for Send as Copy. If the browser has no native
+      // file-share sheet, keep the feature useful by downloading the real copy.
+      await downloadBlobAsFile(file, fileName);
       closeMenu();
+      toast.success("Copy created and downloaded", {
+        description: "Your browser does not provide the native app share sheet.",
+      });
     } catch (error) {
       if (error instanceof DOMException && error.name === "AbortError") {
         return;
       }
 
       console.error("Send as copy failed:", error);
-
-      toast.error("Couldn't share the photo", {
+      toast.error("Couldn't send the copied file", {
         description: error instanceof Error ? error.message : "Please try again.",
       });
     } finally {
@@ -501,21 +538,44 @@ export function PhotoMenu({
     closeMenu();
 
     try {
+      // Share the actual media file so the browser's native OS share sheet
+      // can offer WhatsApp, Gmail, Telegram, Google Drive and other installed apps.
+      const downloadResponse = await requestDownloadUrl(photo.photoId);
+      const fileName = photo.originalFileName || photo.fileName || photo.name || "photo";
+      const file = await getFileForNativeShare(
+        downloadResponse.downloadUrl,
+        fileName,
+        photo.contentType,
+      );
+
+      if (supportsNativeFileShare(file)) {
+        await navigator.share({
+          files: [file],
+          title: fileName,
+        });
+        toast.success("Photo shared");
+        return;
+      }
+
+      // If this browser cannot show an OS file-share sheet, preserve the
+      // existing web-share link flow instead of showing a misleading error.
       const response = await createShare(photo.photoId);
       const share = response.share;
-
       const rawShareUrl = share.shareUrl || `/shared/${encodeURIComponent(share.token)}`;
-
       const generatedShareUrl = new URL(rawShareUrl, window.location.origin).toString();
 
       setShareUrl(generatedShareUrl);
       setCopied(false);
       setShareOpen(true);
-
-      toast.success("Share link created");
+      toast.info("Native app sharing is not supported in this browser", {
+        description: "Use the Share button in the dialog to copy the secure share link.",
+      });
     } catch (error) {
-      console.error("Share failed:", error);
+      if (error instanceof DOMException && error.name === "AbortError") {
+        return;
+      }
 
+      console.error("Share failed:", error);
       toast.error("Share failed", {
         description: error instanceof Error ? error.message : "Please try again.",
       });
